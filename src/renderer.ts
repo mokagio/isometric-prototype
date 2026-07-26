@@ -1,50 +1,51 @@
-import { HALF_H, HALF_W, TILE, type Tileset } from "./tileset";
+import { DRAW, project, SX, SY, SZ, type Origin } from "./iso";
+import type { Tileset } from "./tileset";
 import type { World } from "./world";
 
-// Whole-tile pixel zoom. Keeps the 48px art chunky and readable.
-export const ZOOM = 2;
-
-const DRAW = TILE * ZOOM;
-const STEP_X = HALF_W * ZOOM;
-const STEP_Y = HALF_H * ZOOM;
-
-/** Tiles needed each side of centre to cover a viewport of the given size. */
+/** Tiles per side needed to cover a viewport, with margin for the raised terrain. */
 export function gridSizeFor(viewW: number, viewH: number): { cols: number; rows: number } {
-  // Vertical is the tighter constraint (half-height is half the half-width),
-  // and a diamond field leaves triangular gaps at the rect corners, so pad.
-  const span = Math.ceil(Math.max(viewW / STEP_X, viewH / STEP_Y)) + 6;
+  // A diamond-shaped map leaves triangular gaps at the rectangle's corners, so
+  // oversize it: half-width plus half-height in tiles covers the far corners,
+  // with extra for the raised terrain climbing up the screen.
+  const span = Math.ceil(viewW / (2 * SX) + viewH / (2 * SY)) + 8;
   return { cols: span, rows: span };
+}
+
+/** Places the map's centre column near the viewport centre. */
+export function originFor(world: World, viewW: number, viewH: number): Origin {
+  const cCol = world.cols / 2;
+  const cRow = world.rows / 2;
+  return {
+    x: viewW / 2 - (cCol - cRow) * SX,
+    y: viewH / 2 - (cCol + cRow) * SY + world.cell(cCol | 0, cRow | 0).height * SZ * 0.5,
+  };
 }
 
 export function render(
   ctx: CanvasRenderingContext2D,
   tileset: Tileset,
   world: World,
+  origin: Origin,
   viewW: number,
   viewH: number,
 ): void {
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, viewW, viewH);
 
-  // Place the map's centre tile at the viewport centre.
-  const cCol = world.cols / 2;
-  const cRow = world.rows / 2;
-  const originX = viewW / 2 - (cCol - cRow) * STEP_X;
-  const originY = viewH / 2 - (cCol + cRow) * STEP_Y;
-
-  // Back-to-front: iterating row-major, col-minor is the painter's order for an
-  // iso grid, so each block's skirt is overdrawn by the tile in front of it.
+  // Back-to-front: row-major then col-minor is the painter's order for the iso
+  // grid; within a column, bottom cube first so caps land on top of their body.
   for (let row = 0; row < world.rows; row++) {
     for (let col = 0; col < world.cols; col++) {
-      const apexX = originX + (col - row) * STEP_X;
-      const apexY = originY + (col + row) * STEP_Y;
-      const drawX = apexX - STEP_X; // sprite is DRAW wide; apex sits at its mid-x
-      const drawY = apexY;
-      if (drawX > viewW || drawX + DRAW < 0 || drawY > viewH || drawY + DRAW < 0) {
-        continue;
+      const cell = world.cells[row]![col]!;
+      for (let z = 0; z <= cell.height; z++) {
+        const tile = z === cell.height ? cell.surface : world.body;
+        const apex = project(col, row, z, origin);
+        const drawX = apex.x - SX;
+        const drawY = apex.y;
+        if (drawX > viewW || drawX + DRAW < 0 || drawY > viewH || drawY + DRAW < 0) continue;
+        const [sx, sy, sw, sh] = tileset.rect(...tile);
+        ctx.drawImage(tileset.image, sx, sy, sw, sh, drawX, drawY, DRAW, DRAW);
       }
-      const [sx, sy, sw, sh] = tileset.rect(...world.at(col, row));
-      ctx.drawImage(tileset.image, sx, sy, sw, sh, drawX, drawY, DRAW, DRAW);
     }
   }
 }

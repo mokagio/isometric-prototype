@@ -1,6 +1,6 @@
 import { loadTileset } from "./tileset";
 import { generateWorld } from "./world";
-import { gridSizeFor, render } from "./renderer";
+import { gridSizeFor, originFor, render } from "./renderer";
 import tilesheetUrl from "../isometric_fantasy_tiles.png";
 
 async function main(): Promise<void> {
@@ -21,7 +21,8 @@ async function main(): Promise<void> {
 
     const { cols, rows } = gridSizeFor(viewW, viewH);
     const world = generateWorld(cols, rows);
-    render(ctx, tileset, world, viewW, viewH);
+    const origin = originFor(world, viewW, viewH);
+    render(ctx, tileset, world, origin, viewW, viewH);
   }
 
   draw();
