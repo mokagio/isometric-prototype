@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Whispering Woods</title>
     <style>
+      :root {
+        --ww-inset: 16px; /* gap from the screen edge, shared by every overlay */
+        --ww-btn: 54px; /* menu and attack buttons, borders included */
+        --ww-stick: 144px;
+      }
       html, body {
         margin: 0;
         height: 100%;
@@ -21,8 +26,8 @@
 
       .ww-menu {
         position: fixed;
-        top: 16px;
-        right: 16px;
+        top: var(--ww-inset);
+        right: var(--ww-inset);
         display: flex;
         flex-direction: column;
         align-items: flex-end;
@@ -30,8 +35,9 @@
         user-select: none;
       }
       .ww-menu-btn {
-        width: 48px;
-        height: 48px;
+        box-sizing: border-box;
+        width: var(--ww-btn);
+        height: var(--ww-btn);
         display: grid;
         place-items: center;
         font-size: 22px;
@@ -97,11 +103,11 @@
          checked against the well's half-width without unpacking the borders. */
       .ww-stick {
         position: fixed;
-        left: 16px;
-        bottom: 16px;
+        left: var(--ww-inset);
+        bottom: var(--ww-inset);
         box-sizing: border-box;
-        width: 144px;
-        height: 144px;
+        width: var(--ww-stick);
+        height: var(--ww-stick);
         display: grid;
         place-items: center;
         touch-action: none;

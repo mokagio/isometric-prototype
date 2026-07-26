@@ -3,8 +3,10 @@
 export function createAttackButton(onAttack: () => void): void {
   const wrap = document.createElement("div");
   wrap.style.position = "fixed";
-  wrap.style.right = "16px";
-  wrap.style.bottom = "16px";
+  wrap.style.right = "var(--ww-inset)";
+  // Centred on the stick's midline rather than sat on the same baseline, so the
+  // two thumbs rest level.
+  wrap.style.bottom = "calc(var(--ww-inset) + (var(--ww-stick) - var(--ww-btn)) / 2)";
   wrap.style.userSelect = "none";
 
   const button = document.createElement("button");
