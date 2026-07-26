@@ -52,3 +52,35 @@ describe("Input.axis", () => {
     expect(input.axis).toEqual({ dc: 0, dr: 0 });
   });
 });
+
+describe("Input.jump", () => {
+  it("is idle with nothing held", () => {
+    expect(make().input.jump).toBe(false);
+  });
+
+  it("reads the spacebar", () => {
+    const { input, target } = make();
+    target.press(" ");
+    expect(input.jump).toBe(true);
+    target.release(" ");
+    expect(input.jump).toBe(false);
+  });
+
+  it("reads the on-screen button", () => {
+    const { input } = make();
+    input.setJump(true);
+    expect(input.jump).toBe(true);
+    input.setJump(false);
+    expect(input.jump).toBe(false);
+  });
+
+  it("stays held while either source is down", () => {
+    const { input, target } = make();
+    target.press(" ");
+    input.setJump(true);
+    input.setJump(false); // thumb off the button, spacebar still down
+    expect(input.jump).toBe(true);
+    target.release(" ");
+    expect(input.jump).toBe(false);
+  });
+});

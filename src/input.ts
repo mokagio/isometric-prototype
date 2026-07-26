@@ -10,10 +10,16 @@ const MOVE_KEYS = new Set(["w", "a", "s", "d", "arrowup", "arrowdown", "arrowlef
 export class Input {
   private keys = new Set<string>();
   private stick: Axis | null = null;
+  private jumpButton = false;
 
   /** Analog axis from an on-screen stick; `null` hands steering back to the keys. */
   setStick(axis: Axis | null): void {
     this.stick = axis;
+  }
+
+  /** Held state of an on-screen jump button, ORed with the spacebar. */
+  setJump(held: boolean): void {
+    this.jumpButton = held;
   }
 
   constructor(target: Window = window) {
@@ -44,6 +50,6 @@ export class Input {
   }
 
   get jump(): boolean {
-    return this.keys.has(" ");
+    return this.jumpButton || this.keys.has(" ");
   }
 }

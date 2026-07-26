@@ -8,7 +8,7 @@ import { Input } from "./input";
 import { Hero, drawHeroPlaceholder, drawHeroShadow } from "./hero";
 import { facingFromAxis, type Facing } from "./heroSprite";
 import { createHeroSkin, type HeroAction } from "./heroSkin";
-import { createAttackButton } from "./attackButton";
+import { createActionPad } from "./actionPad";
 import { MonsterField } from "./monsters";
 import tilesheetUrl from "../isometric_fantasy_tiles.png";
 
@@ -38,8 +38,7 @@ async function main(): Promise<void> {
   const ATTACK_DURATION = 0.5; // 7 frames at 14fps
   const triggerAttack = (): void => {
     if (attackTime !== null) return;
-    attackTime = 0;
-    monsters.attackAt(hero.col, hero.row); // the swing connects on the frame it starts
+    attackTime = 0; // the hit lands when the swing finishes (see the frame loop)
   };
 
   let cw = 0;
@@ -93,7 +92,10 @@ async function main(): Promise<void> {
     animClock += dt;
     if (attackTime !== null) {
       attackTime += dt;
-      if (attackTime >= ATTACK_DURATION) attackTime = null;
+      if (attackTime >= ATTACK_DURATION) {
+        attackTime = null;
+        monsters.attackAt(hero.col, hero.row); // the swing connects as it finishes
+      }
     }
     const groundZ = world.heightAt(Math.round(hero.col), Math.round(hero.row));
     camZ += (groundZ - camZ) * Math.min(1, dt * 8);
@@ -134,7 +136,10 @@ async function main(): Promise<void> {
   });
 
   createStick(input);
-  createAttackButton(triggerAttack);
+  createActionPad({
+    onAttack: triggerAttack,
+    onJumpChange: (held) => input.setJump(held),
+  });
   window.addEventListener("keydown", (e) => {
     if (e.key.toLowerCase() === "j") triggerAttack();
   });

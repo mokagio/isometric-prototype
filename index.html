@@ -7,8 +7,14 @@
     <style>
       :root {
         --ww-inset: 16px; /* gap from the screen edge, shared by every overlay */
-        --ww-btn: 54px; /* menu and attack buttons, borders included */
+        --ww-btn: 54px; /* menu and action buttons, borders included */
         --ww-stick: 144px;
+        --ww-pad-gap: 10px; /* clear space between the two action buttons */
+        /* Shift per axis, not along the diagonal: offsetting two squares by
+           their centre-to-centre distance would overlap them at the corner. */
+        --ww-pad-step: calc(var(--ww-btn) + var(--ww-pad-gap));
+        /* Inset that centres the diagonal pair inside the stick-sized square. */
+        --ww-pad-edge: calc((var(--ww-stick) - var(--ww-btn) - var(--ww-pad-step)) / 2);
       }
       html, body {
         margin: 0;
@@ -97,6 +103,30 @@
         .ww-menu-item:hover {
           background: #4a3524;
         }
+      }
+
+      .ww-pad {
+        position: fixed;
+        right: var(--ww-inset);
+        bottom: var(--ww-inset);
+        width: var(--ww-stick);
+        height: var(--ww-stick);
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      /* Offset on the diagonal like a SNES pad's B and A: the thumb rolls between
+         them rather than reaching across a flat row. */
+      .ww-pad-btn {
+        position: absolute;
+      }
+      .ww-pad-attack {
+        left: var(--ww-pad-edge);
+        bottom: var(--ww-pad-edge);
+      }
+      .ww-pad-jump {
+        right: var(--ww-pad-edge);
+        top: var(--ww-pad-edge);
       }
 
       /* Sized border-box so the knob's travel (RADIUS in `stick.ts`) can be

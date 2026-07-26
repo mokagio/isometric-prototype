@@ -1,5 +1,6 @@
 import { HeroSprite, type Facing } from "./heroSprite";
 import { DungeonHeroSkin } from "./dungeonHeroSkin";
+import { OboroSkin } from "./oboroSkin";
 
 export type HeroAction = "idle" | "run" | "attack";
 
@@ -21,17 +22,22 @@ export interface HeroSkin {
   ): boolean;
 }
 
-export type SkinKind = "lpc" | "dungeon";
+export type SkinKind = "soldier" | "slime" | "dungeon" | "lpc";
 
-// The active hero art. Flip this to switch skins (surface in UI later).
-export const HERO_SKIN: SkinKind = "dungeon";
+// The active hero art. Flip this to switch skins (surface in UI later);
+// "slime" makes the player the same green blob the monsters use.
+export const HERO_SKIN: SkinKind = "soldier";
 
 export function createHeroSkin(kind: SkinKind = HERO_SKIN): HeroSkin {
   switch (kind) {
+    case "slime":
+      return new OboroSkin("slime");
     case "dungeon":
       return new DungeonHeroSkin();
     case "lpc":
-    default:
       return new HeroSprite();
+    case "soldier":
+    default:
+      return new OboroSkin("soldier");
   }
 }
