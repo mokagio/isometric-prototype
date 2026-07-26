@@ -3,6 +3,8 @@ export interface MenuActions {
   onEditor: () => void;
 }
 
+const REPO_URL = "https://github.com/mokagio/isometric-prototype";
+
 /** Top-right menu button and its drop panel. */
 export function createMenu(actions: MenuActions): void {
   const wrap = document.createElement("div");
@@ -40,8 +42,21 @@ export function createMenu(actions: MenuActions): void {
     });
     panel.appendChild(item);
   };
-  addItem("New World", actions.onNewWorld);
+  const addLink = (label: string, href: string): void => {
+    const item = document.createElement("a");
+    item.className = "ww-menu-item";
+    item.textContent = label;
+    item.href = href;
+    item.target = "_blank";
+    item.rel = "noopener";
+    item.addEventListener("click", () => setOpen(false));
+    panel.appendChild(item);
+  };
+
+  addItem("New Random World", actions.onNewWorld);
   addItem("Map Editor", actions.onEditor);
+  addLink("Credits", `${REPO_URL}/blob/main/CREDITS.md`);
+  addLink("Source", REPO_URL);
 
   button.addEventListener("click", (e) => {
     e.stopPropagation();
