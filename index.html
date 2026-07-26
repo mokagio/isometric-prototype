@@ -16,6 +16,67 @@
         image-rendering: pixelated;
         image-rendering: crisp-edges;
       }
+
+      .ww-menu {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        font-family: Georgia, "Times New Roman", serif;
+        user-select: none;
+      }
+      .ww-menu-btn {
+        width: 48px;
+        height: 48px;
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        color: #f4e4c1;
+        background: #3b2a1c;
+        border: 3px solid #6b4f34;
+        border-radius: 10px;
+        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+        cursor: pointer;
+      }
+      .ww-menu-btn:hover {
+        background: #4a3524;
+      }
+      .ww-menu-btn:active {
+        transform: translateY(2px);
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+      }
+      .ww-menu-panel {
+        margin-top: 8px;
+        min-width: 168px;
+        padding: 6px;
+        background: #3b2a1c;
+        border: 3px solid #6b4f34;
+        border-radius: 10px;
+        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+      }
+      .ww-menu-title {
+        padding: 6px 10px 8px;
+        color: #c9a86a;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .ww-menu-item {
+        display: block;
+        width: 100%;
+        padding: 10px 12px;
+        text-align: left;
+        font: inherit;
+        font-size: 16px;
+        color: #f4e4c1;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .ww-menu-item:hover {
+        background: #56a03a;
+        color: #10240c;
+      }
     </style>
   </head>
   <body>
