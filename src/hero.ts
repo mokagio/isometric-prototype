@@ -73,23 +73,22 @@ export class Hero {
   }
 }
 
-/**
- * Placeholder hero: a shadow plus a little capsule figure. Swap the body block
- * for `ctx.drawImage(sprite, ...)` once the real art lands — `feetX/feetY` is
- * the anchor (centre of the tile the hero stands on) and `shadowY` the ground.
- */
-export function drawHeroPlaceholder(
-  ctx: CanvasRenderingContext2D,
-  feetX: number,
-  feetY: number,
-  shadowY: number,
-): void {
+/** Ground shadow, drawn at the cell centre under the hero (not its jump height). */
+export function drawHeroShadow(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.save();
   ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
   ctx.beginPath();
-  ctx.ellipse(feetX, shadowY, 15, 7, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y, 15, 7, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
 
+/**
+ * Fallback figure while the LPC sprite loads (or if it fails): a little capsule.
+ * `feetX/feetY` is the anchor — the centre of the tile the hero stands on.
+ */
+export function drawHeroPlaceholder(ctx: CanvasRenderingContext2D, feetX: number, feetY: number): void {
+  ctx.save();
   const bw = 20;
   const bh = 28;
   const bx = feetX - bw / 2;

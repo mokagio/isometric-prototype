@@ -9,6 +9,12 @@ const MOVE_KEYS = new Set(["w", "a", "s", "d", "arrowup", "arrowdown", "arrowlef
 
 export class Input {
   private keys = new Set<string>();
+  private stick: Axis | null = null;
+
+  /** Analog axis from an on-screen stick; `null` hands steering back to the keys. */
+  setStick(axis: Axis | null): void {
+    this.stick = axis;
+  }
 
   constructor(target: Window = window) {
     target.addEventListener("keydown", (e) => {
@@ -25,8 +31,9 @@ export class Input {
     return ks.some((k) => this.keys.has(k));
   }
 
-  /** Summed grid delta from held keys (not normalised). */
+  /** Grid delta from the stick if it is being held, else from the keys (not normalised). */
   get axis(): Axis {
+    if (this.stick) return this.stick;
     let dc = 0;
     let dr = 0;
     if (this.any("w", "arrowup")) (dc -= 1), (dr -= 1);
