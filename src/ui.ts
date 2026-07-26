@@ -54,7 +54,7 @@ export function createMenu(actions: MenuActions): void {
   };
 
   addItem("New Random World", actions.onNewWorld);
-  addItem("Map Editor", actions.onEditor);
+  addItem("World Editor", actions.onEditor);
   addLink("Credits", `${REPO_URL}/blob/main/CREDITS.md`);
   addLink("Source", REPO_URL);
 
