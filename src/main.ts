@@ -9,6 +9,7 @@ import { Hero, drawHeroPlaceholder, drawHeroShadow } from "./hero";
 import { facingFromAxis, type Facing } from "./heroSprite";
 import { createHeroSkin, type HeroAction } from "./heroSkin";
 import { createAttackButton } from "./attackButton";
+import { MonsterField } from "./monsters";
 import tilesheetUrl from "../isometric_fantasy_tiles.png";
 
 const WORLD = 80; // fixed roamable map; the camera follows the hero across it
@@ -29,13 +30,16 @@ async function main(): Promise<void> {
   let camZ = hero.z;
 
   const heroSprite = createHeroSkin();
+  const monsters = new MonsterField();
   let facing: Facing = 2; // faces the camera to start
   let moving = false;
   let animClock = 0; // continuous clock for the looping idle/run cycles
   let attackTime: number | null = null; // seconds into a swing, or null when not attacking
   const ATTACK_DURATION = 0.5; // 7 frames at 14fps
   const triggerAttack = (): void => {
-    if (attackTime === null) attackTime = 0;
+    if (attackTime !== null) return;
+    attackTime = 0;
+    monsters.attackAt(hero.col, hero.row); // the swing connects on the frame it starts
   };
 
   let cw = 0;
@@ -85,6 +89,7 @@ async function main(): Promise<void> {
     if (nextFacing !== null) facing = nextFacing;
 
     hero.update(dt, input, world);
+    monsters.update(dt, hero, world);
     animClock += dt;
     if (attackTime !== null) {
       attackTime += dt;
@@ -96,8 +101,18 @@ async function main(): Promise<void> {
     fitCanvas();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const origin = cameraOrigin();
-    const entity: Entity = { col: hero.col, row: hero.row, draw: () => drawHero(origin) };
-    render(ctx, tileset, world, origin, cw, ch, entity);
+    const entities: Entity[] = [{ col: hero.col, row: hero.row, draw: () => drawHero(origin) }];
+    for (const m of monsters.list()) {
+      entities.push({
+        col: m.col,
+        row: m.row,
+        draw: () => {
+          const feet = project(m.col, m.row, 0, origin);
+          monsters.draw(ctx, m, feet.x, feet.y + SY);
+        },
+      });
+    }
+    render(ctx, tileset, world, origin, cw, ch, entities);
 
     requestAnimationFrame(frame);
   }
@@ -111,6 +126,7 @@ async function main(): Promise<void> {
       spawn = findSpawn(world);
       hero = new Hero(spawn.col, spawn.row, world);
       camZ = hero.z;
+      monsters.reset();
     },
     onEditor: () => {
       location.href = "editor.html";
