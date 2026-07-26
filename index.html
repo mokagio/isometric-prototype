@@ -82,6 +82,24 @@
         background: #56a03a;
         color: #10240c;
       }
+
+      .ww-dpad {
+        position: fixed;
+        left: 16px;
+        bottom: 16px;
+        display: grid;
+        grid-template-areas:
+          ". up ."
+          "left down right";
+        gap: 6px;
+        font-family: Georgia, "Times New Roman", serif;
+        user-select: none;
+        touch-action: none;
+      }
+      .ww-dpad-btn {
+        font-size: 18px;
+        line-height: 1;
+      }
     </style>
   </head>
   <body>

@@ -3,6 +3,7 @@ import { generateWorld, findSpawn } from "./world";
 import { render, type Entity } from "./renderer";
 import { project, SX, SY, SZ, type Origin } from "./iso";
 import { createMenu } from "./ui";
+import { createDpad } from "./dpad";
 import { Input } from "./input";
 import { Hero, drawHeroPlaceholder } from "./hero";
 import tilesheetUrl from "../isometric_fantasy_tiles.png";
@@ -85,6 +86,8 @@ async function main(): Promise<void> {
       location.href = "editor.html";
     },
   });
+
+  createDpad(window);
 }
 
 void main();
