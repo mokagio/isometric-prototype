@@ -7,10 +7,13 @@ export function createMenu(actions: MenuActions): void {
   const wrap = document.createElement("div");
   wrap.className = "ww-menu";
 
+  const OPEN_ICON = "✕";
+  const CLOSED_ICON = "☰";
+
   const button = document.createElement("button");
   button.className = "ww-menu-btn";
   button.setAttribute("aria-label", "Menu");
-  button.textContent = "☰"; // ☰
+  button.textContent = CLOSED_ICON;
 
   const panel = document.createElement("div");
   panel.className = "ww-menu-panel";
@@ -21,27 +24,27 @@ export function createMenu(actions: MenuActions): void {
   title.textContent = "Whispering Woods";
   panel.appendChild(title);
 
+  const setOpen = (open: boolean): void => {
+    panel.hidden = !open;
+    button.textContent = open ? OPEN_ICON : CLOSED_ICON;
+  };
+
   const newWorld = document.createElement("button");
   newWorld.className = "ww-menu-item";
   newWorld.textContent = "New World";
   newWorld.addEventListener("click", () => {
     actions.onNewWorld();
-    panel.hidden = true;
+    setOpen(false);
   });
   panel.appendChild(newWorld);
 
-  const toggle = (): void => {
-    panel.hidden = !panel.hidden;
-  };
   button.addEventListener("click", (e) => {
     e.stopPropagation();
-    toggle();
+    setOpen(panel.hidden);
   });
   // Clicks outside the panel close it; clicks inside keep it open.
   panel.addEventListener("click", (e) => e.stopPropagation());
-  document.addEventListener("click", () => {
-    panel.hidden = true;
-  });
+  document.addEventListener("click", () => setOpen(false));
 
   wrap.append(button, panel);
   document.body.appendChild(wrap);
