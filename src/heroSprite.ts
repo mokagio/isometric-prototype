@@ -1,3 +1,5 @@
+import type { HeroAction, HeroSkin } from "./heroSkin";
+
 // Composites an LPC (Universal LPC Spritesheet) walk cycle for the hero.
 //
 // The art is NOT vendored — licensing is unresolved (see SPRITE-HANDOVER.md),
@@ -48,10 +50,9 @@ export function facingFromAxis(dc: number, dr: number): Facing | null {
   return screenX > 0 ? 3 : 1;
 }
 
-export class HeroSprite {
+export class HeroSprite implements HeroSkin {
   private layers: Layer[] = [];
   private settled = 0;
-  private walkTime = 0;
   ready = false;
 
   constructor(base = LPC_BASE) {
@@ -73,23 +74,27 @@ export class HeroSprite {
     if (++this.settled === total) this.ready = true;
   }
 
-  /** Advance the walk cycle while moving; snap to the idle pose when still. */
-  update(dt: number, moving: boolean): void {
-    this.walkTime = moving ? this.walkTime + dt : 0;
-  }
-
-  private frame(moving: boolean): number {
-    if (!moving) return 0; // frame 0 is the neutral standing pose
-    return 1 + (Math.floor(this.walkTime * WALK_FPS) % (FRAMES - 1));
+  // Only `walk` sheets are loaded, so run cycles frames 1..8 and everything else
+  // (idle, and attack — no LPC slash sheet is wired) shows the neutral frame 0.
+  private frame(action: HeroAction, actionTime: number): number {
+    if (action !== "run") return 0;
+    return 1 + (Math.floor(actionTime * WALK_FPS) % (FRAMES - 1));
   }
 
   /**
    * Draws the composited figure at 2x nearest with its feet at `(feetX, feetY)`.
    * Returns false if nothing is loaded yet, so the caller can fall back.
    */
-  draw(ctx: CanvasRenderingContext2D, feetX: number, feetY: number, facing: Facing, moving: boolean): boolean {
+  draw(
+    ctx: CanvasRenderingContext2D,
+    feetX: number,
+    feetY: number,
+    facing: Facing,
+    action: HeroAction,
+    actionTime: number,
+  ): boolean {
     if (!this.ready) return false;
-    const sx = this.frame(moving) * CELL;
+    const sx = this.frame(action, actionTime) * CELL;
     const sy = facing * CELL;
     // Figure feet sit at cell-y 61 of 64; drawn at 2x that is y 122.
     const dx = Math.round(feetX - CELL);

@@ -7,7 +7,8 @@ import { createStick } from "./stick";
 import { Input } from "./input";
 import { Hero, drawHeroPlaceholder, drawHeroShadow } from "./hero";
 import { facingFromAxis, type Facing } from "./heroSprite";
-import { createHeroSkin } from "./heroSkin";
+import { createHeroSkin, type HeroAction } from "./heroSkin";
+import { createAttackButton } from "./attackButton";
 import tilesheetUrl from "../isometric_fantasy_tiles.png";
 
 const WORLD = 80; // fixed roamable map; the camera follows the hero across it
@@ -30,6 +31,12 @@ async function main(): Promise<void> {
   const heroSprite = createHeroSkin();
   let facing: Facing = 2; // faces the camera to start
   let moving = false;
+  let animClock = 0; // continuous clock for the looping idle/run cycles
+  let attackTime: number | null = null; // seconds into a swing, or null when not attacking
+  const ATTACK_DURATION = 0.5; // 7 frames at 14fps
+  const triggerAttack = (): void => {
+    if (attackTime === null) attackTime = 0;
+  };
 
   let cw = 0;
   let ch = 0;
@@ -60,7 +67,9 @@ async function main(): Promise<void> {
     const feetX = feet.x;
     const feetY = feet.y + SY;
     drawHeroShadow(ctx, feetX, shadowY);
-    if (!heroSprite.draw(ctx, feetX, feetY, facing, moving)) {
+    const action: HeroAction = attackTime !== null ? "attack" : moving ? "run" : "idle";
+    const actionTime = attackTime ?? animClock;
+    if (!heroSprite.draw(ctx, feetX, feetY, facing, action, actionTime)) {
       drawHeroPlaceholder(ctx, feetX, feetY);
     }
   }
@@ -76,7 +85,11 @@ async function main(): Promise<void> {
     if (nextFacing !== null) facing = nextFacing;
 
     hero.update(dt, input, world);
-    heroSprite.update(dt, moving);
+    animClock += dt;
+    if (attackTime !== null) {
+      attackTime += dt;
+      if (attackTime >= ATTACK_DURATION) attackTime = null;
+    }
     const groundZ = world.heightAt(Math.round(hero.col), Math.round(hero.row));
     camZ += (groundZ - camZ) * Math.min(1, dt * 8);
 
@@ -105,6 +118,10 @@ async function main(): Promise<void> {
   });
 
   createStick(input);
+  createAttackButton(triggerAttack);
+  window.addEventListener("keydown", (e) => {
+    if (e.key.toLowerCase() === "j") triggerAttack();
+  });
 }
 
 void main();
