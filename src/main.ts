@@ -1,5 +1,5 @@
 import { loadTileset } from "./tileset";
-import { generateWorld } from "./world";
+import { generateWorld, findSpawn } from "./world";
 import { render, type Entity } from "./renderer";
 import { project, SX, SY, SZ, type Origin } from "./iso";
 import { createMenu } from "./ui";
@@ -18,7 +18,8 @@ async function main(): Promise<void> {
   const input = new Input(window);
 
   let world = generateWorld(WORLD, WORLD, randomSeed());
-  let hero = new Hero(WORLD / 2, WORLD / 2, world);
+  let spawn = findSpawn(world);
+  let hero = new Hero(spawn.col, spawn.row, world);
   // Camera height tracks the ground under the hero (smoothed), not the hero's
   // own z — so a jump reads as the hero rising, and climbs pan gently.
   let camZ = hero.z;
@@ -76,7 +77,8 @@ async function main(): Promise<void> {
   createMenu({
     onNewWorld: () => {
       world = generateWorld(WORLD, WORLD, randomSeed());
-      hero = new Hero(WORLD / 2, WORLD / 2, world);
+      spawn = findSpawn(world);
+      hero = new Hero(spawn.col, spawn.row, world);
       camZ = hero.z;
     },
     onEditor: () => {
