@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Whispering Woods — Map Editor</title>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #1b2b1a;
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      #editor {
+        display: flex;
+        height: 100%;
+      }
+      #sidebar {
+        width: 200px;
+        flex: 0 0 200px;
+        height: 100%;
+        box-sizing: border-box;
+        padding: 14px 14px 24px;
+        overflow-y: auto;
+        background: #2c2016;
+        border-right: 3px solid #6b4f34;
+        color: #f4e4c1;
+        user-select: none;
+      }
+      #board-canvas {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: block;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        cursor: crosshair;
+      }
+
+      .ed-back {
+        display: inline-block;
+        margin-bottom: 12px;
+        color: #c9a86a;
+        text-decoration: none;
+        font-size: 15px;
+      }
+      .ed-back:hover { color: #f4e4c1; }
+
+      .ed-heading {
+        margin: 14px 0 8px;
+        color: #c9a86a;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .ed-palette {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+      }
+      .ed-swatch {
+        padding: 3px;
+        background: #3b2a1c;
+        border: 2px solid #6b4f34;
+        border-radius: 8px;
+        cursor: pointer;
+        line-height: 0;
+      }
+      .ed-swatch canvas { width: 100%; height: auto; image-rendering: pixelated; }
+      .ed-swatch:hover { border-color: #9a7345; }
+      .ed-swatch.selected { border-color: #7cc24a; background: #46351f; }
+
+      .ed-tools { display: flex; gap: 6px; }
+      .ed-tool {
+        flex: 1;
+        padding: 9px 0;
+        font: inherit;
+        font-size: 15px;
+        color: #f4e4c1;
+        background: #3b2a1c;
+        border: 2px solid #6b4f34;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .ed-tool:hover { border-color: #9a7345; }
+      .ed-tool.active { background: #56a03a; color: #10240c; border-color: #7cc24a; }
+
+      .ed-height { display: flex; align-items: center; gap: 8px; }
+      .ed-step {
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+        color: #f4e4c1;
+        background: #3b2a1c;
+        border: 2px solid #6b4f34;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .ed-step:hover { border-color: #9a7345; }
+      .ed-height-value {
+        flex: 1;
+        text-align: center;
+        font-size: 22px;
+        color: #f4e4c1;
+      }
+
+      .ed-hint {
+        margin-top: 16px;
+        color: #8a6f52;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="editor">
+      <aside id="sidebar"></aside>
+      <canvas id="board-canvas"></canvas>
+    </div>
+    <script type="module" src="/src/editor/main.ts"></script>
+  </body>
+</html>

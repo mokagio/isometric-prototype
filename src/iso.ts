@@ -21,3 +21,14 @@ export function project(col: number, row: number, z: number, o: Origin): { x: nu
     y: o.y + (col + row) * SY - z * SZ,
   };
 }
+
+/**
+ * Ground-plane (z=0) inverse of `project`: the grid cell whose top diamond
+ * contains screen point `(x, y)`. Referenced from the diamond centre (one SY
+ * below the apex), so points anywhere in a cell round to that cell.
+ */
+export function unproject(x: number, y: number, o: Origin): { col: number; row: number } {
+  const u = (x - o.x) / SX; // col - row
+  const v = (y - o.y - SY) / SY; // col + row
+  return { col: Math.round((u + v) / 2), row: Math.round((v - u) / 2) };
+}

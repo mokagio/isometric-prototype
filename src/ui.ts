@@ -1,5 +1,6 @@
 export interface MenuActions {
   onNewWorld: () => void;
+  onEditor: () => void;
 }
 
 /** Top-right menu button and its drop panel. */
@@ -29,14 +30,18 @@ export function createMenu(actions: MenuActions): void {
     button.textContent = open ? OPEN_ICON : CLOSED_ICON;
   };
 
-  const newWorld = document.createElement("button");
-  newWorld.className = "ww-menu-item";
-  newWorld.textContent = "New World";
-  newWorld.addEventListener("click", () => {
-    actions.onNewWorld();
-    setOpen(false);
-  });
-  panel.appendChild(newWorld);
+  const addItem = (label: string, onClick: () => void): void => {
+    const item = document.createElement("button");
+    item.className = "ww-menu-item";
+    item.textContent = label;
+    item.addEventListener("click", () => {
+      onClick();
+      setOpen(false);
+    });
+    panel.appendChild(item);
+  };
+  addItem("New World", actions.onNewWorld);
+  addItem("Map Editor", actions.onEditor);
 
   button.addEventListener("click", (e) => {
     e.stopPropagation();
