@@ -1,7 +1,8 @@
 import { SX, SY } from "./iso";
 import type { Axis } from "./input";
 
-const RADIUS = 52; // how far the knob travels from centre, px
+// Half the well minus half the knob, so the knob stays inside its square.
+const RADIUS = 44;
 const DEADZONE = 0.18; // fraction of RADIUS that still reads as centred
 
 /**

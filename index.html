@@ -93,17 +93,20 @@
         }
       }
 
+      /* Sized border-box so the knob's travel (RADIUS in `stick.ts`) can be
+         checked against the well's half-width without unpacking the borders. */
       .ww-stick {
         position: fixed;
         left: 16px;
         bottom: 16px;
-        width: 132px;
-        height: 132px;
+        box-sizing: border-box;
+        width: 144px;
+        height: 144px;
         display: grid;
         place-items: center;
-        background: rgba(59, 42, 28, 0.55);
+        background: rgba(27, 43, 26, 0.5);
         border: 3px solid #6b4f34;
-        border-radius: 50%;
+        border-radius: 10px;
         touch-action: none;
         cursor: grab;
         -webkit-user-select: none;
@@ -114,11 +117,12 @@
         cursor: grabbing;
       }
       .ww-stick-knob {
-        width: 56px;
-        height: 56px;
+        box-sizing: border-box;
+        width: 54px;
+        height: 54px;
         background: #3b2a1c;
         border: 3px solid #6b4f34;
-        border-radius: 50%;
+        border-radius: 10px;
         box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
         pointer-events: none;
       }
