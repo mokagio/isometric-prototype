@@ -21,6 +21,14 @@ export function originFor(world: World, viewW: number, viewH: number): Origin {
   };
 }
 
+// A point actor (e.g. the hero) drawn interleaved with terrain so columns in
+// front of its cell occlude it. `draw` runs right after that cell's column.
+export interface Entity {
+  col: number;
+  row: number;
+  draw: () => void;
+}
+
 export function render(
   ctx: CanvasRenderingContext2D,
   tileset: Tileset,
@@ -28,9 +36,13 @@ export function render(
   origin: Origin,
   viewW: number,
   viewH: number,
+  entity?: Entity,
 ): void {
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, viewW, viewH);
+
+  const entityCol = entity ? Math.round(entity.col) : -1;
+  const entityRow = entity ? Math.round(entity.row) : -1;
 
   // Back-to-front: row-major then col-minor is the painter's order for the iso
   // grid; within a column, bottom cube first so caps land on top of their body.
@@ -46,6 +58,7 @@ export function render(
         const [sx, sy, sw, sh] = tileset.rect(...tile);
         ctx.drawImage(tileset.image, sx, sy, sw, sh, drawX, drawY, DRAW, DRAW);
       }
+      if (entity && col === entityCol && row === entityRow) entity.draw();
     }
   }
 }
