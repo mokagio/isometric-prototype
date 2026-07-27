@@ -15,14 +15,26 @@ export const MON_FPS = 10; // walk playback rate
 export const MAX_MONSTERS = 1;
 export const SPEED = 2.6; // cells/sec — slower than the hero, so you can kite them
 export const CONTACT = 0.55; // stop advancing this close: the "bump"
-export const MELEE = 1.3; // a swing kills monsters within this radius
+// Reach has to cover the ground a monster crosses between swings, or it can
+// step from outside the blade to bumping the hero in a gap and take a heart
+// however well the swing was timed. `encounter.test.ts` pins the relationship.
+export const MELEE = 2; // a swing kills monsters within this radius
 export const FADE = 0.4; // death: seconds to play the death anim and fade out
+export const KNOCKBACK = 1.6; // cells a killed monster is thrown, over the fade
 export const SPAWN_MIN = 7;
 export const SPAWN_MAX = 12;
 
 interface Pos {
   col: number;
   row: number;
+}
+
+/** Where a killing blow caught the monster, and the way it threw the body. */
+export interface Knock {
+  col: number;
+  row: number;
+  dx: number;
+  dy: number;
 }
 
 export interface Monster {
@@ -32,6 +44,7 @@ export interface Monster {
   dying: boolean;
   dyingT: number;
   faceLeft: boolean;
+  knock: Knock | null;
 }
 
 interface Sheet {
@@ -82,6 +95,7 @@ export class MonsterField {
       dying: false,
       dyingT: 0,
       faceLeft: false,
+      knock: null,
     });
   }
 
@@ -91,6 +105,14 @@ export class MonsterField {
       m.animT += dt;
       if (m.dying) {
         m.dyingT += dt;
+        if (m.knock) {
+          // Anchored to where the blow landed rather than integrated per frame,
+          // so the throw covers the same ground whatever the frame rate.
+          const p = Math.min(1, m.dyingT / FADE);
+          const eased = p * (2 - p); // ease-out: thrown hard, settling as it fades
+          m.col = m.knock.col + m.knock.dx * KNOCKBACK * eased;
+          m.row = m.knock.row + m.knock.dy * KNOCKBACK * eased;
+        }
         continue;
       }
       // Home in on the hero; stop at contact distance and keep bumping.
@@ -108,18 +130,24 @@ export class MonsterField {
     while (this.mons.length < MAX_MONSTERS) this.spawn(hero, world);
   }
 
-  /** Is a live monster bumping (col, row)? `CONTACT` is where they stop, so it is the bump radius. */
-  touching(col: number, row: number): boolean {
-    return this.mons.some((m) => !m.dying && Math.hypot(m.col - col, m.row - row) <= CONTACT);
+  /** The live monster bumping (col, row), if any. They stop at `CONTACT`, so that is the bump radius. */
+  contactAt(col: number, row: number): Monster | null {
+    return this.mons.find((m) => !m.dying && Math.hypot(m.col - col, m.row - row) <= CONTACT) ?? null;
   }
 
-  /** A swing at (col, row): every alive monster within melee range dies. */
+  /** A swing at (col, row): every alive monster within melee range dies, thrown clear of the blow. */
   attackAt(col: number, row: number): void {
     for (const m of this.mons) {
-      if (!m.dying && Math.hypot(m.col - col, m.row - row) <= MELEE) {
-        m.dying = true;
-        m.dyingT = 0;
-      }
+      if (m.dying) continue;
+      const dx = m.col - col;
+      const dy = m.row - row;
+      const d = Math.hypot(dx, dy);
+      if (d > MELEE) continue;
+      m.dying = true;
+      m.dyingT = 0;
+      // A blow landing dead-on leaves no direction to throw along; pick one.
+      const away = d > 0 ? { dx: dx / d, dy: dy / d } : { dx: 0, dy: 1 };
+      m.knock = { col: m.col, row: m.row, ...away };
     }
   }
 

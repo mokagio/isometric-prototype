@@ -3,6 +3,7 @@ import {
   CONTACT,
   FADE,
   FRAMES,
+  KNOCKBACK,
   MAX_MONSTERS,
   MELEE,
   MON_FPS,
@@ -193,33 +194,33 @@ describe("MonsterField chasing", () => {
 });
 
 describe("MonsterField contact", () => {
-  it("bumps whatever is inside contact range", () => {
-    const { field } = fieldWith(HERO.col + CONTACT * 0.5, HERO.row);
-    expect(field.touching(HERO.col, HERO.row)).toBe(true);
+  it("hands back the monster doing the bumping", () => {
+    const { field, mon } = fieldWith(HERO.col + CONTACT * 0.5, HERO.row);
+    expect(field.contactAt(HERO.col, HERO.row)).toBe(mon);
   });
 
   it("bumps at exactly the contact radius", () => {
     // Measured from the origin so the distance is exactly CONTACT rather than a
     // float a hair over it, which would pass whether the bound is < or <=.
-    const { field } = fieldWith(0, 0);
-    expect(field.touching(CONTACT, 0)).toBe(true);
+    const { field, mon } = fieldWith(0, 0);
+    expect(field.contactAt(CONTACT, 0)).toBe(mon);
   });
 
   it("leaves alone whatever is beyond contact range", () => {
     const { field } = fieldWith(HERO.col + CONTACT * 1.1, HERO.row);
-    expect(field.touching(HERO.col, HERO.row)).toBe(false);
+    expect(field.contactAt(HERO.col, HERO.row)).toBeNull();
   });
 
   it("cannot be bumped by a monster that is already dying", () => {
     const { field, mon } = fieldWith(HERO.col, HERO.row);
     mon.dying = true;
-    expect(field.touching(HERO.col, HERO.row)).toBe(false);
+    expect(field.contactAt(HERO.col, HERO.row)).toBeNull();
   });
 
   it("reports nothing on an empty field", () => {
     const field = loaded();
     field.reset();
-    expect(field.touching(HERO.col, HERO.row)).toBe(false);
+    expect(field.contactAt(HERO.col, HERO.row)).toBeNull();
   });
 });
 
@@ -257,6 +258,64 @@ describe("MonsterField swings", () => {
     const partway = mon.dyingT;
     field.attackAt(mon.col, mon.row);
     expect(mon.dyingT).toBe(partway);
+  });
+});
+
+// The blow has to land inside MELEE or the monster simply is not killed, so the
+// struck monster sits one cell along +col from a swing at the origin.
+const STRUCK_AT = 1;
+const struck = (): { field: MonsterField; mon: Monster } => {
+  const both = fieldWith(STRUCK_AT, 0);
+  both.field.attackAt(0, 0);
+  return both;
+};
+
+describe("MonsterField knockback", () => {
+  it("throws the body away from the blow", () => {
+    const { field, mon } = struck();
+    field.update(FADE, HERO, WORLD);
+    expect(mon.col - STRUCK_AT).toBeCloseTo(KNOCKBACK);
+    expect(mon.row).toBeCloseTo(0);
+  });
+
+  it("throws it the full distance over the fade, and no further", () => {
+    const { field, mon } = struck();
+    field.update(FADE / 2, HERO, WORLD);
+    const partway = mon.col - STRUCK_AT;
+    expect(partway).toBeGreaterThan(0);
+    expect(partway).toBeLessThan(KNOCKBACK);
+    field.update(FADE * 5, HERO, WORLD);
+    expect(mon.col - STRUCK_AT).toBeCloseTo(KNOCKBACK);
+  });
+
+  it("front-loads the throw so it reads as a shove", () => {
+    const { field, mon } = struck();
+    field.update(FADE / 2, HERO, WORLD);
+    expect(mon.col - STRUCK_AT).toBeGreaterThan(KNOCKBACK / 2);
+  });
+
+  it("covers the same ground however the frames are sliced", () => {
+    const coarse = struck();
+    coarse.field.update(FADE, HERO, WORLD);
+
+    const fine = struck();
+    for (let i = 0; i < 60; i++) fine.field.update(FADE / 60, HERO, WORLD);
+
+    expect(fine.mon.col).toBeCloseTo(coarse.mon.col, 6);
+  });
+
+  it("still throws a monster struck dead-on", () => {
+    const { field, mon } = fieldWith(0, 0);
+    field.attackAt(0, 0);
+    field.update(FADE, HERO, WORLD);
+    expect(Math.hypot(mon.col, mon.row)).toBeCloseTo(KNOCKBACK);
+  });
+
+  it("leaves an untouched monster where it stands", () => {
+    const { field, mon } = fieldWith(MELEE * 1.1, 0);
+    field.attackAt(0, 0);
+    expect(mon.dying).toBe(false);
+    expect(mon.knock).toBeNull();
   });
 });
 
@@ -319,7 +378,7 @@ describe("MonsterField.draw", () => {
   it("draws nothing before the sheets have loaded", () => {
     const field = new MonsterField(BASE);
     const { ctx, calls } = recordingCtx();
-    field.draw(ctx, { col: 0, row: 0, animT: 0, dying: false, dyingT: 0, faceLeft: false }, 0, 0);
+    field.draw(ctx, { col: 0, row: 0, animT: 0, dying: false, dyingT: 0, faceLeft: false, knock: null }, 0, 0);
     expect(calls).toHaveLength(0);
   });
 
