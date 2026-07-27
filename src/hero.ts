@@ -6,6 +6,12 @@ const SPEED = 5; // cells per second
 const GRAVITY = 34; // levels per second^2
 const JUMP_V = 9; // launch velocity, levels per second
 const CLIMB = 1.05; // max step-up (levels) while walking; taller = a wall
+// Worth more than it looks: the monster is already closing at SPEED, so it wins
+// back most of the shove while the shove is still playing. Much under a cell and
+// the hit does not read on screen at all.
+export const KNOCKBACK = 1.5; // cells the hero is shoved by a hit
+const KNOCKBACK_DECAY = 12; // per second — the shove launches fast and eases off
+const KNOCKBACK_MIN = 0.001; // cells left below which the slide reads as stopped
 
 export interface HeroControls {
   axis: { dc: number; dr: number };
@@ -21,6 +27,9 @@ export class Hero {
   z: number;
   vz = 0;
   grounded = true;
+  private kdc = 0; // knockback heading, a unit vector
+  private kdr = 0;
+  private kLeft = 0; // cells of shove still to travel
 
   constructor(col: number, row: number, world: Terrain) {
     this.col = col;
@@ -41,6 +50,29 @@ export class Hero {
     return world.heightAt(c, r) <= this.z + CLIMB;
   }
 
+  /** Shove the hero along (dc, dr) — the direction away from whatever landed the blow. */
+  knockback(dc: number, dr: number): void {
+    const len = Math.hypot(dc, dr);
+    if (len === 0) return;
+    this.kdc = dc / len;
+    this.kdr = dr / len;
+    this.kLeft = KNOCKBACK;
+  }
+
+  // Eats a decaying share of the distance still owed rather than integrating a
+  // velocity, so the shove covers KNOCKBACK whatever the frame rate. Walls stop
+  // it the same way they stop walking.
+  private slide(dt: number, world: Terrain): void {
+    if (this.kLeft === 0) return;
+    const step = this.kLeft * (1 - Math.exp(-KNOCKBACK_DECAY * dt));
+    const nc = this.col + this.kdc * step;
+    if (this.canStand(nc, this.row, world)) this.col = nc;
+    const nr = this.row + this.kdr * step;
+    if (this.canStand(this.col, nr, world)) this.row = nr;
+    this.kLeft -= step;
+    if (this.kLeft < KNOCKBACK_MIN) this.kLeft = 0;
+  }
+
   update(dt: number, ctrl: HeroControls, world: Terrain): void {
     let { dc, dr } = ctrl.axis;
     const len = Math.hypot(dc, dr);
@@ -54,6 +86,8 @@ export class Hero {
       const nr = this.row + dr * step;
       if (this.canStand(this.col, nr, world)) this.row = nr;
     }
+
+    this.slide(dt, world);
 
     if (ctrl.jump && this.grounded) {
       this.vz = JUMP_V;

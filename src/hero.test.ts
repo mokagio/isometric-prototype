@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Hero, type HeroControls } from "./hero";
+import { Hero, KNOCKBACK, type HeroControls } from "./hero";
 
 // Minimal terrain: heights come from a function, sized 20x20.
 const terrain = (heightAt: (c: number, r: number) => number) =>
@@ -57,5 +57,72 @@ describe("Hero", () => {
     expect(Math.round(hero.col)).toBeGreaterThanOrEqual(6);
     expect(hero.z).toBe(0);
     expect(hero.grounded).toBe(true);
+  });
+});
+
+describe("Hero.knockback", () => {
+  const FLAT = terrain(() => 0);
+
+  it("shoves the hero the way it is pointed", () => {
+    const hero = new Hero(5, 5, FLAT);
+    hero.knockback(1, 0);
+    run(hero, FLAT, 60, NONE);
+    expect(hero.col).toBeGreaterThan(5);
+    expect(hero.row).toBe(5);
+  });
+
+  it("covers the knockback distance", () => {
+    const hero = new Hero(5, 5, FLAT);
+    hero.knockback(0, -1);
+    run(hero, FLAT, 120, NONE);
+    expect(5 - hero.row).toBeCloseTo(KNOCKBACK, 2);
+  });
+
+  it("covers the same ground however the frames are sliced", () => {
+    // A velocity integrated per frame would overshoot at low frame rates.
+    const smooth = new Hero(5, 5, FLAT);
+    smooth.knockback(1, 0);
+    run(smooth, FLAT, 240, NONE);
+
+    const choppy = new Hero(5, 5, FLAT);
+    choppy.knockback(1, 0);
+    for (let i = 0; i < 12; i++) choppy.update(1 / 5, NONE, FLAT);
+
+    expect(choppy.col).toBeCloseTo(smooth.col, 2);
+  });
+
+  it("sizes the shove by the constant, not by how hard it was pushed", () => {
+    const gentle = new Hero(5, 5, FLAT);
+    gentle.knockback(1, 0);
+    const hard = new Hero(5, 5, FLAT);
+    hard.knockback(1000, 0);
+    run(gentle, FLAT, 120, NONE);
+    run(hard, FLAT, 120, NONE);
+    expect(hard.col).toBeCloseTo(gentle.col, 6);
+  });
+
+  it("settles instead of sliding forever", () => {
+    const hero = new Hero(5, 5, FLAT);
+    hero.knockback(1, 0);
+    run(hero, FLAT, 120, NONE);
+    const settled = hero.col;
+    run(hero, FLAT, 60, NONE);
+    expect(hero.col).toBe(settled);
+  });
+
+  it("cannot shove the hero through a wall", () => {
+    const world = terrain((c) => (c >= 6 ? 2 : 0));
+    const hero = new Hero(5, 5, world);
+    hero.knockback(1, 0);
+    run(hero, world, 120, NONE);
+    expect(Math.round(hero.col)).toBe(5);
+  });
+
+  it("ignores a shove with no direction", () => {
+    const hero = new Hero(5, 5, FLAT);
+    hero.knockback(0, 0);
+    run(hero, FLAT, 60, NONE);
+    expect(hero.col).toBe(5);
+    expect(hero.row).toBe(5);
   });
 });
