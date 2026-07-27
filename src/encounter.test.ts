@@ -28,6 +28,24 @@ const FLAT = { cols: 400, rows: 400, heightAt: () => 0 } as unknown as World;
 const STILL = { axis: { dc: 0, dr: 0 }, jump: false };
 const DT = 1 / 60;
 const ORIGIN = 200;
+const OFFSTAGE = 380; // far enough that the rest of the wave never joins in
+
+/**
+ * One monster from a freshly spawned wave, parked `startDistance` out along +col
+ * with its wave-mates sent offstage. These tests are about a single approach; the
+ * wave as a whole is covered in `monsters.test.ts`.
+ */
+function loneMonster(field: MonsterField, hero: Hero, startDistance: number) {
+  field.update(0, hero, FLAT);
+  const [mon, ...rest] = field.list();
+  mon!.col = ORIGIN + startDistance;
+  mon!.row = ORIGIN;
+  rest.forEach((m, i) => {
+    m.col = OFFSTAGE;
+    m.row = OFFSTAGE - i * 3;
+  });
+  return mon!;
+}
 
 /**
  * Runs the real hero, field, swing, and lives against one monster walking in
@@ -42,10 +60,7 @@ function encounter(startDistance: number): number {
   const lives = new Lives();
   const swing = new Swing();
 
-  field.update(0, hero, FLAT); // spawns one, then park it at a known distance
-  const mon = field.list()[0]!;
-  mon.col = ORIGIN + startDistance;
-  mon.row = ORIGIN;
+  const mon = loneMonster(field, hero, startDistance);
 
   const before = lives.lives;
   for (let t = 0; t < 20; t += DT) {
@@ -76,10 +91,7 @@ describe("fighting off an incoming monster", () => {
     pending.forEach((i) => i.onload?.());
     const hero = new Hero(ORIGIN, ORIGIN, FLAT);
     const lives = new Lives();
-    field.update(0, hero, FLAT);
-    const mon = field.list()[0]!;
-    mon.col = ORIGIN + SPAWN_MIN;
-    mon.row = ORIGIN;
+    loneMonster(field, hero, SPAWN_MIN);
 
     for (let t = 0; t < 10; t += DT) {
       hero.update(DT, STILL, FLAT);

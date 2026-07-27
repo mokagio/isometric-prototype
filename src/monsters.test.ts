@@ -4,13 +4,16 @@ import {
   FADE,
   FRAMES,
   KNOCKBACK,
-  MAX_MONSTERS,
   MELEE,
   MON_FPS,
   MonsterField,
   SPAWN_MAX,
   SPAWN_MIN,
+  SEPARATION,
   SPEED,
+  WAVE_BREAK,
+  WAVE_SIZE,
+  WAVE_STAGGER,
   type Monster,
 } from "./monsters";
 import type { World } from "./world";
@@ -45,7 +48,7 @@ const WORLD = worldOf(200, 200);
 const HERO = { col: 100, row: 100 };
 const DT = 1 / 60;
 
-/** A field with both sheets loaded, topped up to the cap. */
+/** A field with both sheets loaded and its first wave spawned. */
 function loaded(): MonsterField {
   const field = new MonsterField(BASE);
   loadAll();
@@ -53,13 +56,24 @@ function loaded(): MonsterField {
   return field;
 }
 
-/** A loaded field holding one monster parked at (col, row). */
+// Somewhere the rest of a wave cannot reach the hero or each other during a test.
+const OFFSTAGE = 900;
+
+/**
+ * A loaded field holding one monster parked at (col, row), with the rest of its
+ * wave sent offstage — so a test about one monster is about one monster, while
+ * still running against the real WAVE_SIZE.
+ */
 function fieldWith(col: number, row: number): { field: MonsterField; mon: Monster } {
   const field = loaded();
-  const mon = field.list()[0]!;
-  mon.col = col;
-  mon.row = row;
-  return { field, mon };
+  const [mon, ...rest] = field.list();
+  mon!.col = col;
+  mon!.row = row;
+  rest.forEach((m, i) => {
+    m.col = OFFSTAGE + i * SEPARATION * 4;
+    m.row = OFFSTAGE;
+  });
+  return { field, mon: mon! };
 }
 
 const distanceToHero = (m: Monster): number => Math.hypot(m.col - HERO.col, m.row - HERO.row);
@@ -106,16 +120,19 @@ describe("MonsterField loading", () => {
 });
 
 describe("MonsterField spawning", () => {
-  it("tops the field back up to the cap", () => {
-    expect(loaded().list()).toHaveLength(MAX_MONSTERS);
+  it("spawns a whole wave at once", () => {
+    expect(loaded().list()).toHaveLength(WAVE_SIZE);
   });
 
   it("spawns into a ring around the hero, never on top of them", () => {
     const field = loaded();
     for (let i = 0; i < 200; i++) {
-      const d = distanceToHero(field.list()[0]!);
-      expect(d).toBeGreaterThanOrEqual(SPAWN_MIN);
-      expect(d).toBeLessThanOrEqual(SPAWN_MAX);
+      // Each monster sits a stagger's walk further out than the one before it.
+      field.list().forEach((m, slot) => {
+        const back = slot * SPEED * WAVE_STAGGER;
+        expect(distanceToHero(m)).toBeGreaterThanOrEqual(SPAWN_MIN + back - 1e-9);
+        expect(distanceToHero(m)).toBeLessThanOrEqual(SPAWN_MAX + back + 1e-9);
+      });
       field.reset();
       field.update(0, HERO, WORLD);
     }
@@ -130,11 +147,12 @@ describe("MonsterField spawning", () => {
     for (let i = 0; i < 200; i++) {
       field.reset();
       field.update(0, corner, small);
-      const m = field.list()[0]!;
-      expect(m.col).toBeGreaterThanOrEqual(1);
-      expect(m.col).toBeLessThanOrEqual(small.cols - 2);
-      expect(m.row).toBeGreaterThanOrEqual(1);
-      expect(m.row).toBeLessThanOrEqual(small.rows - 2);
+      for (const m of field.list()) {
+        expect(m.col).toBeGreaterThanOrEqual(1);
+        expect(m.col).toBeLessThanOrEqual(small.cols - 2);
+        expect(m.row).toBeGreaterThanOrEqual(1);
+        expect(m.row).toBeLessThanOrEqual(small.rows - 2);
+      }
     }
   });
 
@@ -327,12 +345,125 @@ describe("MonsterField death", () => {
     expect(field.list()).toContain(mon);
   });
 
-  it("clears the corpse once the death finishes and replaces it", () => {
+  it("clears the corpse once the death finishes", () => {
     const { field, mon } = fieldWith(HERO.col + 3, HERO.row);
     field.attackAt(mon.col, mon.row);
     field.update(FADE, HERO, WORLD);
     expect(field.list()).not.toContain(mon);
-    expect(field.list()).toHaveLength(MAX_MONSTERS);
+  });
+
+  it("does not replace a kill while the rest of the wave is still up", () => {
+    const { field, mon } = fieldWith(HERO.col + 3, HERO.row);
+    field.attackAt(mon.col, mon.row);
+    field.update(FADE, HERO, WORLD);
+    expect(field.list()).toHaveLength(WAVE_SIZE - 1);
+  });
+});
+
+describe("MonsterField waves", () => {
+  /** Kills everything standing and lets the bodies finish fading. */
+  const wipe = (field: MonsterField): void => {
+    for (const m of field.list()) field.attackAt(m.col, m.row);
+    field.update(FADE, HERO, WORLD);
+  };
+
+  // Clearing the bodies takes FADE, and the breather runs from that same frame,
+  // so this is what is left of it once `wipe` returns.
+  const REMAINING = WAVE_BREAK - FADE;
+
+  it("leaves a gap long enough to be worth having", () => {
+    expect(REMAINING).toBeGreaterThan(0);
+  });
+
+  it("holds the field empty for a breather after a wipe", () => {
+    const field = loaded();
+    wipe(field);
+    expect(field.list()).toHaveLength(0);
+    field.update(REMAINING * 0.8, HERO, WORLD);
+    expect(field.list()).toHaveLength(0);
+  });
+
+  it("sends in the next wave at full strength", () => {
+    const field = loaded();
+    wipe(field);
+    field.update(REMAINING, HERO, WORLD);
+    expect(field.list()).toHaveLength(WAVE_SIZE);
+  });
+
+  it("does not bank the breather while the wave is still up", () => {
+    // Time spent fighting must not be credited against the next wave's gap.
+    const field = loaded();
+    field.update(WAVE_BREAK * 5, HERO, WORLD);
+    wipe(field);
+    field.update(REMAINING * 0.8, HERO, WORLD);
+    expect(field.list()).toHaveLength(0);
+  });
+
+  it("starts the first wave without waiting", () => {
+    expect(loaded().list()).toHaveLength(WAVE_SIZE);
+  });
+
+  it("sends a fresh wave straight in after a reset", () => {
+    const field = loaded();
+    field.reset();
+    field.update(0, HERO, WORLD);
+    expect(field.list()).toHaveLength(WAVE_SIZE);
+  });
+});
+
+describe("MonsterField separation", () => {
+  it("eases two stacked monsters apart", () => {
+    const field = loaded();
+    const [a, b] = field.list();
+    a!.col = HERO.col + 4;
+    a!.row = HERO.row;
+    b!.col = HERO.col + 4;
+    b!.row = HERO.row;
+    for (let i = 0; i < 120; i++) field.update(DT, HERO, WORLD);
+    expect(Math.hypot(a!.col - b!.col, a!.row - b!.row)).toBeGreaterThan(SEPARATION * 0.8);
+  });
+
+  it("leaves monsters that already have room alone", () => {
+    const { field, mon } = fieldWith(HERO.col + SEPARATION * 3, HERO.row);
+    const other = field.list()[1]!;
+    other.col = mon.col + SEPARATION * 2;
+    other.row = mon.row;
+    const before = other.col;
+    field.update(DT, HERO, WORLD);
+    // It walks toward the hero, but nothing pushes it sideways off the row.
+    expect(other.row).toBeCloseTo(mon.row, 6);
+    expect(other.col).toBeLessThan(before);
+  });
+
+  it("does not shove a corpse around", () => {
+    const field = loaded();
+    const [a, b] = field.list();
+    a!.col = HERO.col + 4;
+    a!.row = HERO.row;
+    b!.col = HERO.col + 4;
+    b!.row = HERO.row;
+    b!.dying = true;
+    b!.knock = null;
+    const parked = { col: b!.col, row: b!.row };
+    field.update(DT, HERO, WORLD);
+    expect(b!.col).toBe(parked.col);
+    expect(b!.row).toBe(parked.row);
+  });
+
+  it("still lets a wave closing from all sides reach the hero", () => {
+    // Why SEPARATION stays under the spacing of three monsters stood around the
+    // contact circle: any wider and the ring they settle into would hold every
+    // one of them outside bump range, and the hero could never be hit.
+    const field = loaded();
+    field.list().forEach((m, i) => {
+      const bearing = (i * Math.PI * 2) / WAVE_SIZE;
+      m.col = HERO.col + Math.cos(bearing) * 3;
+      m.row = HERO.row + Math.sin(bearing) * 3;
+    });
+    for (let i = 0; i < 600; i++) field.update(DT, HERO, WORLD);
+    for (const m of field.list()) {
+      expect(Math.hypot(m.col - HERO.col, m.row - HERO.row)).toBeLessThanOrEqual(CONTACT + 1e-6);
+    }
   });
 });
 

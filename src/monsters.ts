@@ -12,7 +12,16 @@ const DEATH_FRAMES = 10;
 export const FRAMES = 8; // slime walk frames
 export const MON_FPS = 10; // walk playback rate
 
-export const MAX_MONSTERS = 1;
+export const WAVE_SIZE = 3; // monsters per wave
+export const WAVE_BREAK = 1.5; // seconds of calm once a wave is cleared
+export const WAVE_STAGGER = 1.4; // seconds between arrivals inside a wave
+// Under 2 * CONTACT * sin(60 degrees) on purpose: that is how far apart three
+// monsters stand when all three are touching the hero, so a wider berth than
+// this would hold the last of them off the hero and stop it ever landing a bump.
+export const SEPARATION = 0.8; // cells monsters keep between each other
+const SEPARATION_RATE = 8; // per second — how quickly a stack eases apart
+const SPREAD = 0.4; // share of its slice a spawn bearing may wander
+
 export const SPEED = 2.6; // cells/sec — slower than the hero, so you can kite them
 export const CONTACT = 0.55; // stop advancing this close: the "bump"
 // Reach has to cover the ground a monster crosses between swings, or it can
@@ -59,6 +68,8 @@ export class MonsterField {
   private death: Sheet;
   private mons: Monster[] = [];
   private settled = 0;
+  // Starts spent so the first wave walks in as soon as the sheets are ready.
+  private calm = WAVE_BREAK;
   ready = false;
 
   constructor(base: string = import.meta.env.BASE_URL) {
@@ -79,24 +90,65 @@ export class MonsterField {
 
   reset(): void {
     this.mons = [];
+    this.calm = WAVE_BREAK;
   }
 
   list(): readonly Monster[] {
     return this.mons;
   }
 
-  private spawn(hero: Pos, world: World): void {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = SPAWN_MIN + Math.random() * (SPAWN_MAX - SPAWN_MIN);
-    this.mons.push({
-      col: clamp(hero.col + Math.cos(angle) * dist, 1, world.cols - 2),
-      row: clamp(hero.row + Math.sin(angle) * dist, 1, world.rows - 2),
-      animT: Math.random(),
-      dying: false,
-      dyingT: 0,
-      faceLeft: false,
-      knock: null,
-    });
+  private spawnWave(hero: Pos, world: World): void {
+    const bearing = Math.random() * Math.PI * 2;
+    const slice = (Math.PI * 2) / WAVE_SIZE;
+    const base = SPAWN_MIN + Math.random() * (SPAWN_MAX - SPAWN_MIN);
+    for (let i = 0; i < WAVE_SIZE; i++) {
+      // One slice of the ring each, so a wave closes in from several bearings
+      // instead of as a single clump. The jitter stays inside its own slice.
+      const angle = bearing + i * slice + (Math.random() - 0.5) * slice * SPREAD;
+      // Each starts a stagger's worth of walking further out than the last, so
+      // they arrive one at a time rather than as one wall.
+      const dist = base + i * SPEED * WAVE_STAGGER;
+      this.mons.push({
+        col: clamp(hero.col + Math.cos(angle) * dist, 1, world.cols - 2),
+        row: clamp(hero.row + Math.sin(angle) * dist, 1, world.rows - 2),
+        animT: Math.random(),
+        dying: false,
+        dyingT: 0,
+        faceLeft: false,
+        knock: null,
+      });
+    }
+  }
+
+  // Every monster homes on the same point, so without this a wave ends up stacked
+  // into what reads as one slime. Easing a share of the overlap away each frame
+  // settles them around the hero rather than jittering against each other.
+  private separate(dt: number): void {
+    const ease = Math.min(1, SEPARATION_RATE * dt);
+    for (let i = 0; i < this.mons.length; i++) {
+      const a = this.mons[i]!;
+      if (a.dying) continue;
+      for (let j = i + 1; j < this.mons.length; j++) {
+        const b = this.mons[j]!;
+        if (b.dying) continue;
+        let dx = b.col - a.col;
+        let dy = b.row - a.row;
+        let d = Math.hypot(dx, dy);
+        if (d >= SEPARATION) continue;
+        if (d === 0) {
+          dx = 1; // exactly stacked leaves no axis to push along
+          dy = 0;
+          d = 1;
+        }
+        const shift = ((SEPARATION - d) / 2) * ease;
+        const ux = (dx / d) * shift;
+        const uy = (dy / d) * shift;
+        a.col -= ux;
+        a.row -= uy;
+        b.col += ux;
+        b.row += uy;
+      }
+    }
   }
 
   update(dt: number, hero: Pos, world: World): void {
@@ -127,7 +179,18 @@ export class MonsterField {
       }
     }
     this.mons = this.mons.filter((m) => !(m.dying && m.dyingT >= FADE));
-    while (this.mons.length < MAX_MONSTERS) this.spawn(hero, world);
+    this.separate(dt);
+
+    // Waves, not a trickle: the field stays empty until the whole batch is gone,
+    // then the next one walks in after a breather.
+    if (this.mons.length > 0) {
+      this.calm = 0;
+      return;
+    }
+    this.calm += dt;
+    if (this.calm < WAVE_BREAK) return;
+    this.spawnWave(hero, world);
+    this.calm = 0;
   }
 
   /** The live monster bumping (col, row), if any. They stop at `CONTACT`, so that is the bump radius. */
