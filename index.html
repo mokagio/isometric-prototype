@@ -34,6 +34,9 @@
         position: fixed;
         top: var(--ww-inset);
         right: var(--ww-inset);
+        /* Over the stick and action pad, which `main.ts` appends later: in
+           landscape on a short screen the open panel reaches down across them. */
+        z-index: 1;
         display: flex;
         flex-direction: column;
         align-items: flex-end;
