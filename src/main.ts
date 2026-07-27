@@ -12,6 +12,7 @@ import { createActionPad } from "./actionPad";
 import { MonsterField } from "./monsters";
 import { Lives } from "./lives";
 import { createHud } from "./hud";
+import { Swing } from "./swing";
 import tilesheetUrl from "../isometric_fantasy_tiles.png";
 
 const WORLD = 80; // fixed roamable map; the camera follows the hero across it
@@ -37,11 +38,9 @@ async function main(): Promise<void> {
   let facing: Facing = 2; // faces the camera to start
   let moving = false;
   let animClock = 0; // continuous clock for the looping idle/run cycles
-  let attackTime: number | null = null; // seconds into a swing, or null when not attacking
-  const ATTACK_DURATION = 0.5; // 7 frames at 14fps
+  const swing = new Swing();
   const triggerAttack = (): void => {
-    if (attackTime !== null || !lives.alive) return;
-    attackTime = 0; // the hit lands when the swing finishes (see the frame loop)
+    if (lives.alive) swing.start();
   };
 
   function restart(): void {
@@ -89,8 +88,8 @@ async function main(): Promise<void> {
     ctx.save();
     ctx.globalAlpha = lives.alpha();
     drawHeroShadow(ctx, feetX, shadowY);
-    const action: HeroAction = attackTime !== null ? "attack" : moving ? "run" : "idle";
-    const actionTime = attackTime ?? animClock;
+    const action: HeroAction = swing.active ? "attack" : moving ? "run" : "idle";
+    const actionTime = swing.active ? swing.time : animClock;
     if (!heroSprite.draw(ctx, feetX, feetY, facing, action, actionTime)) {
       drawHeroPlaceholder(ctx, feetX, feetY);
     }
@@ -113,19 +112,17 @@ async function main(): Promise<void> {
 
       hero.update(dt, input, world);
       monsters.update(dt, hero, world);
-      if (attackTime !== null) {
-        attackTime += dt;
-        if (attackTime >= ATTACK_DURATION) {
-          attackTime = null;
-          monsters.attackAt(hero.col, hero.row); // the swing connects as it finishes
-        }
+      if (swing.update(dt)) monsters.attackAt(hero.col, hero.row);
+      const bumping = monsters.contactAt(hero.col, hero.row);
+      if (bumping && lives.hit()) {
+        hero.knockback(hero.col - bumping.col, hero.row - bumping.row);
+        hud.setLives(lives.lives);
       }
-      if (monsters.touching(hero.col, hero.row) && lives.hit()) hud.setLives(lives.lives);
     } else {
       // Freeze the field and let the hero idle while fading, so the sign lands
       // on a still scene rather than a monster mid-lunge.
       moving = false;
-      attackTime = null;
+      swing.cancel();
       if (lives.gameOver) hud.showGameOver();
     }
 
