@@ -232,7 +232,11 @@
         cursor: grabbing;
       }
       .ww-stick-knob {
-        position: relative; /* lift above the two well layers */
+        /* The rim is `::after`, which paints after every real child, so without
+           the z-index it covers the knob wherever the two meet at full
+           deflection. `position: relative` alone does not beat a later sibling. */
+        position: relative;
+        z-index: 1;
         box-sizing: border-box;
         width: 54px;
         height: 54px;
