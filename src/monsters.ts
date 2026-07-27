@@ -108,6 +108,11 @@ export class MonsterField {
     while (this.mons.length < MAX_MONSTERS) this.spawn(hero, world);
   }
 
+  /** Is a live monster bumping (col, row)? `CONTACT` is where they stop, so it is the bump radius. */
+  touching(col: number, row: number): boolean {
+    return this.mons.some((m) => !m.dying && Math.hypot(m.col - col, m.row - row) <= CONTACT);
+  }
+
   /** A swing at (col, row): every alive monster within melee range dies. */
   attackAt(col: number, row: number): void {
     for (const m of this.mons) {

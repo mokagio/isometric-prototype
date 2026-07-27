@@ -192,6 +192,37 @@ describe("MonsterField chasing", () => {
   });
 });
 
+describe("MonsterField contact", () => {
+  it("bumps whatever is inside contact range", () => {
+    const { field } = fieldWith(HERO.col + CONTACT * 0.5, HERO.row);
+    expect(field.touching(HERO.col, HERO.row)).toBe(true);
+  });
+
+  it("bumps at exactly the contact radius", () => {
+    // Measured from the origin so the distance is exactly CONTACT rather than a
+    // float a hair over it, which would pass whether the bound is < or <=.
+    const { field } = fieldWith(0, 0);
+    expect(field.touching(CONTACT, 0)).toBe(true);
+  });
+
+  it("leaves alone whatever is beyond contact range", () => {
+    const { field } = fieldWith(HERO.col + CONTACT * 1.1, HERO.row);
+    expect(field.touching(HERO.col, HERO.row)).toBe(false);
+  });
+
+  it("cannot be bumped by a monster that is already dying", () => {
+    const { field, mon } = fieldWith(HERO.col, HERO.row);
+    mon.dying = true;
+    expect(field.touching(HERO.col, HERO.row)).toBe(false);
+  });
+
+  it("reports nothing on an empty field", () => {
+    const field = loaded();
+    field.reset();
+    expect(field.touching(HERO.col, HERO.row)).toBe(false);
+  });
+});
+
 describe("MonsterField swings", () => {
   it("kills what is inside melee range", () => {
     const { field, mon } = fieldWith(HERO.col + MELEE * 0.9, HERO.row);
