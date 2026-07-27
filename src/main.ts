@@ -10,6 +10,8 @@ import { facingFromAxis, type Facing } from "./heroSprite";
 import { createHeroSkin, type HeroAction } from "./heroSkin";
 import { createActionPad } from "./actionPad";
 import { MonsterField } from "./monsters";
+import { Lives } from "./lives";
+import { createHud } from "./hud";
 import tilesheetUrl from "../isometric_fantasy_tiles.png";
 
 const WORLD = 80; // fixed roamable map; the camera follows the hero across it
@@ -31,15 +33,30 @@ async function main(): Promise<void> {
 
   const heroSprite = createHeroSkin();
   const monsters = new MonsterField();
+  const lives = new Lives();
   let facing: Facing = 2; // faces the camera to start
   let moving = false;
   let animClock = 0; // continuous clock for the looping idle/run cycles
   let attackTime: number | null = null; // seconds into a swing, or null when not attacking
   const ATTACK_DURATION = 0.5; // 7 frames at 14fps
   const triggerAttack = (): void => {
-    if (attackTime !== null) return;
+    if (attackTime !== null || !lives.alive) return;
     attackTime = 0; // the hit lands when the swing finishes (see the frame loop)
   };
+
+  function restart(): void {
+    world = generateWorld(WORLD, WORLD, randomSeed());
+    spawn = findSpawn(world);
+    hero = new Hero(spawn.col, spawn.row, world);
+    camZ = hero.z;
+    monsters.reset();
+    lives.reset();
+    hud.setLives(lives.lives);
+    hud.hideGameOver();
+  }
+
+  const hud = createHud(restart);
+  hud.setLives(lives.lives);
 
   let cw = 0;
   let ch = 0;
@@ -69,12 +86,15 @@ async function main(): Promise<void> {
     const shadowY = project(hero.col, hero.row, groundZ, o).y + SY;
     const feetX = feet.x;
     const feetY = feet.y + SY;
+    ctx.save();
+    ctx.globalAlpha = lives.alpha();
     drawHeroShadow(ctx, feetX, shadowY);
     const action: HeroAction = attackTime !== null ? "attack" : moving ? "run" : "idle";
     const actionTime = attackTime ?? animClock;
     if (!heroSprite.draw(ctx, feetX, feetY, facing, action, actionTime)) {
       drawHeroPlaceholder(ctx, feetX, feetY);
     }
+    ctx.restore();
   }
 
   let last = 0;
@@ -82,21 +102,33 @@ async function main(): Promise<void> {
     const dt = last ? Math.min((now - last) / 1000, 0.05) : 0;
     last = now;
 
-    const axis = input.axis;
-    moving = axis.dc !== 0 || axis.dr !== 0;
-    const nextFacing = facingFromAxis(axis.dc, axis.dr);
-    if (nextFacing !== null) facing = nextFacing;
-
-    hero.update(dt, input, world);
-    monsters.update(dt, hero, world);
     animClock += dt;
-    if (attackTime !== null) {
-      attackTime += dt;
-      if (attackTime >= ATTACK_DURATION) {
-        attackTime = null;
-        monsters.attackAt(hero.col, hero.row); // the swing connects as it finishes
+    lives.update(dt);
+
+    if (lives.alive) {
+      const axis = input.axis;
+      moving = axis.dc !== 0 || axis.dr !== 0;
+      const nextFacing = facingFromAxis(axis.dc, axis.dr);
+      if (nextFacing !== null) facing = nextFacing;
+
+      hero.update(dt, input, world);
+      monsters.update(dt, hero, world);
+      if (attackTime !== null) {
+        attackTime += dt;
+        if (attackTime >= ATTACK_DURATION) {
+          attackTime = null;
+          monsters.attackAt(hero.col, hero.row); // the swing connects as it finishes
+        }
       }
+      if (monsters.touching(hero.col, hero.row) && lives.hit()) hud.setLives(lives.lives);
+    } else {
+      // Freeze the field and let the hero idle while fading, so the sign lands
+      // on a still scene rather than a monster mid-lunge.
+      moving = false;
+      attackTime = null;
+      if (lives.gameOver) hud.showGameOver();
     }
+
     const groundZ = world.heightAt(Math.round(hero.col), Math.round(hero.row));
     camZ += (groundZ - camZ) * Math.min(1, dt * 8);
 
@@ -123,13 +155,7 @@ async function main(): Promise<void> {
   requestAnimationFrame(frame);
 
   createMenu({
-    onNewWorld: () => {
-      world = generateWorld(WORLD, WORLD, randomSeed());
-      spawn = findSpawn(world);
-      hero = new Hero(spawn.col, spawn.row, world);
-      camZ = hero.z;
-      monsters.reset();
-    },
+    onNewWorld: restart,
     onEditor: () => {
       location.href = "editor.html";
     },
