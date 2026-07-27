@@ -105,6 +105,68 @@
         }
       }
 
+      .ww-hearts {
+        position: fixed;
+        top: var(--ww-inset);
+        left: var(--ww-inset);
+        /* Wrap rather than run under the menu button once the row outgrows the
+           screen, so raising MAX_LIVES stays a one-line change. */
+        max-width: calc(100% - var(--ww-btn) - var(--ww-inset) * 3);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+        font-size: 20px;
+        line-height: 1;
+        /* The row sits over whatever terrain scrolls under it, so both states
+           need an outline to stay legible on bright grass and pale sand. */
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+        pointer-events: none;
+        user-select: none;
+      }
+      .ww-heart-lost {
+        filter: grayscale(1) brightness(0.45);
+        opacity: 0.6;
+      }
+
+      .ww-gameover {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(12, 20, 12, 0.6);
+        font-family: Georgia, "Times New Roman", serif;
+        user-select: none;
+      }
+      /* `display: grid` above outranks the UA's `[hidden]` rule, so restate it. */
+      .ww-gameover[hidden] {
+        display: none;
+      }
+      .ww-gameover-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        padding: 28px 40px;
+        background: #3b2a1c;
+        border: 3px solid #6b4f34;
+        border-radius: 14px;
+        box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+      }
+      .ww-gameover-title {
+        color: #f4e4c1;
+        font-size: 34px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      /* Widened out of the menu button's fixed square. */
+      .ww-gameover-btn {
+        width: auto;
+        height: auto;
+        padding: 12px 30px;
+        font-family: inherit;
+        font-size: 20px;
+      }
+
       .ww-pad {
         position: fixed;
         right: var(--ww-inset);
