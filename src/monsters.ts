@@ -1,4 +1,5 @@
 import type { World } from "./world";
+import { blitFrame, frameAt, SheetLoader, type Sheet } from "./sprites";
 
 // oboropixel slime (public/oboro/slime/): 96x96 side-view frames, one row per
 // animation. Monsters home in on the hero and bump; a hit plays the death
@@ -66,41 +67,28 @@ export interface Monster {
   knock: Knock | null;
 }
 
-interface Sheet {
-  img: HTMLImageElement;
-  ok: boolean;
-}
-
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
 
 export class MonsterField {
   private walk: Sheet;
   private death: Sheet;
   private mons: Monster[] = [];
-  private settled = 0;
+  private loader = new SheetLoader(2);
   // Starts spent so the first wave walks in as soon as the sheets are ready.
   private calm = WAVE_BREAK;
   private mode: AggroMode = "hunt";
-  ready = false;
+
+  get ready(): boolean {
+    return this.loader.ready;
+  }
 
   setMode(mode: AggroMode): void {
     this.mode = mode;
   }
 
   constructor(base: string = import.meta.env.BASE_URL) {
-    const load = (file: string): Sheet => {
-      const sheet: Sheet = { img: new Image(), ok: false };
-      const settle = (ok: boolean): void => {
-        sheet.ok = ok;
-        if (++this.settled === 2) this.ready = true;
-      };
-      sheet.img.onload = () => settle(true);
-      sheet.img.onerror = () => settle(false);
-      sheet.img.src = `${base}oboro/slime/${file}`;
-      return sheet;
-    };
-    this.walk = load("walk.png");
-    this.death = load("death.png");
+    this.walk = this.loader.load(`${base}oboro/slime/walk.png`);
+    this.death = this.loader.load(`${base}oboro/slime/death.png`);
   }
 
   reset(): void {
@@ -256,20 +244,17 @@ export class MonsterField {
       // death reads as an animation rather than a fade.
       alpha = p < 1 - FADE_TAIL ? 1 : Math.max(0, (1 - p) / FADE_TAIL);
     } else {
-      frame = Math.floor(m.animT * MON_FPS) % FRAMES;
+      frame = frameAt(m.animT, MON_FPS, FRAMES, true);
     }
 
-    const dx = Math.round(feetX - ANCHOR_X * SCALE);
-    const dy = Math.round(feetY - ANCHOR_Y * SCALE);
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, alpha);
-    ctx.imageSmoothingEnabled = false;
-    if (m.faceLeft) {
-      ctx.translate(feetX, 0);
-      ctx.scale(-1, 1);
-      ctx.translate(-feetX, 0);
-    }
-    ctx.drawImage(sheet.img, frame * CELL, 0, CELL, CELL, dx, dy, CELL * SCALE, CELL * SCALE);
-    ctx.restore();
+    blitFrame(ctx, sheet.img, feetX, feetY, {
+      cell: CELL,
+      scale: SCALE,
+      anchorX: ANCHOR_X,
+      anchorY: ANCHOR_Y,
+      frame,
+      flip: m.faceLeft,
+      alpha,
+    });
   }
 }
