@@ -1,4 +1,5 @@
 import type { HeroAction, HeroSkin } from "./heroSkin";
+import { frameAt, SheetLoader, type Sheet } from "./sprites";
 
 // Composites an LPC (Universal LPC Spritesheet) walk cycle for the hero.
 //
@@ -34,11 +35,6 @@ const LAYER_DEFS: LayerDef[] = [
   { path: "weapon/sword/longsword/walk/longsword.png", zPos: 150 },
 ];
 
-interface Layer {
-  img: HTMLImageElement;
-  ok: boolean;
-}
-
 export type Facing = 0 | 1 | 2 | 3; // up, left, down, right
 
 /** Movement direction → the nearest of LPC's four facings, or null when still. */
@@ -51,34 +47,25 @@ export function facingFromAxis(dc: number, dr: number): Facing | null {
 }
 
 export class HeroSprite implements HeroSkin {
-  private layers: Layer[] = [];
-  private settled = 0;
-  ready = false;
+  private layers: Sheet[] = [];
+  private loader = new SheetLoader(LAYER_DEFS.length);
+
+  get ready(): boolean {
+    return this.loader.ready;
+  }
 
   constructor(base = LPC_BASE) {
     const defs = [...LAYER_DEFS].sort((a, b) => a.zPos - b.zPos);
     for (const def of defs) {
-      const layer: Layer = { img: new Image(), ok: false };
-      layer.img.crossOrigin = "anonymous";
-      layer.img.onload = () => {
-        layer.ok = true;
-        this.settle(defs.length);
-      };
-      layer.img.onerror = () => this.settle(defs.length); // a missing layer just drops
-      layer.img.src = base + def.path;
-      this.layers.push(layer);
+      this.layers.push(this.loader.load(base + def.path, "anonymous"));
     }
-  }
-
-  private settle(total: number): void {
-    if (++this.settled === total) this.ready = true;
   }
 
   // Only `walk` sheets are loaded, so run cycles frames 1..8 and everything else
   // (idle, and attack — no LPC slash sheet is wired) shows the neutral frame 0.
   private frame(action: HeroAction, actionTime: number): number {
     if (action !== "run") return 0;
-    return 1 + (Math.floor(actionTime * WALK_FPS) % (FRAMES - 1));
+    return 1 + frameAt(actionTime, WALK_FPS, FRAMES - 1, true);
   }
 
   /**
