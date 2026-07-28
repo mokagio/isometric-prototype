@@ -9,11 +9,11 @@ import { Hero, drawHeroPlaceholder, drawHeroShadow } from "./hero";
 import { facingFromAxis, type Facing } from "./heroSprite";
 import { createHeroSkin, type HeroAction } from "./heroSkin";
 import { createActionPad } from "./actionPad";
-import { MonsterField } from "./monsters";
+import { AGGRO_HALF, MonsterField } from "./monsters";
 import { Lives } from "./lives";
 import { createHud } from "./hud";
 import { Swing } from "./swing";
-import { drawBox, HERO_BOX, MONSTER_BOX } from "./debug";
+import { drawArea, drawBox, HERO_BOX, MONSTER_BOX } from "./debug";
 import tilesheetUrl from "../isometric_fantasy_tiles.png";
 
 const WORLD = 80; // fixed roamable map; the camera follows the hero across it
@@ -163,6 +163,7 @@ async function main(): Promise<void> {
       const hf = project(hero.col, hero.row, hero.z, origin);
       drawBox(ctx, hf.x, hf.y + SY, HERO_BOX, "#7cff5a");
       for (const m of monsters.list()) {
+        drawArea(ctx, m.col, m.row, AGGRO_HALF, origin, "#ffd24a"); // the lurk square
         const mf = project(m.col, m.row, 0, origin);
         drawBox(ctx, mf.x, mf.y + SY, MONSTER_BOX, "#ff5a5a");
       }

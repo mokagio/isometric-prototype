@@ -1,3 +1,5 @@
+import { project, type Origin } from "./iso";
+
 // Debug bounding boxes. The offsets match the default oboropixel skins — the
 // soldier hero and the slime monster — tracking each figure's visible bounds
 // within its 96px frame, from the feet anchor, at draw SCALE 3.
@@ -28,5 +30,33 @@ export function drawBox(
   ctx.beginPath();
   ctx.arc(feetX, feetY, 2.5, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+/** Outline the (2*half+1) square of cells centred on (col, row) — the lurk area. */
+export function drawArea(
+  ctx: CanvasRenderingContext2D,
+  col: number,
+  row: number,
+  half: number,
+  origin: Origin,
+  color: string,
+): void {
+  const h = half + 0.5; // cell edges, so the square wraps the whole 5x5 block
+  const corners = [
+    project(col - h, row - h, 0, origin),
+    project(col + h, row - h, 0, origin),
+    project(col + h, row + h, 0, origin),
+    project(col - h, row + h, 0, origin),
+  ];
+  ctx.save();
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(corners[0]!.x, corners[0]!.y);
+  for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i]!.x, corners[i]!.y);
+  ctx.closePath();
+  ctx.stroke();
   ctx.restore();
 }
