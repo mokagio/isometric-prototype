@@ -4,12 +4,12 @@ import type { HeroAction, HeroSkin } from "./heroSkin";
 // oboropixel "Free Characters Animations" pack (public/oboro/<character>/).
 // 96x96 frames, one row per animation (a horizontal strip), side-view facing
 // right — so left/right is a horizontal flip and there is no up/down facing.
-const CELL = 96;
+export const CELL = 96;
 const SCALE = 3;
 const ANCHOR_X = 48; // frame centre
 const ANCHOR_Y = 57; // feet baseline within the 96px frame
 
-const ANIM: Record<HeroAction, { file: string; frames: number; fps: number; loop: boolean }> = {
+export const ANIM: Record<HeroAction, { file: string; frames: number; fps: number; loop: boolean }> = {
   idle: { file: "idle.png", frames: 6, fps: 8, loop: true },
   run: { file: "walk.png", frames: 8, fps: 12, loop: true },
   attack: { file: "attack.png", frames: 8, fps: 16, loop: false },
@@ -18,7 +18,7 @@ const ANIM: Record<HeroAction, { file: string; frames: number; fps: number; loop
 // Death is played through `drawDefeat`, not the shared action set, so skins
 // without a death sheet needn't carry one. Plays once and holds the last frame
 // (the fallen body).
-const DEATH = { file: "death.png", frames: 10, fps: 10 };
+export const DEATH = { file: "death.png", frames: 10, fps: 10 };
 
 interface Sheet {
   img: HTMLImageElement;
