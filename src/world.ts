@@ -17,16 +17,20 @@ const FLOWERS: Tile[] = [
   [2, 2],
 ];
 const DIRT: Tile = [0, 1]; // cliff-face body cube
-const WATER: Tile = [7, 1];
+const WATER: Tile = [0, 10]; // the bright blue water cube
 
 export const GROUND_HEIGHT = 0; // single flat level for the whole world
 const WATER_THRESHOLD = 0.22; // lower noise → water; keeps ponds small and scattered
 const NOISE_FREQ = 0.11; // higher → smaller, more broken-up water features
 // Rivers: a thin band tracing one contour of a low-frequency field, so it winds
 // across the map as a narrow ribbon rather than a blob.
-const RIVER_FREQ = 0.045;
-const RIVER_WIDTH = 0.04;
+const RIVER_FREQ = 0.05;
+const RIVER_WIDTH = 0.022;
 const RIVER_SEED = 4242;
+// Dry crossings punched through rivers on a grid, so a winding river always
+// hits one and can never wall the map off end to end. Pools keep their shape.
+const FORD_PERIOD = 11; // cells between crossings
+const FORD_GAP = 2; // width of each crossing
 
 // Terraced-generation tuning, kept for `{ flat: false }` worlds.
 export const MAX_HEIGHT = 6;
@@ -93,9 +97,10 @@ function fbm(x: number, y: number, seed: number): number {
 }
 
 function isWaterAt(col: number, row: number, seed: number): boolean {
-  const pool = fbm(col * NOISE_FREQ, row * NOISE_FREQ, seed) < WATER_THRESHOLD;
+  if (fbm(col * NOISE_FREQ, row * NOISE_FREQ, seed) < WATER_THRESHOLD) return true; // pool
   const river = Math.abs(fbm(col * RIVER_FREQ, row * RIVER_FREQ, seed + RIVER_SEED) - 0.5) < RIVER_WIDTH;
-  return pool || river;
+  const ford = col % FORD_PERIOD < FORD_GAP || row % FORD_PERIOD < FORD_GAP;
+  return river && !ford;
 }
 
 function flatCell(col: number, row: number, seed: number): Cell {
