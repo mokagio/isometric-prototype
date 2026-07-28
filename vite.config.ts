@@ -8,6 +8,7 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, "index.html"),
         editor: resolve(import.meta.dirname, "editor.html"),
+        credits: resolve(import.meta.dirname, "credits.html"),
       },
     },
   },

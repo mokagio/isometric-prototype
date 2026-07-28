@@ -176,6 +176,9 @@ async function main(): Promise<void> {
     onEditor: () => {
       location.href = "editor.html";
     },
+    onCredits: () => {
+      location.href = "credits.html";
+    },
     onEnemyMode: (lurk) => monsters.setMode(lurk ? "lurk" : "hunt"),
     onDebug: (on) => {
       debug = on;
