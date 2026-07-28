@@ -28,7 +28,8 @@ export const CONTACT = 0.55; // stop advancing this close: the "bump"
 // step from outside the blade to bumping the hero in a gap and take a heart
 // however well the swing was timed. `encounter.test.ts` pins the relationship.
 export const MELEE = 2; // a swing kills monsters within this radius
-export const FADE = 0.4; // death: seconds to play the death anim and fade out
+export const FADE = 0.6; // death: seconds to play the deflate animation out
+const FADE_TAIL = 0.3; // last fraction of the death that fades — the rest is full opacity
 export const KNOCKBACK = 1.6; // cells a killed monster is thrown, over the fade
 export const SPAWN_MIN = 7;
 export const SPAWN_MAX = 12;
@@ -225,7 +226,9 @@ export class MonsterField {
     if (m.dying) {
       const p = Math.min(1, m.dyingT / FADE);
       frame = Math.min(DEATH_FRAMES - 1, Math.floor(p * DEATH_FRAMES));
-      alpha = 1 - p;
+      // Full opacity through the deflate, fading only over the tail, so the
+      // death reads as an animation rather than a fade.
+      alpha = p < 1 - FADE_TAIL ? 1 : Math.max(0, (1 - p) / FADE_TAIL);
     } else {
       frame = Math.floor(m.animT * MON_FPS) % FRAMES;
     }

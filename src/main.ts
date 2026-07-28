@@ -86,7 +86,9 @@ async function main(): Promise<void> {
     const feetX = feet.x;
     const feetY = feet.y + SY;
     ctx.save();
-    ctx.globalAlpha = lives.alpha();
+    // Blink through the immunity window while alive; on death the fall-down
+    // animation plays at full opacity — no fade-out.
+    ctx.globalAlpha = lives.alive ? lives.alpha() : 1;
     drawHeroShadow(ctx, feetX, shadowY);
     if (!lives.alive) {
       // Defeated: play the fall-down death animation (skins without one hold idle).

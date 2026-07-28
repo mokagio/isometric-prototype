@@ -531,11 +531,12 @@ describe("MonsterField.draw", () => {
     expect(drawOnce((m) => (m.dying = true)).src).toContain("death.png");
   });
 
-  it("fades out as the death plays", () => {
-    const start = drawOnce((m) => ((m.dying = true), (m.dyingT = 0))).alpha;
-    const mid = drawOnce((m) => ((m.dying = true), (m.dyingT = FADE / 2))).alpha;
-    expect(start).toBeGreaterThan(mid);
-    expect(mid).toBeGreaterThan(0);
+  it("plays at full opacity, then fades out over the tail", () => {
+    expect(drawOnce((m) => ((m.dying = true), (m.dyingT = 0))).alpha).toBe(1);
+    expect(drawOnce((m) => ((m.dying = true), (m.dyingT = FADE / 2))).alpha).toBe(1);
+    const tail = drawOnce((m) => ((m.dying = true), (m.dyingT = FADE * 0.95))).alpha;
+    expect(tail).toBeGreaterThan(0);
+    expect(tail).toBeLessThan(1);
   });
 
   it("never asks for a negative alpha once the death overruns", () => {
