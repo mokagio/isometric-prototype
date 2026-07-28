@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  AGGRO_HALF,
   CONTACT,
   FADE,
   FRAMES,
@@ -559,5 +560,40 @@ describe("MonsterField.draw", () => {
     expect(dx! + dw! / 2).toBe(500);
     expect(dy!).toBeLessThan(300);
     expect(dy! + dh!).toBeGreaterThan(300); // anchored inside the frame, not on its bottom edge
+  });
+});
+
+describe("MonsterField aggro modes", () => {
+  it("hunt (the default) closes even from well outside the square", () => {
+    const { field, mon } = fieldWith(HERO.col + 8, HERO.row);
+    const before = mon.col;
+    field.update(DT, HERO, WORLD);
+    expect(mon.col).toBeLessThan(before);
+  });
+
+  it("lurk holds a monster still while the hero is outside its square", () => {
+    const { field, mon } = fieldWith(HERO.col + AGGRO_HALF + 1, HERO.row);
+    field.setMode("lurk");
+    const { col, row } = mon;
+    field.update(DT, HERO, WORLD);
+    expect(mon.col).toBe(col);
+    expect(mon.row).toBe(row);
+  });
+
+  it("lurk wakes the monster once the hero steps inside the square", () => {
+    const { field, mon } = fieldWith(HERO.col + AGGRO_HALF - 1, HERO.row);
+    field.setMode("lurk");
+    const before = mon.col;
+    field.update(DT, HERO, WORLD);
+    expect(mon.col).toBeLessThan(before);
+  });
+
+  it("the square is measured per-axis, not by straight-line distance", () => {
+    // A corner cell (AGGRO_HALF, AGGRO_HALF) is ~2.8 away yet still inside a 5x5.
+    const { field, mon } = fieldWith(HERO.col + AGGRO_HALF, HERO.row + AGGRO_HALF);
+    field.setMode("lurk");
+    const before = Math.hypot(mon.col - HERO.col, mon.row - HERO.row);
+    field.update(DT, HERO, WORLD);
+    expect(Math.hypot(mon.col - HERO.col, mon.row - HERO.row)).toBeLessThan(before);
   });
 });

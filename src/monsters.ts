@@ -33,6 +33,12 @@ const FADE_TAIL = 0.3; // last fraction of the death that fades — the rest is 
 export const KNOCKBACK = 1.6; // cells a killed monster is thrown, over the fade
 export const SPAWN_MIN = 7;
 export const SPAWN_MAX = 12;
+// "lurk" mode: the hero must be within this many cells on both axes — a 5x5
+// square centred on the monster — to wake it. "hunt" mode ignores it.
+export const AGGRO_HALF = 2;
+
+// hunt: always close on the hero. lurk: only once the hero enters the square.
+export type AggroMode = "hunt" | "lurk";
 
 interface Pos {
   col: number;
@@ -71,7 +77,12 @@ export class MonsterField {
   private settled = 0;
   // Starts spent so the first wave walks in as soon as the sheets are ready.
   private calm = WAVE_BREAK;
+  private mode: AggroMode = "hunt";
   ready = false;
+
+  setMode(mode: AggroMode): void {
+    this.mode = mode;
+  }
 
   constructor(base: string = import.meta.env.BASE_URL) {
     const load = (file: string): Sheet => {
@@ -173,7 +184,9 @@ export class MonsterField {
       const dy = hero.row - m.row;
       const d = Math.hypot(dx, dy);
       m.faceLeft = dx - dy < 0; // the hero's screen-x direction from the monster
-      if (d > CONTACT) {
+      // In lurk mode a monster only stirs once the hero is inside its square.
+      const awake = this.mode === "hunt" || (Math.abs(dx) <= AGGRO_HALF && Math.abs(dy) <= AGGRO_HALF);
+      if (awake && d > CONTACT) {
         const step = SPEED * dt;
         m.col += (dx / d) * step;
         m.row += (dy / d) * step;

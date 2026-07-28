@@ -13,6 +13,7 @@ import { MonsterField } from "./monsters";
 import { Lives } from "./lives";
 import { createHud } from "./hud";
 import { Swing } from "./swing";
+import { drawBox, HERO_BOX, MONSTER_BOX } from "./debug";
 import tilesheetUrl from "../isometric_fantasy_tiles.png";
 
 const WORLD = 80; // fixed roamable map; the camera follows the hero across it
@@ -39,6 +40,7 @@ async function main(): Promise<void> {
   let moving = false;
   let animClock = 0; // continuous clock for the looping idle/run cycles
   const swing = new Swing();
+  let debug = false;
   const triggerAttack = (): void => {
     if (lives.alive) swing.start();
   };
@@ -157,6 +159,15 @@ async function main(): Promise<void> {
     }
     render(ctx, tileset, world, origin, cw, ch, entities);
 
+    if (debug) {
+      const hf = project(hero.col, hero.row, hero.z, origin);
+      drawBox(ctx, hf.x, hf.y + SY, HERO_BOX, "#7cff5a");
+      for (const m of monsters.list()) {
+        const mf = project(m.col, m.row, 0, origin);
+        drawBox(ctx, mf.x, mf.y + SY, MONSTER_BOX, "#ff5a5a");
+      }
+    }
+
     requestAnimationFrame(frame);
   }
 
@@ -167,6 +178,10 @@ async function main(): Promise<void> {
     onNewWorld: restart,
     onEditor: () => {
       location.href = "editor.html";
+    },
+    onEnemyMode: (lurk) => monsters.setMode(lurk ? "lurk" : "hunt"),
+    onDebug: (on) => {
+      debug = on;
     },
   });
 
