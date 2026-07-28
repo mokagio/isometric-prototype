@@ -597,3 +597,14 @@ describe("MonsterField aggro modes", () => {
     expect(Math.hypot(mon.col - HERO.col, mon.row - HERO.row)).toBeLessThan(before);
   });
 });
+
+describe("MonsterField water", () => {
+  it("stops a monster at the shore rather than walking into water", () => {
+    // A river three columns wide (101-103) between the monster (105) and hero (100).
+    const river = { cols: 200, rows: 200, isWater: (c: number) => c >= 101 && c <= 103 } as unknown as World;
+    const { field, mon } = fieldWith(105, HERO.row);
+    for (let i = 0; i < 300; i++) field.update(DT, HERO, river);
+    expect(mon.col).toBeLessThan(105); // it did advance
+    expect(Math.round(mon.col)).toBe(104); // but parked in the dry cell beside the river
+  });
+});

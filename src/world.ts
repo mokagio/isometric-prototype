@@ -20,8 +20,13 @@ const DIRT: Tile = [0, 1]; // cliff-face body cube
 const WATER: Tile = [7, 1];
 
 export const GROUND_HEIGHT = 0; // single flat level for the whole world
-const WATER_THRESHOLD = 0.24; // lower noise → water; keeps ponds small and scattered
+const WATER_THRESHOLD = 0.22; // lower noise → water; keeps ponds small and scattered
 const NOISE_FREQ = 0.11; // higher → smaller, more broken-up water features
+// Rivers: a thin band tracing one contour of a low-frequency field, so it winds
+// across the map as a narrow ribbon rather than a blob.
+const RIVER_FREQ = 0.045;
+const RIVER_WIDTH = 0.04;
+const RIVER_SEED = 4242;
 
 // Terraced-generation tuning, kept for `{ flat: false }` worlds.
 export const MAX_HEIGHT = 6;
@@ -46,6 +51,8 @@ export interface World {
   cell(col: number, row: number): Cell;
   /** Surface height at a cell — where a character stands. */
   heightAt(col: number, row: number): number;
+  /** Whether a cell is water — impassable to the hero and monsters. */
+  isWater(col: number, row: number): boolean;
 }
 
 // Deterministic hash → [0, 1) at integer lattice points.
@@ -85,10 +92,16 @@ function fbm(x: number, y: number, seed: number): number {
   return value / norm;
 }
 
+function isWaterAt(col: number, row: number, seed: number): boolean {
+  const pool = fbm(col * NOISE_FREQ, row * NOISE_FREQ, seed) < WATER_THRESHOLD;
+  const river = Math.abs(fbm(col * RIVER_FREQ, row * RIVER_FREQ, seed + RIVER_SEED) - 0.5) < RIVER_WIDTH;
+  return pool || river;
+}
+
 function flatCell(col: number, row: number, seed: number): Cell {
-  // Noise only paints where water pools; a hash sprinkles grass variants and
-  // the odd flower patch. Every column stays at ground level.
-  if (fbm(col * NOISE_FREQ, row * NOISE_FREQ, seed) < WATER_THRESHOLD) {
+  // Water pools and rivers; a hash sprinkles grass variants and the odd flower
+  // patch onto the dry land. Every column stays at ground level.
+  if (isWaterAt(col, row, seed)) {
     return { height: GROUND_HEIGHT, surface: WATER, isWater: true };
   }
   const v = hash(col, row, seed + 7);
@@ -135,6 +148,7 @@ export function generateWorld(cols: number, rows: number, seed = 1337, options: 
     body: DIRT,
     cell: (col, row) => cells[clamp(row, 0, rows - 1)]![clamp(col, 0, cols - 1)]!,
     heightAt: (col, row) => cells[clamp(row, 0, rows - 1)]![clamp(col, 0, cols - 1)]!.height,
+    isWater: (col, row) => cells[clamp(row, 0, rows - 1)]![clamp(col, 0, cols - 1)]!.isWater,
   };
 }
 

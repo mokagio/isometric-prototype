@@ -126,3 +126,18 @@ describe("Hero.knockback", () => {
     expect(hero.row).toBe(5);
   });
 });
+
+describe("Hero water", () => {
+  it("cannot step onto a water cell", () => {
+    // Flat land, but every column from 6 on is water.
+    const world = {
+      cols: 20,
+      rows: 20,
+      heightAt: () => 0,
+      isWater: (c: number) => c >= 6,
+    } as unknown as Parameters<Hero["update"]>[2];
+    const hero = new Hero(5, 5, world);
+    run(hero, world, 60, { axis: { dc: 1, dr: 0 }, jump: false });
+    expect(Math.round(hero.col)).toBe(5); // stopped at the shore
+  });
+})

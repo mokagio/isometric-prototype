@@ -120,9 +120,16 @@ export class MonsterField {
       // Each starts a stagger's worth of walking further out than the last, so
       // they arrive one at a time rather than as one wall.
       const dist = base + i * SPEED * WAVE_STAGGER;
+      let col = clamp(hero.col + Math.cos(angle) * dist, 1, world.cols - 2);
+      let row = clamp(hero.row + Math.sin(angle) * dist, 1, world.rows - 2);
+      // Don't strand a spawn in the water — draw it in toward the hero to dry land.
+      for (let k = 0; k < 20 && world.isWater?.(Math.round(col), Math.round(row)); k++) {
+        col = clamp(col + (hero.col - col) * 0.15, 1, world.cols - 2);
+        row = clamp(row + (hero.row - row) * 0.15, 1, world.rows - 2);
+      }
       this.mons.push({
-        col: clamp(hero.col + Math.cos(angle) * dist, 1, world.cols - 2),
-        row: clamp(hero.row + Math.sin(angle) * dist, 1, world.rows - 2),
+        col,
+        row,
         animT: Math.random(),
         dying: false,
         dyingT: 0,
@@ -188,8 +195,11 @@ export class MonsterField {
       const awake = this.mode === "hunt" || (Math.abs(dx) <= AGGRO_HALF && Math.abs(dy) <= AGGRO_HALF);
       if (awake && d > CONTACT) {
         const step = SPEED * dt;
-        m.col += (dx / d) * step;
-        m.row += (dy / d) * step;
+        // Per-axis, blocked by water, so a slime slides along the shore.
+        const nc = m.col + (dx / d) * step;
+        if (!world.isWater?.(Math.round(nc), Math.round(m.row))) m.col = nc;
+        const nr = m.row + (dy / d) * step;
+        if (!world.isWater?.(Math.round(m.col), Math.round(nr))) m.row = nr;
       }
     }
     this.mons = this.mons.filter((m) => !(m.dying && m.dyingT >= FADE));

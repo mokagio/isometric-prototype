@@ -34,6 +34,15 @@ describe("generateWorld (flat — the default)", () => {
     expect(world.heightAt(-5, -5)).toBe(world.heightAt(0, 0));
     expect(world.heightAt(999, 999)).toBe(world.heightAt(world.cols - 1, world.rows - 1));
   });
+
+  it("reports isWater in step with each cell", () => {
+    for (let row = 0; row < world.rows; row++) {
+      for (let col = 0; col < world.cols; col++) {
+        expect(world.isWater(col, row)).toBe(world.cell(col, row).isWater);
+      }
+    }
+    expect(world.isWater(-3, -3)).toBe(world.isWater(0, 0)); // clamps like the others
+  });
 });
 
 describe("generateWorld (terraced — { flat: false })", () => {

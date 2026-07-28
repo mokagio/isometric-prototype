@@ -19,7 +19,7 @@ export interface HeroControls {
 }
 
 // Just enough of the world for the hero to stand on.
-type Terrain = Pick<World, "cols" | "rows" | "heightAt">;
+type Terrain = Pick<World, "cols" | "rows" | "heightAt"> & { isWater?: World["isWater"] };
 
 export class Hero {
   col: number;
@@ -47,6 +47,7 @@ export class Hero {
     const c = Math.round(col);
     const r = Math.round(row);
     if (c < 0 || r < 0 || c >= world.cols || r >= world.rows) return false;
+    if (world.isWater?.(c, r)) return false; // water is impassable
     return world.heightAt(c, r) <= this.z + CLIMB;
   }
 
