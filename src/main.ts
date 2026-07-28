@@ -1,7 +1,8 @@
 import { loadTileset } from "./tileset";
 import { generateWorld, findSpawn } from "./world";
 import { render, type Entity } from "./renderer";
-import { project, SX, SY, SZ, type Origin } from "./iso";
+import { project, SY, type Origin } from "./iso";
+import { Camera } from "./camera";
 import { createMenu } from "./ui";
 import { createStick } from "./stick";
 import { Input } from "./input";
@@ -29,9 +30,9 @@ async function main(): Promise<void> {
   let world = generateWorld(WORLD, WORLD, randomSeed());
   let spawn = findSpawn(world);
   let hero = new Hero(spawn.col, spawn.row, world);
-  // Camera height tracks the ground under the hero (smoothed), not the hero's
-  // own z — so a jump reads as the hero rising, and climbs pan gently.
-  let camZ = hero.z;
+  // Height tracks the ground under the hero, not the hero's own z, so a jump
+  // reads as the hero rising and climbs pan gently.
+  const camera = new Camera(hero.z);
 
   const heroSprite = createHeroSkin();
   const monsters = new MonsterField();
@@ -49,7 +50,7 @@ async function main(): Promise<void> {
     world = generateWorld(WORLD, WORLD, randomSeed());
     spawn = findSpawn(world);
     hero = new Hero(spawn.col, spawn.row, world);
-    camZ = hero.z;
+    camera.snap(hero.z);
     monsters.reset();
     lives.reset();
     hud.setLives(lives.lives);
@@ -74,12 +75,6 @@ async function main(): Promise<void> {
     canvas.style.width = `${w}px`;
     canvas.style.height = `${h}px`;
   }
-
-  // Camera centres the hero on screen, so moving scrolls the world.
-  const cameraOrigin = (): Origin => ({
-    x: cw / 2 - (hero.col - hero.row) * SX,
-    y: ch / 2 - ((hero.col + hero.row) * SY - camZ * SZ) - SY,
-  });
 
   function drawHero(o: Origin): void {
     const feet = project(hero.col, hero.row, hero.z, o);
@@ -141,11 +136,11 @@ async function main(): Promise<void> {
     }
 
     const groundZ = world.heightAt(Math.round(hero.col), Math.round(hero.row));
-    camZ += (groundZ - camZ) * Math.min(1, dt * 8);
+    camera.follow(groundZ, dt);
 
     fitCanvas();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const origin = cameraOrigin();
+    const origin = camera.origin(hero, { width: cw, height: ch });
     const entities: Entity[] = [{ col: hero.col, row: hero.row, draw: () => drawHero(origin) }];
     for (const m of monsters.list()) {
       entities.push({
