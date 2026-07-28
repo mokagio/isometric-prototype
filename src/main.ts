@@ -3,6 +3,8 @@ import { generateWorld, findSpawn } from "./world";
 import { render, type Entity } from "./renderer";
 import { project, SY, type Origin } from "./iso";
 import { Camera } from "./camera";
+import { Loop } from "./loop";
+import { Viewport } from "./viewport";
 import { createMenu } from "./ui";
 import { createStick } from "./stick";
 import { Input } from "./input";
@@ -60,21 +62,7 @@ async function main(): Promise<void> {
   const hud = createHud(restart);
   hud.setLives(lives.lives);
 
-  let cw = 0;
-  let ch = 0;
-  let dpr = 1;
-  function fitCanvas(): void {
-    dpr = window.devicePixelRatio || 1;
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    if (w === cw && h === ch) return;
-    cw = w;
-    ch = h;
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
-  }
+  const viewport = new Viewport(canvas);
 
   function drawHero(o: Origin): void {
     const feet = project(hero.col, hero.row, hero.z, o);
@@ -105,11 +93,7 @@ async function main(): Promise<void> {
     ctx.restore();
   }
 
-  let last = 0;
-  function frame(now: number): void {
-    const dt = last ? Math.min((now - last) / 1000, 0.05) : 0;
-    last = now;
-
+  const step = (dt: number): void => {
     animClock += dt;
     lives.update(dt);
 
@@ -138,9 +122,9 @@ async function main(): Promise<void> {
     const groundZ = world.heightAt(Math.round(hero.col), Math.round(hero.row));
     camera.follow(groundZ, dt);
 
-    fitCanvas();
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const origin = camera.origin(hero, { width: cw, height: ch });
+    viewport.fit();
+    viewport.applyTransform(ctx);
+    const origin = camera.origin(hero, { width: viewport.width, height: viewport.height });
     const entities: Entity[] = [{ col: hero.col, row: hero.row, draw: () => drawHero(origin) }];
     for (const m of monsters.list()) {
       entities.push({
@@ -152,7 +136,7 @@ async function main(): Promise<void> {
         },
       });
     }
-    render(ctx, tileset, world, origin, cw, ch, entities);
+    render(ctx, tileset, world, origin, viewport.width, viewport.height, entities);
 
     if (debug) {
       const hf = project(hero.col, hero.row, hero.z, origin);
@@ -164,12 +148,10 @@ async function main(): Promise<void> {
         drawBox(ctx, mf.x, mf.y + SY, MONSTER_BOX, "#ff5a5a");
       }
     }
+  };
 
-    requestAnimationFrame(frame);
-  }
-
-  fitCanvas();
-  requestAnimationFrame(frame);
+  viewport.fit();
+  new Loop(step).start();
 
   createMenu({
     onNewWorld: restart,
