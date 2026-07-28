@@ -13,9 +13,9 @@ import type { HeroAction, HeroSkin } from "./heroSkin";
 export const LPC_BASE =
   "https://raw.githubusercontent.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator/master/spritesheets/";
 
-const CELL = 64;
-const FRAMES = 9;
-const WALK_FPS = 9;
+export const CELL = 64;
+export const FRAMES = 9;
+export const WALK_FPS = 9;
 
 interface LayerDef {
   path: string;
