@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AGGRO_HALF,
+  AGGRO_REACH,
   CONTACT,
   FADE,
   FRAMES,
@@ -571,8 +572,8 @@ describe("MonsterField aggro modes", () => {
     expect(mon.col).toBeLessThan(before);
   });
 
-  it("lurk holds a monster still while the hero is outside its square", () => {
-    const { field, mon } = fieldWith(HERO.col + AGGRO_HALF + 1, HERO.row);
+  it("lurk holds a monster still while the hero is beyond reach", () => {
+    const { field, mon } = fieldWith(HERO.col + AGGRO_REACH + 1, HERO.row);
     field.setMode("lurk");
     const { col, row } = mon;
     field.update(DT, HERO, WORLD);
@@ -580,12 +581,20 @@ describe("MonsterField aggro modes", () => {
     expect(mon.row).toBe(row);
   });
 
-  it("lurk wakes the monster once the hero steps inside the square", () => {
-    const { field, mon } = fieldWith(HERO.col + AGGRO_HALF - 1, HERO.row);
-    field.setMode("lurk");
-    const before = mon.col;
-    field.update(DT, HERO, WORLD);
-    expect(mon.col).toBeLessThan(before);
+  it("lurk wakes on touch, not full enclosure", () => {
+    // Just inside reach wakes; a hair past it does not — the footprint touching
+    // the square is enough, the hero need not be inside it.
+    const inside = fieldWith(HERO.col + AGGRO_REACH - 0.1, HERO.row);
+    inside.field.setMode("lurk");
+    const wasInside = inside.mon.col;
+    inside.field.update(DT, HERO, WORLD);
+    expect(inside.mon.col).toBeLessThan(wasInside);
+
+    const outside = fieldWith(HERO.col + AGGRO_REACH + 0.1, HERO.row);
+    outside.field.setMode("lurk");
+    const wasOutside = outside.mon.col;
+    outside.field.update(DT, HERO, WORLD);
+    expect(outside.mon.col).toBe(wasOutside);
   });
 
   it("the square is measured per-axis, not by straight-line distance", () => {

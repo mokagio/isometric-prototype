@@ -33,9 +33,12 @@ const FADE_TAIL = 0.3; // last fraction of the death that fades — the rest is 
 export const KNOCKBACK = 1.6; // cells a killed monster is thrown, over the fade
 export const SPAWN_MIN = 7;
 export const SPAWN_MAX = 12;
-// "lurk" mode: the hero must be within this many cells on both axes — a 5x5
-// square centred on the monster — to wake it. "hunt" mode ignores it.
+// "lurk" mode: the monster guards a 5x5 square (this many cells each way).
 export const AGGRO_HALF = 2;
+// It wakes when the hero's footprint (one cell) *touches* that square, not once
+// the hero is fully inside it — the Minkowski sum of the square's edge (+0.5)
+// and the footprint's half-width (0.5). "hunt" mode ignores this.
+export const AGGRO_REACH = AGGRO_HALF + 0.5 + 0.5;
 
 // hunt: always close on the hero. lurk: only once the hero enters the square.
 export type AggroMode = "hunt" | "lurk";
@@ -192,7 +195,7 @@ export class MonsterField {
       const d = Math.hypot(dx, dy);
       m.faceLeft = dx - dy < 0; // the hero's screen-x direction from the monster
       // In lurk mode a monster only stirs once the hero is inside its square.
-      const awake = this.mode === "hunt" || (Math.abs(dx) <= AGGRO_HALF && Math.abs(dy) <= AGGRO_HALF);
+      const awake = this.mode === "hunt" || (Math.abs(dx) <= AGGRO_REACH && Math.abs(dy) <= AGGRO_REACH);
       if (awake && d > CONTACT) {
         const step = SPEED * dt;
         // Per-axis, blocked by water, so a slime slides along the shore.
