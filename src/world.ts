@@ -157,21 +157,66 @@ export function generateWorld(cols: number, rows: number, seed = 1337, options: 
   };
 }
 
-/** Nearest non-water cell to the map centre — a dry place to drop the hero. */
+/**
+ * A dry cell on the largest connected landmass, nearest the map centre — so the
+ * hero never wakes trapped on a little island. Land is 4-connected, matching a
+ * hero who can't cut a diagonal corner between two water cells.
+ */
 export function findSpawn(world: World): { col: number; row: number } {
-  const cx = Math.floor(world.cols / 2);
-  const cy = Math.floor(world.rows / 2);
-  const reach = Math.max(world.cols, world.rows);
-  for (let radius = 0; radius < reach; radius++) {
-    for (let dr = -radius; dr <= radius; dr++) {
-      for (let dc = -radius; dc <= radius; dc++) {
-        if (Math.max(Math.abs(dc), Math.abs(dr)) !== radius) continue; // walk the ring only
-        const col = cx + dc;
-        const row = cy + dr;
-        if (col < 0 || row < 0 || col >= world.cols || row >= world.rows) continue;
-        if (!world.cell(col, row).isWater) return { col, row };
+  const { cols, rows } = world;
+  const comp = new Int32Array(cols * rows).fill(-1); // land component id per cell, -1 = unvisited
+  const at = (c: number, r: number): number => r * cols + c;
+
+  let bestId = -1;
+  let bestSize = 0;
+  const stack: number[] = [];
+  let id = 0;
+  for (let r0 = 0; r0 < rows; r0++) {
+    for (let c0 = 0; c0 < cols; c0++) {
+      if (world.isWater(c0, r0) || comp[at(c0, r0)] !== -1) continue;
+      let size = 0;
+      stack.length = 0;
+      stack.push(at(c0, r0));
+      comp[at(c0, r0)] = id;
+      while (stack.length) {
+        const p = stack.pop()!;
+        const c = p % cols;
+        const r = (p - c) / cols;
+        size++;
+        const neighbours = [
+          [c + 1, r],
+          [c - 1, r],
+          [c, r + 1],
+          [c, r - 1],
+        ];
+        for (const [nc, nr] of neighbours) {
+          if (nc! < 0 || nr! < 0 || nc! >= cols || nr! >= rows) continue;
+          if (comp[at(nc!, nr!)] !== -1 || world.isWater(nc!, nr!)) continue;
+          comp[at(nc!, nr!)] = id;
+          stack.push(at(nc!, nr!));
+        }
+      }
+      if (size > bestSize) {
+        bestSize = size;
+        bestId = id;
+      }
+      id++;
+    }
+  }
+
+  const cx = (cols - 1) / 2;
+  const cy = (rows - 1) / 2;
+  let best = { col: Math.floor(cx), row: Math.floor(cy) };
+  let bestDist = Infinity;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (comp[at(c, r)] !== bestId) continue;
+      const dist = (c - cx) * (c - cx) + (r - cy) * (r - cy);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = { col: c, row: r };
       }
     }
   }
-  return { col: cx, row: cy };
+  return best;
 }

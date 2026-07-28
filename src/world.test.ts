@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateWorld, GROUND_HEIGHT, MAX_HEIGHT, WATER_LEVEL } from "./world";
+import { findSpawn, generateWorld, GROUND_HEIGHT, MAX_HEIGHT, WATER_LEVEL, type World } from "./world";
 
 describe("generateWorld (flat — the default)", () => {
   const world = generateWorld(40, 40, 42);
@@ -74,5 +74,41 @@ describe("generateWorld (terraced — { flat: false })", () => {
       for (let col = 0; col < world.cols; col++) heights.add(world.heightAt(col, row));
     }
     expect(heights.size).toBeGreaterThan(2);
+  });
+});
+
+describe("findSpawn", () => {
+  const S = 20;
+  const centre = 10;
+
+  it("skips a ringed-off island for the mainland", () => {
+    // A one-cell island at the centre, moated by water; everything past the moat
+    // is one big landmass.
+    const isWater = (c: number, r: number): boolean =>
+      Math.max(Math.abs(c - centre), Math.abs(r - centre)) === 1;
+    const world = { cols: S, rows: S, isWater } as unknown as World;
+
+    const spawn = findSpawn(world);
+    expect(world.isWater(spawn.col, spawn.row)).toBe(false);
+    expect(spawn).not.toEqual({ col: centre, row: centre }); // not the island
+  });
+
+  it("lands on dry ground with room to walk, on a generated world", () => {
+    const world = generateWorld(60, 60, 7);
+    const spawn = findSpawn(world);
+    expect(world.isWater(spawn.col, spawn.row)).toBe(false);
+
+    // The spawn's connected land region should be large, not a pocket.
+    const seen = new Set<number>();
+    const stack = [spawn];
+    while (stack.length) {
+      const { col, row } = stack.pop()!;
+      const key = row * world.cols + col;
+      if (seen.has(key) || col < 0 || row < 0 || col >= world.cols || row >= world.rows) continue;
+      if (world.isWater(col, row)) continue;
+      seen.add(key);
+      stack.push({ col: col + 1, row }, { col: col - 1, row }, { col, row: row + 1 }, { col, row: row - 1 });
+    }
+    expect(seen.size).toBeGreaterThan(200);
   });
 });
