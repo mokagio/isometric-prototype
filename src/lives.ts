@@ -26,6 +26,11 @@ export class Lives {
     return !this.alive && this.deathT >= DEATH_FADE;
   }
 
+  /** Seconds since the hero went down — drives the defeat animation. */
+  get deathTime(): number {
+    return this.deathT;
+  }
+
   /** Spend a heart. False when the hit is swallowed by immunity, or the hero is already down. */
   hit(): boolean {
     if (!this.alive || this.invulnerable) return false;

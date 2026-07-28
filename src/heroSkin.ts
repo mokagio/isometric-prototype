@@ -20,6 +20,17 @@ export interface HeroSkin {
     action: HeroAction,
     actionTime: number,
   ): boolean;
+  /**
+   * Play the defeat animation `t` seconds after death, if this skin has one.
+   * Returns false when it doesn't, so the caller can fall back.
+   */
+  drawDefeat?(
+    ctx: CanvasRenderingContext2D,
+    feetX: number,
+    feetY: number,
+    facing: Facing,
+    t: number,
+  ): boolean;
 }
 
 export type SkinKind = "soldier" | "slime" | "dungeon" | "lpc";

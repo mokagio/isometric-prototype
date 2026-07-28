@@ -88,10 +88,20 @@ async function main(): Promise<void> {
     ctx.save();
     ctx.globalAlpha = lives.alpha();
     drawHeroShadow(ctx, feetX, shadowY);
-    const action: HeroAction = swing.active ? "attack" : moving ? "run" : "idle";
-    const actionTime = swing.active ? swing.time : animClock;
-    if (!heroSprite.draw(ctx, feetX, feetY, facing, action, actionTime)) {
-      drawHeroPlaceholder(ctx, feetX, feetY);
+    if (!lives.alive) {
+      // Defeated: play the fall-down death animation (skins without one hold idle).
+      if (
+        !heroSprite.drawDefeat?.(ctx, feetX, feetY, facing, lives.deathTime) &&
+        !heroSprite.draw(ctx, feetX, feetY, facing, "idle", animClock)
+      ) {
+        drawHeroPlaceholder(ctx, feetX, feetY);
+      }
+    } else {
+      const action: HeroAction = swing.active ? "attack" : moving ? "run" : "idle";
+      const actionTime = swing.active ? swing.time : animClock;
+      if (!heroSprite.draw(ctx, feetX, feetY, facing, action, actionTime)) {
+        drawHeroPlaceholder(ctx, feetX, feetY);
+      }
     }
     ctx.restore();
   }
