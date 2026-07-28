@@ -1,5 +1,6 @@
 import type { Facing } from "./heroSprite";
 import type { HeroAction, HeroSkin } from "./heroSkin";
+import { blitFrame, frameAt, SheetLoader, type Sheet } from "./sprites";
 
 // oboropixel "Free Characters Animations" pack (public/oboro/<character>/).
 // 96x96 frames, one row per animation (a horizontal strip), side-view facing
@@ -20,64 +21,30 @@ export const ANIM: Record<HeroAction, { file: string; frames: number; fps: numbe
 // (the fallen body).
 export const DEATH = { file: "death.png", frames: 10, fps: 10 };
 
-interface Sheet {
-  img: HTMLImageElement;
-  ok: boolean;
-  frames: number;
-  fps: number;
-  loop: boolean;
-}
-
 export class OboroSkin implements HeroSkin {
   private sheets: Record<HeroAction, Sheet>;
   private deathSheet: Sheet;
-  private settled = 0;
-  private readonly total = 4;
-  ready = false;
+  private loader = new SheetLoader(4);
+
+  get ready(): boolean {
+    return this.loader.ready;
+  }
 
   constructor(character: string, base: string = import.meta.env.BASE_URL) {
-    const load = (file: string, frames: number, fps: number, loop: boolean): Sheet => {
-      const sheet: Sheet = { img: new Image(), ok: false, frames, fps, loop };
-      sheet.img.onload = () => {
-        sheet.ok = true;
-        this.settle();
-      };
-      sheet.img.onerror = () => this.settle();
-      sheet.img.src = `${base}oboro/${character}/${file}`;
-      return sheet;
-    };
-    const anim = (action: HeroAction): Sheet => {
-      const def = ANIM[action];
-      return load(def.file, def.frames, def.fps, def.loop);
-    };
-    this.sheets = { idle: anim("idle"), run: anim("run"), attack: anim("attack") };
-    this.deathSheet = load(DEATH.file, DEATH.frames, DEATH.fps, false);
+    const load = (file: string): Sheet => this.loader.load(`${base}oboro/${character}/${file}`);
+    this.sheets = { idle: load(ANIM.idle.file), run: load(ANIM.run.file), attack: load(ANIM.attack.file) };
+    this.deathSheet = load(DEATH.file);
   }
 
-  private settle(): void {
-    if (++this.settled === this.total) this.ready = true;
-  }
-
-  private blit(
-    ctx: CanvasRenderingContext2D,
-    sheet: Sheet,
-    frame: number,
-    feetX: number,
-    feetY: number,
-    facing: Facing,
-  ): void {
-    const dx = Math.round(feetX - ANCHOR_X * SCALE);
-    const dy = Math.round(feetY - ANCHOR_Y * SCALE);
-    ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    if (facing === 1) {
-      // Heading screen-left: mirror horizontally around the feet.
-      ctx.translate(feetX, 0);
-      ctx.scale(-1, 1);
-      ctx.translate(-feetX, 0);
-    }
-    ctx.drawImage(sheet.img, frame * CELL, 0, CELL, CELL, dx, dy, CELL * SCALE, CELL * SCALE);
-    ctx.restore();
+  private blit(ctx: CanvasRenderingContext2D, sheet: Sheet, frame: number, feetX: number, feetY: number, facing: Facing): void {
+    blitFrame(ctx, sheet.img, feetX, feetY, {
+      cell: CELL,
+      scale: SCALE,
+      anchorX: ANCHOR_X,
+      anchorY: ANCHOR_Y,
+      frame,
+      flip: facing === 1, // heading screen-left
+    });
   }
 
   draw(
@@ -90,9 +57,8 @@ export class OboroSkin implements HeroSkin {
   ): boolean {
     const sheet = this.sheets[action];
     if (!sheet.ok) return false;
-    const raw = Math.floor(actionTime * sheet.fps);
-    const frame = sheet.loop ? raw % sheet.frames : Math.min(raw, sheet.frames - 1);
-    this.blit(ctx, sheet, frame, feetX, feetY, facing);
+    const def = ANIM[action];
+    this.blit(ctx, sheet, frameAt(actionTime, def.fps, def.frames, def.loop), feetX, feetY, facing);
     return true;
   }
 
@@ -100,8 +66,7 @@ export class OboroSkin implements HeroSkin {
   drawDefeat(ctx: CanvasRenderingContext2D, feetX: number, feetY: number, facing: Facing, t: number): boolean {
     const sheet = this.deathSheet;
     if (!sheet.ok) return false;
-    const frame = Math.min(sheet.frames - 1, Math.floor(t * sheet.fps));
-    this.blit(ctx, sheet, frame, feetX, feetY, facing);
+    this.blit(ctx, sheet, frameAt(t, DEATH.fps, DEATH.frames, false), feetX, feetY, facing);
     return true;
   }
 }
