@@ -5,9 +5,10 @@ export interface MenuActions {
   onEnemyMode: (lurk: boolean) => void;
   /** true = draw entity bounding boxes. */
   onDebug: (on: boolean) => void;
+  /** Open the credits page. */
+  onCredits: () => void;
 }
 
-const REPO_URL = "https://github.com/mokagio/isometric-prototype";
 const LURK_KEY = "ww:lurk"; // remembered across reloads
 
 const loadBool = (key: string, fallback: boolean): boolean => {
@@ -81,17 +82,6 @@ export function createMenu(actions: MenuActions): void {
     });
     panel.appendChild(item);
   };
-  const addLink = (label: string, href: string): void => {
-    const item = document.createElement("a");
-    item.className = "ww-menu-item";
-    item.textContent = label;
-    item.href = href;
-    item.target = "_blank";
-    item.rel = "noopener";
-    item.addEventListener("click", () => setOpen(false));
-    panel.appendChild(item);
-  };
-
   const buildSwitch = (on: boolean): { sw: HTMLElement; set: (on: boolean) => void } => {
     const sw = document.createElement("span");
     sw.className = "ww-switch";
@@ -154,8 +144,7 @@ export function createMenu(actions: MenuActions): void {
   addItem("World Editor", actions.onEditor);
   addModeToggle();
   addToggle("Debug boxes", actions.onDebug);
-  addLink("Credits", `${REPO_URL}/blob/main/CREDITS.md`);
-  addLink("Source", REPO_URL);
+  addItem("Credits", actions.onCredits);
 
   button.addEventListener("click", (e) => {
     e.stopPropagation();
