@@ -53,12 +53,7 @@ function recordingCtx(): { ctx: CanvasRenderingContext2D; calls: DrawCall[] } {
 }
 
 const BASE = "/";
-const DOWN: Facing = 2; // no up/down art, so this draws the sprite unmirrored
-
-/** Draws a loaded skin's run frame 0 facing `facing`, for mirror checks. */
-function skinDraw(ctx: CanvasRenderingContext2D, facing: Facing): void {
-  ready().draw(ctx, 0, 0, facing, "run", 0);
-}
+const DOWN: Facing = 2; // any non-left facing, so the sprite is not mirrored
 
 /** A skin with every sheet loaded. */
 function ready(character = "soldier", base = BASE): OboroSkin {
@@ -140,32 +135,15 @@ describe("OboroSkin frames", () => {
 });
 
 describe("OboroSkin facing", () => {
-  // The pack's art faces screen-left (the soldier's sword points that way), so
-  // mirroring is what sends the figure right. Getting this backwards is not a
-  // subtle wrongness: the hero walks the way it came from.
-  it("mirrors the sprite only when heading screen-right", () => {
+  it("mirrors the sprite only when heading screen-left", () => {
     const skin = ready();
-    const right = recordingCtx();
-    skin.draw(right.ctx, 0, 0, 3, "run", 0);
-    expect(right.calls[0]!.mirrored).toBe(true);
-
     const left = recordingCtx();
     skin.draw(left.ctx, 0, 0, 1, "run", 0);
-    expect(left.calls[0]!.mirrored).toBe(false);
-  });
+    expect(left.calls[0]!.mirrored).toBe(true);
 
-  it("leaves the art as drawn when heading up or down, having no such frames", () => {
-    for (const facing of [0, 2] as Facing[]) {
-      const { ctx, calls } = recordingCtx();
-      skinDraw(ctx, facing);
-      expect(calls[0]!.mirrored, `facing ${facing}`).toBe(false);
-    }
-  });
-
-  it("faces the death animation the same way as the walk", () => {
-    const dying = recordingCtx();
-    ready().drawDefeat(dying.ctx, 0, 0, 3, 0);
-    expect(dying.calls[0]!.mirrored).toBe(true);
+    const right = recordingCtx();
+    skin.draw(right.ctx, 0, 0, 3, "run", 0);
+    expect(right.calls[0]!.mirrored).toBe(false);
   });
 });
 

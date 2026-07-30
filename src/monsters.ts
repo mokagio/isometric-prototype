@@ -75,7 +75,6 @@ export interface Monster {
   animT: number;
   dying: boolean;
   dyingT: number;
-  /** Heading screen-left, which for this pack's art is the sprite unmirrored. */
   faceLeft: boolean;
   knock: Knock | null;
   /** Where it spawned: the centre of the square it guards and wanders inside. */
@@ -320,7 +319,7 @@ export class MonsterField {
       anchorX: ANCHOR_X,
       anchorY: ANCHOR_Y,
       frame,
-      flip: !m.faceLeft, // the sheet is drawn heading left, so mirroring sends it right
+      flip: m.faceLeft,
       alpha,
     });
   }

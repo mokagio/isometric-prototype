@@ -3,10 +3,8 @@ import type { HeroAction, HeroSkin } from "./heroSkin";
 import { blitFrame, frameAt, SheetLoader, type Sheet } from "./sprites";
 
 // oboropixel "Free Characters Animations" pack (public/oboro/<character>/).
-// 96x96 frames, one row per animation (a horizontal strip). The figure faces the
-// camera with its weapon out to the **screen-left**, and there is no up/down
-// facing — so mirroring is what sends it right, and heading left is the art as
-// drawn. Mirror it the other way round and the hero walks backwards.
+// 96x96 frames, one row per animation (a horizontal strip), side-view facing
+// right — so left/right is a horizontal flip and there is no up/down facing.
 export const CELL = 96;
 const SCALE = 3;
 const ANCHOR_X = 48; // frame centre
@@ -45,7 +43,7 @@ export class OboroSkin implements HeroSkin {
       anchorX: ANCHOR_X,
       anchorY: ANCHOR_Y,
       frame,
-      flip: facing === 3, // heading screen-right; up and down keep the art as drawn
+      flip: facing === 1, // heading screen-left
     });
   }
 

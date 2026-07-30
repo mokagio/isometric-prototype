@@ -583,10 +583,9 @@ describe("MonsterField.draw", () => {
     expect(ghosted).toBeCloseTo(fading * 0.5);
   });
 
-  it("mirrors the sprite only when heading screen-right", () => {
-    // The pack's art is drawn heading left, so the mirror is what turns it round.
-    expect(drawOnce((m) => (m.faceLeft = false)).mirrored).toBe(true);
-    expect(drawOnce((m) => (m.faceLeft = true)).mirrored).toBe(false);
+  it("mirrors the sprite only when facing left", () => {
+    expect(drawOnce((m) => (m.faceLeft = true)).mirrored).toBe(true);
+    expect(drawOnce((m) => (m.faceLeft = false)).mirrored).toBe(false);
   });
 
   it("centres the sprite on the feet and stands it on them", () => {
