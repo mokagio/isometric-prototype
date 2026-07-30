@@ -23,6 +23,8 @@ export interface MapActions {
   onOpen: () => void;
   /** Load the world the game is playing onto the board. */
   onLoadGameWorld: () => void;
+  /** Hand the board to the game and go and play it. */
+  onPlay: () => void;
 }
 
 export function clampHeight(h: number): number {
@@ -148,13 +150,14 @@ export function buildSidebar(
   heading("Map");
   const mapButtons = document.createElement("div");
   mapButtons.className = "ed-map";
-  const button = (label: string, onClick: () => void): void => {
+  const button = (label: string, onClick: () => void, className = "ed-action"): void => {
     const b = document.createElement("button");
-    b.className = "ed-action";
+    b.className = className;
     b.textContent = label;
     b.addEventListener("click", onClick);
     mapButtons.appendChild(b);
   };
+  button("▶ Play this map", actions.onPlay, "ed-action ed-action-go");
   button("Save map", actions.onSave);
   button("Open map…", actions.onOpen);
   button("Load game world", actions.onLoadGameWorld);

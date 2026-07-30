@@ -1,6 +1,7 @@
 import { loadTileset } from "./tileset";
-import { generateWorld, findSpawn, MAP_SIZE, randomSeed, type World } from "./world";
-import { rememberWorldSeed } from "./handoff";
+import { generateWorld, findSpawn, GRASS, MAP_SIZE, randomSeed, type World } from "./world";
+import { recallMap, rememberWorldSeed, wantsStashedMap } from "./handoff";
+import { decodeMap, fillEmpty, isComplete, worldFromMap } from "./mapFormat";
 import { render, type Entity } from "./renderer";
 import { project, SY, type Origin } from "./iso";
 import { Camera } from "./camera";
@@ -28,13 +29,28 @@ function newWorld(): World {
   return generateWorld(MAP_SIZE, MAP_SIZE, seed);
 }
 
+/** The map the editor handed over, or null to walk a generated world instead. */
+function stashedWorld(): World | null {
+  if (!wantsStashedMap(location.search)) return null;
+  const text = recallMap();
+  if (text === null) return null;
+  try {
+    const map = decodeMap(text);
+    // Anywhere unbuilt becomes grass, so a half-drawn map is still walkable.
+    return worldFromMap(isComplete(map) ? map : fillEmpty(map, GRASS));
+  } catch (e) {
+    alert(e instanceof Error ? e.message : "That map could not be played.");
+    return null;
+  }
+}
+
 async function main(): Promise<void> {
   const canvas = document.getElementById("game") as HTMLCanvasElement;
   const ctx = canvas.getContext("2d")!;
   const tileset = await loadTileset(tilesheetUrl);
   const input = new Input(window);
 
-  let world = newWorld();
+  let world = stashedWorld() ?? newWorld();
   let spawn = findSpawn(world);
   let hero = new Hero(spawn.col, spawn.row, world);
   // Height tracks the ground under the hero, not the hero's own z, so a jump
@@ -53,8 +69,8 @@ async function main(): Promise<void> {
     if (lives.alive) swing.start();
   };
 
-  function restart(): void {
-    world = newWorld();
+  function resetTo(next: World): void {
+    world = next;
     spawn = findSpawn(world);
     hero = new Hero(spawn.col, spawn.row, world);
     camera.snap(hero.z);
@@ -62,6 +78,18 @@ async function main(): Promise<void> {
     lives.reset();
     hud.setLives(lives.lives);
     hud.hideGameOver();
+  }
+
+  /** Try again: back onto the same ground you died on, hand-built map included. */
+  function restart(): void {
+    resetTo(stashedWorld() ?? newWorld());
+  }
+
+  function newRandomWorld(): void {
+    // Leaving a hand-built map behind means the URL has to stop asking for it,
+    // or the next reload would drop you back onto the map.
+    history.replaceState(null, "", location.pathname);
+    resetTo(newWorld());
   }
 
   const hud = createHud(restart);
@@ -159,7 +187,7 @@ async function main(): Promise<void> {
   new Loop(step).start();
 
   createMenu({
-    onNewWorld: restart,
+    onNewWorld: newRandomWorld,
     onEditor: () => {
       location.href = "editor.html";
     },

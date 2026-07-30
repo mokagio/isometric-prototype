@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { recallWorldSeed, rememberWorldSeed } from "./handoff";
+import {
+  PLAY_STASHED_MAP_URL,
+  recallMap,
+  recallWorldSeed,
+  rememberWorldSeed,
+  stashMap,
+  wantsStashedMap,
+} from "./handoff";
 
 /** Just enough of `Storage` to stand in for it, since node has none. */
 function fakeStorage(): Storage & { fail: boolean } {
@@ -63,5 +70,57 @@ describe("world seed handoff", () => {
     storage.fail = true;
     expect(() => rememberWorldSeed(7)).not.toThrow();
     expect(recallWorldSeed()).toBeNull();
+  });
+});
+
+describe("map handoff", () => {
+  const MAP = '{"format":"whispering-woods-map"}';
+
+  it("hands a map from the editor to the game", () => {
+    expect(stashMap(MAP)).toBe(true);
+    expect(recallMap()).toBe(MAP);
+  });
+
+  it("reports nothing when no map has been stashed", () => {
+    expect(recallMap()).toBeNull();
+  });
+
+  it("leaves the map in place once read, so a reload stays on it", () => {
+    stashMap(MAP);
+    recallMap();
+    expect(recallMap()).toBe(MAP);
+  });
+
+  it("says so when storage refuses the map, rather than losing it quietly", () => {
+    storage.fail = true;
+    expect(stashMap(MAP)).toBe(false);
+    expect(recallMap()).toBeNull();
+  });
+
+  it("keeps the map and the world seed out of each other's way", () => {
+    rememberWorldSeed(99);
+    stashMap(MAP);
+    expect(recallWorldSeed()).toBe(99);
+    expect(recallMap()).toBe(MAP);
+  });
+});
+
+describe("the play-a-stashed-map request", () => {
+  it("is what the editor's play link asks for", () => {
+    // The link and the check have to agree, or Play lands on a random world.
+    const query = PLAY_STASHED_MAP_URL.slice(PLAY_STASHED_MAP_URL.indexOf("?"));
+    expect(wantsStashedMap(query)).toBe(true);
+  });
+
+  it("goes to the game page", () => {
+    expect(PLAY_STASHED_MAP_URL.startsWith("index.html?")).toBe(true);
+  });
+
+  it("is not asked for by an ordinary visit", () => {
+    expect(wantsStashedMap("")).toBe(false);
+    expect(wantsStashedMap("?")).toBe(false);
+    expect(wantsStashedMap("?debug=1")).toBe(false);
+    expect(wantsStashedMap("?map=")).toBe(false);
+    expect(wantsStashedMap("?map=something-else")).toBe(false);
   });
 });

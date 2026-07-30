@@ -7,7 +7,7 @@
 // just never uses more than a single level.
 export type Tile = readonly [col: number, row: number];
 
-const GRASS: Tile = [1, 1];
+export const GRASS: Tile = [1, 1]; // also what an unfinished map's gaps are filled with
 const GRASS_VARIANTS: Tile[] = [
   [1, 2],
   [1, 5],

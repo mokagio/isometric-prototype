@@ -11,7 +11,7 @@ import { createPanPad } from "./panPad";
 import { boardToMap, loadMapIntoBoard, mapFilename } from "./mapIO";
 import { decodeMap, encodeMap, mapFromWorld } from "../mapFormat";
 import { downloadText, pickTextFile } from "./files";
-import { recallWorldSeed } from "../handoff";
+import { PLAY_STASHED_MAP_URL, recallWorldSeed, stashMap } from "../handoff";
 
 const PAN_KEYS: Record<string, PanDir> = {
   arrowup: "up",
@@ -83,10 +83,19 @@ async function main(): Promise<void> {
     showBoard();
   };
 
+  const playMap = (): void => {
+    if (!stashMap(encodeMap(boardToMap(board)))) {
+      alert("This browser will not let the editor pass a map to the game. Save the map and open it in the game instead.");
+      return;
+    }
+    location.href = PLAY_STASHED_MAP_URL;
+  };
+
   const sidebar = buildSidebar(sidebarEl, tileset, state, requestRender, {
     onSave: saveMap,
     onOpen: () => void openMap(),
     onLoadGameWorld: loadGameWorld,
+    onPlay: playMap,
   });
 
   function draw(): void {
