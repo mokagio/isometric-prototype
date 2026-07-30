@@ -27,6 +27,7 @@ export default defineConfig({
         game: resolve(import.meta.dirname, "game.html"),
         woods: resolve(import.meta.dirname, "woods.html"),
         editor: resolve(import.meta.dirname, "editor.html"),
+        woodsEditor: resolve(import.meta.dirname, "woodsEditor.html"),
         credits: resolve(import.meta.dirname, "credits.html"),
       },
     },

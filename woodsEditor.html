@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Island Editor | Games Playground</title>
+    <style>
+      html, body {
+        height: 100%;
+        overflow: hidden;
+        background: #0099db;
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      #island-canvas {
+        flex: 1 1 auto;
+        min-width: 0;
+        cursor: crosshair;
+      }
+      /* Two columns of swatches, not three: the things in this library are
+         bigger than a single tile, and a house shrunk to a third of a narrow
+         sidebar is not something a child can tell apart from another house. */
+      #sidebar .ed-palette { grid-template-columns: repeat(2, 1fr); }
+    </style>
+  </head>
+  <body>
+    <div id="editor">
+      <aside id="sidebar"></aside>
+      <canvas id="island-canvas"></canvas>
+    </div>
+    <script type="module" src="/src/woods/editor/main.ts"></script>
+  </body>
+</html>

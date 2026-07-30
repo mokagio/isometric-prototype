@@ -215,3 +215,118 @@ canvas {
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
   pointer-events: none;
 }
+
+
+/* The map editors' shell and controls. Both editor pages build against these;
+   each page's own <style> holds only its canvas. */
+#editor {
+  display: flex;
+  height: 100%;
+  position: relative;
+}
+#sidebar {
+  /* The sidebar is against the left edge, the one a landscape notch eats.
+     Added to the width as well as the padding, so the cutout costs the
+     controls nothing rather than squeezing them. */
+  width: calc(200px + env(safe-area-inset-left, 0px));
+  flex: 0 0 auto;
+  height: 100%;
+  box-sizing: border-box;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 14px
+    calc(24px + env(safe-area-inset-bottom, 0px))
+    calc(14px + env(safe-area-inset-left, 0px));
+  overflow-y: auto;
+  background: #2c2016;
+  border-right: 3px solid #6b4f34;
+  color: #f4e4c1;
+  user-select: none;
+}
+.ed-back {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: #c9a86a;
+  text-decoration: none;
+  font-size: 15px;
+}
+.ed-back:hover { color: #f4e4c1; }
+
+.ed-heading {
+  margin: 14px 0 8px;
+  color: #c9a86a;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ed-palette {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.ed-swatch {
+  padding: 3px;
+  background: #3b2a1c;
+  border: 2px solid #6b4f34;
+  border-radius: 8px;
+  cursor: pointer;
+  line-height: 0;
+}
+.ed-swatch canvas { width: 100%; height: auto; image-rendering: pixelated; }
+.ed-swatch:hover { border-color: #9a7345; }
+.ed-swatch.selected { border-color: #7cc24a; background: #46351f; }
+
+.ed-tools { display: flex; gap: 6px; }
+.ed-tool {
+  flex: 1;
+  padding: 9px 0;
+  font: inherit;
+  font-size: 15px;
+  color: #f4e4c1;
+  background: #3b2a1c;
+  border: 2px solid #6b4f34;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ed-tool:hover { border-color: #9a7345; }
+.ed-tool.active { background: #56a03a; color: #10240c; border-color: #7cc24a; }
+
+.ed-map { display: flex; flex-direction: column; gap: 6px; }
+.ed-action {
+  padding: 10px 0;
+  font: inherit;
+  font-size: 15px;
+  color: #f4e4c1;
+  background: #3b2a1c;
+  border: 2px solid #6b4f34;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ed-action:hover { border-color: #9a7345; }
+.ed-action-go { background: #56a03a; color: #10240c; border-color: #7cc24a; }
+.ed-action-go:hover { border-color: #a8e07a; }
+
+.ed-hint {
+  margin-top: 16px;
+  color: #8a6f52;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ed-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.ed-tab {
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: #c9a86a;
+  background: #3b2a1c;
+  border: 2px solid #6b4f34;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.ed-tab:hover { border-color: #9a7345; }
+.ed-tab.active { background: #56a03a; color: #10240c; border-color: #7cc24a; }
