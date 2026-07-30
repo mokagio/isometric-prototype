@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Logs, LOGS_PER_TREE, PICKUP_RANGE } from "./logs";
+import { MAX_DT } from "../loop";
+import { LOG_REACH, Logs, LOGS_PER_TREE, PICKUP_RANGE } from "./logs";
 
 const DT = 1 / 60;
 const STUMP = { x: 200, y: 200 };
@@ -25,15 +26,19 @@ describe("Logs.spawn", () => {
     expect(new Set(logs.list().map((l) => Math.sign(l.vx))).size).toBeGreaterThan(1); // they scatter
   });
 
-  it("lands them all, near the stump and in front of it", () => {
-    const logs = new Logs();
-    logs.spawn(STUMP);
-    settle(logs);
-    for (const log of logs.list()) {
-      expect(log.resting).toBe(true);
-      expect(log.z).toBe(0);
-      expect(Math.hypot(log.x - STUMP.x, log.y - STUMP.y)).toBeLessThan(32); // within two tiles
-      expect(log.y).toBeGreaterThanOrEqual(STUMP.y); // never behind the stump
+  it("lands them all within LOG_REACH of the stump, and in front of it", () => {
+    // `field.ts` keeps trees this far in from the edge, so a throw that carried
+    // further would drop logs into the void.
+    for (const dt of [1 / 60, 1 / 30, MAX_DT]) {
+      const logs = new Logs();
+      logs.spawn(STUMP);
+      for (let i = 0; i < 3 / dt; i++) logs.update(dt, FAR);
+      for (const log of logs.list()) {
+        expect(log.resting, `dt ${dt}`).toBe(true);
+        expect(log.z).toBe(0);
+        expect(Math.hypot(log.x - STUMP.x, log.y - STUMP.y), `dt ${dt}`).toBeLessThanOrEqual(LOG_REACH);
+        expect(log.y).toBeGreaterThanOrEqual(STUMP.y); // never behind the stump
+      }
     }
   });
 

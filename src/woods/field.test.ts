@@ -13,6 +13,7 @@ import {
   treeAt,
   visibleTiles,
 } from "./field";
+import { LOG_CLEARANCE } from "./logs";
 import { walk, type Pos } from "./walker";
 
 const ZOOM = 4;
@@ -74,6 +75,29 @@ describe("treeAt", () => {
         expect(near, `${col},${row} and ${otherCol},${otherRow}`).toBe(false);
       }
     }
+  });
+
+  it("stands far enough in that a felled tree cannot drop its logs in the void", () => {
+    // The edge rule exists for this: a log lands up to LOG_REACH from the stump,
+    // and LOG_CLEARANCE adds the half sprite so none of it hangs over the grass.
+    for (const [col, row] of all()) {
+      const base = { x: col * TILE + TILE / 2, y: row * TILE + TILE / 2 };
+      expect(base.x - LOG_CLEARANCE, `${col},${row}`).toBeGreaterThanOrEqual(0);
+      expect(base.x + LOG_CLEARANCE, `${col},${row}`).toBeLessThanOrEqual(FIELD_PX);
+      expect(base.y - LOG_CLEARANCE, `${col},${row}`).toBeGreaterThanOrEqual(0);
+      expect(base.y + LOG_CLEARANCE, `${col},${row}`).toBeLessThanOrEqual(FIELD_PX);
+    }
+  });
+
+  it("still fills most of the field, rather than hiding in the middle", () => {
+    // The edge rule must not have quietly shrunk the wood to a copse.
+    const trees = all();
+    const cols = trees.map(([col]) => col);
+    const rows = trees.map(([, row]) => row);
+    expect(Math.min(...cols)).toBeLessThan(FIELD / 4);
+    expect(Math.max(...cols)).toBeGreaterThan((3 * FIELD) / 4);
+    expect(Math.min(...rows)).toBeLessThan(FIELD / 4);
+    expect(Math.max(...rows)).toBeGreaterThan((3 * FIELD) / 4);
   });
 
   it("leaves the middle clear, so nobody starts inside a trunk", () => {

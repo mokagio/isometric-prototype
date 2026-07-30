@@ -1,3 +1,4 @@
+import { LOG_CLEARANCE } from "./logs";
 import type { Bounds, Pos } from "./walker";
 
 // The ground Whispering Woods stands on: a finite square of Sunnyside grass with
@@ -24,6 +25,9 @@ const TREE_SPACING = 3;
 const TREE_REACH = TREE_SPACING - 1;
 // Tiles kept clear around the middle, so nobody starts inside a trunk.
 const CLEARING = 3;
+// Tiles kept clear along the edge, so the logs a tree drops cannot land in the
+// void where nobody could ever pick them up.
+const EDGE = Math.ceil(LOG_CLEARANCE / TILE);
 
 /**
  * What a trunk blocks, in world pixels around the base it stands on: its roots,
@@ -48,7 +52,7 @@ export const MIDDLE: Pos = { x: FIELD_PX / 2, y: FIELD_PX / 2 };
 
 /** A cell's claim to a tree, or -1 where one may not stand at all. */
 function claim(col: number, row: number): number {
-  if (col < 0 || row < 0 || col >= FIELD || row >= FIELD) return -1;
+  if (col < EDGE || row < EDGE || col >= FIELD - EDGE || row >= FIELD - EDGE) return -1;
   const mid = FIELD / 2;
   if (Math.abs(col - mid) <= CLEARING && Math.abs(row - mid) <= CLEARING) return -1;
   const h = hash(col, row, TREE_SEED);

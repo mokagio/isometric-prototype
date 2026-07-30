@@ -17,6 +17,21 @@ export const DRAG = 0.6; // sideways speed kept per bounce, so they stop rolling
 /** How near the feet have to be to sweep a log up, in world pixels. */
 export const PICKUP_RANGE = 10;
 
+/**
+ * The furthest from the stump a log ever comes to rest. Two hops of the burst
+ * above carry it 16.4 world pixels at worst — measured across frame steps up to
+ * the loop's `MAX_DT` clamp, since a coarser step overshoots each landing —
+ * and the tests hold it to this.
+ */
+export const LOG_REACH = 18;
+
+// Half the sprite, so a log lying at full reach still has none of itself over
+// the edge of the field.
+const LOG_HALF_W = 6;
+
+/** Room a stump needs around it for its logs: what keeps trees off the edge. */
+export const LOG_CLEARANCE = LOG_REACH + LOG_HALF_W;
+
 // Out and towards the front of the stump: logs landing behind it would sit under
 // the next tree's crown, where nobody would find them.
 const SPREAD: ReadonlyArray<Pos> = [
