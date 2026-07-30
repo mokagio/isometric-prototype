@@ -231,12 +231,12 @@ describe("fieldBounds", () => {
     expect(pos.x).toBeLessThan(FIELD_PX);
   });
 
-  it("keeps a cell further back on the south shore, where the drop's face is drawn", () => {
+  it("stops short of the fence on the south shore, above the drop's face", () => {
     const bounds = fieldBounds(INSET);
     const south = { dc: 1, dr: 1 };
     let pos = MIDDLE;
     for (let i = 0; i < 200; i++) pos = walk(pos, south, 0.5, bounds);
-    expect(pos.y).toBe(FIELD_PX - (COAST_RINGS + CLIFF_RINGS) * TILE - INSET);
+    expect(pos.y).toBe(FIELD_PX - (COAST_RINGS + CLIFF_RINGS + 1) * TILE - INSET);
     // Which is further in than the other shores, so nobody stands on the wall.
     expect(bounds.maxY).toBeLessThan(bounds.maxX);
   });

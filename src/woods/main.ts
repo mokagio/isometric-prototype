@@ -15,7 +15,9 @@ import {
   ringOf,
   seaTile,
   chamferTile,
+  fenceTile,
   isWater,
+  lipCornerTile,
   shoreTile,
   SPARKLE_FRAMES,
   SPARKLE_SECONDS,
@@ -113,7 +115,7 @@ function main(): void {
   const ctx = canvas.getContext("2d")!;
   const viewport = new Viewport(canvas);
 
-  const sheets = new SheetLoader(14);
+  const sheets = new SheetLoader(16);
   const walkSheet = sheets.load(url("walk.png"));
   const idleSheet = sheets.load(url("idle.png"));
   const axeSheet = sheets.load(url("axe.png"));
@@ -128,6 +130,8 @@ function main(): void {
   const shore2Sheet = sheets.load(url("shore2.png"));
   const cliffSheet = sheets.load(url("cliff.png"));
   const lipSheet = sheets.load(url("lip.png"));
+  const lipCornerSheet = sheets.load(url("cliffTop.png"));
+  const fenceSheet = sheets.load(url("fence.png"));
 
   const input = new Input();
   createStick(input);
@@ -153,19 +157,19 @@ function main(): void {
   });
 
   /** One 16px tile of a sheet, blown up to the drawing zoom. */
-  const drawTile = (img: CanvasImageSource, src: CoastTile, at: Pos): void => {
+  const drawTile = (img: CanvasImageSource, src: CoastTile, at: Pos, mirror = false): void => {
     const size = TILE * ZOOM;
-    ctx.drawImage(
-      img,
-      src.col * TILE,
-      src.row * TILE,
-      TILE,
-      TILE,
-      Math.round(at.x),
-      Math.round(at.y),
-      size,
-      size,
-    );
+    const x = Math.round(at.x);
+    const y = Math.round(at.y);
+    if (!mirror) {
+      ctx.drawImage(img, src.col * TILE, src.row * TILE, TILE, TILE, x, y, size, size);
+      return;
+    }
+    ctx.save();
+    ctx.translate(x + size, y);
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, src.col * TILE, src.row * TILE, TILE, TILE, 0, 0, size, size);
+    ctx.restore();
   };
 
   /** Sea, then the island on top of it: grass, the bank's face, and the surf. */
@@ -196,7 +200,11 @@ function main(): void {
         const ownGround = isWater(col, row) || chamfer !== null || (isLip(col, row) && lipSheet.ok);
         if (grassSheet.ok && !ownGround) drawTile(grassSheet.img, { col: tileVariant(col, row), row: 0 }, at);
         if (chamfer && surf.ok) drawTile(surf.img, chamfer, at);
-        if (isLip(col, row) && lipSheet.ok) drawTile(lipSheet.img, { col: 0, row: 0 }, at);
+        if (isLip(col, row)) {
+          const corner = lipCornerSheet.ok ? lipCornerTile(col, row) : null;
+          if (corner) drawTile(lipCornerSheet.img, corner, at);
+          else if (lipSheet.ok) drawTile(lipSheet.img, { col: 0, row: 0 }, at);
+        }
         // The face is a wall, so it is drawn over the grass rather than instead of
         // it: its own tiles are cut away at the top where the lip shows through.
         if (isCliffFace(col, row) && cliffSheet.ok) {
@@ -257,6 +265,23 @@ function main(): void {
     // Whatever stands lower on the field is drawn last, so a tree in front of
     // the character hides them and one behind does not.
     const standing: Array<{ y: number; draw: () => void }> = [];
+
+    // The fence along the top of the drop. It stands on the ground like anything
+    // else, so it joins the depth order and the character passes behind it.
+    if (fenceSheet.ok) {
+      const range = visibleTiles(camera, viewport.width, viewport.height, ZOOM, 1);
+      for (let row = range.minRow; row <= range.maxRow; row++) {
+        for (let col = range.minCol; col <= range.maxCol; col++) {
+          const fence = fenceTile(col, row);
+          if (!fence) continue;
+          const at = screenAt(cellAt(col, row), camera, ZOOM);
+          standing.push({
+            y: row * TILE + TILE,
+            draw: () => drawTile(fenceSheet.img, fence.tile, at, fence.mirror),
+          });
+        }
+      }
+    }
     const trunks: Array<{ x: number; y: number }> = []; // screen points, for the debug boxes
 
     if (treeSheet.ok && stumpSheet.ok) {

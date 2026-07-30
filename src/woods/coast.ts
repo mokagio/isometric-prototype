@@ -66,10 +66,14 @@ export function facesSouth(col: number, row: number): boolean {
   return ring >= 0 && row === FIELD - 1 - ring;
 }
 
-// The island's own corner cells, on the shores that have no bank. Land runs from
-// COAST_RINGS to FIELD - 1 - COAST_RINGS, so these are its first and last cells.
+// The island's own corner cells: land runs from COAST_RINGS to
+// FIELD - 1 - COAST_RINGS, so these are its first and last cells.
 const INNER_FIRST = COAST_RINGS;
 const INNER_LAST = FIELD - 1 - COAST_RINGS;
+// The lip's run is shorter than the island is wide: nearer the sides than this and
+// a cell belongs to the west or east shore instead, which has no drop.
+const LIP_FIRST = COAST_RINGS + CLIFF_RINGS;
+const LIP_LAST = FIELD - 1 - COAST_RINGS - CLIFF_RINGS;
 
 /**
  * The wedge that chamfers a corner of the island, or null.
@@ -139,6 +143,32 @@ export function isCliffFace(col: number, row: number): boolean {
 /** Whether the grass on a cell carries the dark lip cut by the drop below it. */
 export function isLip(col: number, row: number): boolean {
   return ringOf(col, row) === COAST_RINGS + CLIFF_RINGS && facesSouth(col, row);
+}
+
+/**
+ * The lip's own corner tile at either end of its run, where the drop turns and the
+ * dark edge has to curve down with it rather than stopping square. `cliffTop.png`
+ * holds the pair, one for each end.
+ */
+export function lipCornerTile(col: number, row: number): Tile | null {
+  if (!isLip(col, row)) return null;
+  if (col === LIP_FIRST) return { col: 0, row: 0 };
+  if (col === LIP_LAST) return { col: 1, row: 0 };
+  return null;
+}
+
+/**
+ * The fence along the top of the drop, and which way round its tile goes. A run of
+ * posts-and-rails, ended properly at each corner rather than trailing off.
+ *
+ * `FENCE` names cells of `fence.png`, cut as a strip: a mid post with rails both
+ * ways, then an end post with a rail on one side only, mirrored for the other end.
+ */
+export function fenceTile(col: number, row: number): { tile: Tile; mirror: boolean } | null {
+  if (!isLip(col, row)) return null;
+  if (col === LIP_FIRST) return { tile: { col: 1, row: 0 }, mirror: true };
+  if (col === LIP_LAST) return { tile: { col: 1, row: 0 }, mirror: false };
+  return { tile: { col: 0, row: 0 }, mirror: false };
 }
 
 /** Which tile of the sea block a cell takes, so the mottle stays seamless. */

@@ -124,7 +124,10 @@ export function fieldBounds(inset: number): Bounds {
     minX: coast + inset,
     maxX: FIELD_PX - coast - inset,
     minY: coast + inset,
-    maxY: FIELD_PX - (COAST_RINGS + CLIFF_RINGS) * TILE - inset,
+    // Two cells further on the south: the drop's face, and the lip above it, which
+    // carries the fence. Stopping short of the fence is what keeps the figure from
+    // standing in it, with no collision to write.
+    maxY: FIELD_PX - (COAST_RINGS + CLIFF_RINGS + 1) * TILE - inset,
   };
 }
 

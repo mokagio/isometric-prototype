@@ -5,7 +5,9 @@ import {
   isCliffFace,
   isLip,
   chamferTile,
+  fenceTile,
   isWater,
+  lipCornerTile,
   ringOf,
   SEA_BLOCK,
   seaTile,
@@ -226,5 +228,39 @@ describe("chamferTile", () => {
     // While the shores either side of them keep theirs.
     expect(shoreTile(MID, 0)).not.toBeNull();
     expect(shoreTile(0, MID)).not.toBeNull();
+  });
+});
+
+describe("the fence and the lip's corners", () => {
+  const LIP_ROW = FIELD - 1 - COAST_RINGS - CLIFF_RINGS;
+  // The run is shorter than the island is wide: the cells nearer the sides belong
+  // to the west and east shores, which have no drop and so no lip.
+  const INNER_FIRST = COAST_RINGS + CLIFF_RINGS;
+  const INNER_LAST = FIELD - 1 - COAST_RINGS - CLIFF_RINGS;
+
+  it("runs a fence the length of the lip, and nowhere else", () => {
+    expect(fenceTile(MID, LIP_ROW)).not.toBeNull();
+    expect(fenceTile(MID, LIP_ROW - 1)).toBeNull();
+    expect(fenceTile(MID, MID)).toBeNull();
+    expect(fenceTile(INNER_FIRST, MID)).toBeNull(); // no fence on the side shores
+  });
+
+  it("ends the run properly at each corner, one of them mirrored", () => {
+    const west = fenceTile(INNER_FIRST, LIP_ROW)!;
+    const east = fenceTile(INNER_LAST, LIP_ROW)!;
+    const middle = fenceTile(MID, LIP_ROW)!;
+    expect(west.tile).toEqual(east.tile); // the same end post
+    expect(west.mirror).not.toBe(east.mirror); // facing opposite ways
+    expect(middle.tile).not.toEqual(west.tile); // and a different post between
+    expect(middle.mirror).toBe(false);
+  });
+
+  it("curves the lip's dark edge at both ends of its run", () => {
+    const west = lipCornerTile(INNER_FIRST, LIP_ROW);
+    const east = lipCornerTile(INNER_LAST, LIP_ROW);
+    expect(west).not.toBeNull();
+    expect(east).not.toBeNull();
+    expect(west).not.toEqual(east);
+    expect(lipCornerTile(MID, LIP_ROW)).toBeNull(); // the straight run keeps the straight lip
   });
 });
