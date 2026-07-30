@@ -4,6 +4,7 @@ import {
   frameOf,
   isCliffFace,
   isLip,
+  chamferTile,
   isWater,
   ringOf,
   SEA_BLOCK,
@@ -53,19 +54,13 @@ describe("shoreTile", () => {
     expect(shoreTile(LAST, MID)).toEqual({ col: 0, row: 1 });
   });
 
-  it("tapers the bank round the two south corners, with a tile each", () => {
-    const sw = shoreTile(0, LAST);
-    const se = shoreTile(LAST, LAST);
-    expect(sw).not.toBeNull();
-    expect(se).not.toBeNull();
-    expect(sw).not.toEqual(se);
-  });
-
-  it("leaves the north corners bare, since there is no bank to taper", () => {
-    // Those cells touch the island only at a point: a corner tile there is a lone
-    // wedge of land out in the water.
+  it("leaves every extreme corner bare — the island turns on its own chamfer", () => {
+    // Those cells touch the island only at a point, so a wedge there is a shard of
+    // land floating in the sea.
     expect(shoreTile(0, 0)).toBeNull();
     expect(shoreTile(LAST, 0)).toBeNull();
+    expect(shoreTile(0, LAST)).toBeNull();
+    expect(shoreTile(LAST, LAST)).toBeNull();
   });
 });
 
@@ -171,5 +166,65 @@ describe("isWater", () => {
   it("leaves everything inland dry", () => {
     expect(isWater(1, MID)).toBe(false);
     expect(isWater(MID, MID)).toBe(false);
+  });
+});
+
+describe("chamferTile", () => {
+  const INNER_FIRST = COAST_RINGS;
+  const INNER_LAST = FIELD - 1 - COAST_RINGS;
+
+  it("chamfers all four corners, each its own way round", () => {
+    const corners = [
+      chamferTile(INNER_FIRST, INNER_FIRST),
+      chamferTile(INNER_LAST, INNER_FIRST),
+      chamferTile(INNER_FIRST, INNER_LAST),
+      chamferTile(INNER_LAST, INNER_LAST),
+    ];
+    for (const corner of corners) expect(corner).not.toBeNull();
+    expect(new Set(corners.map((c) => `${c!.col},${c!.row}`)).size).toBe(4);
+  });
+
+  it("turns each corner in the colour of its shore", () => {
+    // Grass bank at the north, brown bank at the south: the ring's rows 2 and 0.
+    expect(chamferTile(INNER_FIRST, INNER_FIRST)!.row).toBe(2);
+    expect(chamferTile(INNER_FIRST, INNER_LAST)!.row).toBe(0);
+  });
+
+  it("leaves the wall off the corner cell, so the wedge is not painted over", () => {
+    expect(isCliffFace(INNER_FIRST, INNER_LAST)).toBe(false);
+    expect(isCliffFace(INNER_LAST, INNER_LAST)).toBe(false);
+    expect(isCliffFace(MID, INNER_LAST)).toBe(true); // the run between them still has it
+  });
+
+  it("leaves the rest of the island square", () => {
+    expect(chamferTile(MID, INNER_FIRST)).toBeNull();
+    expect(chamferTile(INNER_FIRST, MID)).toBeNull();
+    expect(chamferTile(MID, MID)).toBeNull();
+  });
+
+  it("sits on the land, not on the water beyond it", () => {
+    // The mistake worth not repeating: a wedge on the diagonal water cell is a
+    // lone triangle of land out at sea.
+    expect(isWater(INNER_FIRST, INNER_FIRST)).toBe(false);
+    expect(chamferTile(0, 0)).toBeNull();
+    expect(chamferTile(FIELD - 1, 0)).toBeNull();
+  });
+
+  it("takes the straight rim off the cells the chamfer's diagonal covers", () => {
+    for (const [col, row] of [
+      [INNER_FIRST, 0],
+      [INNER_LAST, 0],
+      [INNER_FIRST, FIELD - 1],
+      [INNER_LAST, FIELD - 1],
+      [0, INNER_FIRST],
+      [FIELD - 1, INNER_FIRST],
+      [0, INNER_LAST],
+      [FIELD - 1, INNER_LAST],
+    ]) {
+      expect(shoreTile(col!, row!), `${col},${row}`).toBeNull();
+    }
+    // While the shores either side of them keep theirs.
+    expect(shoreTile(MID, 0)).not.toBeNull();
+    expect(shoreTile(0, MID)).not.toBeNull();
   });
 });

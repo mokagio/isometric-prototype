@@ -14,6 +14,7 @@ import {
   isLip,
   ringOf,
   seaTile,
+  chamferTile,
   isWater,
   shoreTile,
   SPARKLE_FRAMES,
@@ -188,10 +189,13 @@ function main(): void {
         }
         if (ringOf(col, row) < 0) continue; // out at sea
 
-        // Grass everywhere on the island but the lip, which is its own ground.
-        // Never on the coast ring: that is water, and the shore tiles go over it.
-        const ownGround = isWater(col, row) || (isLip(col, row) && lipSheet.ok);
+        // Grass everywhere on the island but the lip and the corner chamfers,
+        // which are their own ground. Never on the coast ring: that is water, and
+        // the shore tiles go over it.
+        const chamfer = shoreSheet.ok ? chamferTile(col, row) : null;
+        const ownGround = isWater(col, row) || chamfer !== null || (isLip(col, row) && lipSheet.ok);
         if (grassSheet.ok && !ownGround) drawTile(grassSheet.img, { col: tileVariant(col, row), row: 0 }, at);
+        if (chamfer && surf.ok) drawTile(surf.img, chamfer, at);
         if (isLip(col, row) && lipSheet.ok) drawTile(lipSheet.img, { col: 0, row: 0 }, at);
         // The face is a wall, so it is drawn over the grass rather than instead of
         // it: its own tiles are cut away at the top where the lip shows through.

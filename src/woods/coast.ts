@@ -66,20 +66,58 @@ export function facesSouth(col: number, row: number): boolean {
   return ring >= 0 && row === FIELD - 1 - ring;
 }
 
+// The island's own corner cells, on the shores that have no bank. Land runs from
+// COAST_RINGS to FIELD - 1 - COAST_RINGS, so these are its first and last cells.
+const INNER_FIRST = COAST_RINGS;
+const INNER_LAST = FIELD - 1 - COAST_RINGS;
+
+/**
+ * The wedge that chamfers a corner of the island, or null.
+ *
+ * These tiles carry land in one quadrant and a diagonal rim across it, so they
+ * work as the land's own corner: the coast turns on the diagonal, like a headland,
+ * instead of being cut square. Laid on the *diagonal water cell* outside the
+ * island — which touches it only at a point — the same tile is a lone shard of
+ * land floating in the sea, which is the mistake worth not repeating.
+ *
+ * The north pair are the grass-bank wedges, the south pair the brown-bank ones, so
+ * each corner turns in the colour of the shore it belongs to.
+ */
+export function chamferTile(col: number, row: number): Tile | null {
+  const first = col === INNER_FIRST;
+  const last = col === INNER_LAST;
+  if (row === INNER_FIRST) {
+    if (first) return RING.landBelowRight; // land to its south-east
+    if (last) return RING.landBelowLeft; // land to its south-west
+  }
+  if (row === INNER_LAST) {
+    if (first) return RING.landAboveRight; // land to its north-east
+    if (last) return RING.landAboveLeft; // land to its north-west
+  }
+  return null;
+}
+
+/** Whether a water cell's straight rim is left off because a chamfer covers it. */
+function chamfered(col: number, row: number): boolean {
+  const onCornerCol = col === INNER_FIRST || col === INNER_LAST;
+  const onCornerRow = row === INNER_FIRST || row === INNER_LAST;
+  const flanksAcross = (row === 0 || row === FIELD - 1) && onCornerCol;
+  const flanksDown = (col === 0 || col === FIELD - 1) && onCornerRow;
+  const diagonallyOutside = (row === 0 || row === FIELD - 1) && (col === 0 || col === FIELD - 1);
+  return flanksAcross || flanksDown || diagonallyOutside;
+}
+
 /** The shore tile at the water's edge, or null anywhere else. */
 export function shoreTile(col: number, row: number): Tile | null {
   if (ringOf(col, row) !== 0) return null;
+  if (chamfered(col, row)) return null; // the chamfer carries the rim here
   const north = row === 0;
   const south = row === FIELD - 1;
   const west = col === 0;
   const east = col === FIELD - 1;
-  // The extreme corner cells touch the island only at a point. The ring's corner
-  // tiles carry a wedge of bank, which is what a south shore wants — the band
-  // tapers round the corner — but on the other three shores there is no bank to
-  // taper, so a wedge there is a lone triangle of land sitting out in the water.
-  if (south && west) return RING.landAboveRight;
-  if (south && east) return RING.landAboveLeft;
-  if (north && (west || east)) return null;
+  // The extreme corner cells are handled by `chamferTile`, which puts the wedge on
+  // the island's own corner rather than out here where it touches nothing.
+  if ((north || south) && (west || east)) return null;
   if (south) return RING.landAbove;
   if (north) return RING.landBelow;
   if (west) return RING.landRight;
@@ -93,6 +131,7 @@ export function shoreTile(col: number, row: number): Tile | null {
  * would show through as brown water.
  */
 export function isCliffFace(col: number, row: number): boolean {
+  if (chamferTile(col, row)) return false; // the corner turns on its wedge instead
   const ring = ringOf(col, row);
   return ring >= COAST_RINGS && ring < COAST_RINGS + CLIFF_RINGS && facesSouth(col, row);
 }
