@@ -46,7 +46,7 @@ Any new art or font goes in `CREDITS.md` and `credits.html`.
 Its metadata gives the origin as (48, 64), the bottom edge; the figure is 11x16 of that frame and stands at y=39, so anchoring on 64 floats it a sprite's height above its own shadow.
 Measure a new sheet instead of trusting it: `magick walk.png -crop 96x64+0+0 +repage -format %@ info:`.
 Frame counts and fps *are* reliable in the pack's GameMaker metadata (`Sunnyside_World_Gamemaker/sprites/<name>/<name>.yy`): walk is 8 frames, idle 9, both at 12 fps.
-A character is layers composited in order — `base_*`, then a hair sheet, then `tools_*` for whatever it is holding — flattened at vendoring time, per `CREDITS.md`.
+A character is layers composited in order — `base_*`, then a hair sheet, then `tools_*` for whatever it is holding — flattened at vendoring time.
 The pack draws one facing, so left is `blitFrame`'s `flip` and walking up or down keeps the sprite front-on.
 
 `woods/field.ts` holds the ground: a finite `FIELD` square of `TILE` (16px) grass, painted from `grass.png` by a value hash so no map is stored, with dark green past its edge.
