@@ -9,11 +9,12 @@ import {
   isComplete,
   MAX_SIDE,
   VERSION,
+  mapFromWorld,
   worldFromMap,
   type MapCell,
   type MapData,
 } from "./mapFormat";
-import { isLiquidTile, type Tile } from "./world";
+import { generateWorld, isLiquidTile, type Tile } from "./world";
 
 const GRASS: Tile = [1, 1];
 const STONE: Tile = [0, 4];
@@ -214,6 +215,53 @@ describe("worldFromMap", () => {
   it("plays a gappy map once the gaps are filled", () => {
     const world = worldFromMap(fillEmpty(blank(2, 2), GRASS));
     expect(world.isWater(0, 0)).toBe(false);
+  });
+});
+
+describe("mapFromWorld", () => {
+  const world = generateWorld(24, 24, 4242);
+
+  it("hands over a finished map, with nothing left to fill", () => {
+    const map = mapFromWorld(world);
+    expect(map.cols).toBe(24);
+    expect(map.rows).toBe(24);
+    expect(isComplete(map)).toBe(true);
+  });
+
+  it("brings a generated world back unchanged through the format", () => {
+    // This is the editor opening the world you are playing, then handing it
+    // straight back: every cell has to survive both trips.
+    const back = worldFromMap(decodeMap(encodeMap(mapFromWorld(world))));
+    for (let row = 0; row < world.rows; row++) {
+      for (let col = 0; col < world.cols; col++) {
+        expect(back.cell(col, row)).toEqual(world.cell(col, row));
+      }
+    }
+  });
+
+  it("keeps the generated world's water impassable", () => {
+    // The generator flags water itself; a round trip has to rediscover it from
+    // the tile alone, so a mismatch here would drown the hero or dry up a lake.
+    const back = worldFromMap(mapFromWorld(world));
+    let water = 0;
+    for (let row = 0; row < world.rows; row++) {
+      for (let col = 0; col < world.cols; col++) {
+        expect(back.isWater(col, row)).toBe(world.isWater(col, row));
+        if (world.isWater(col, row)) water++;
+      }
+    }
+    expect(water).toBeGreaterThan(0); // or the check above proves nothing
+  });
+
+  it("does not transpose the world on the way out", () => {
+    const oblong = generateWorld(9, 5, 7);
+    const map = mapFromWorld(oblong);
+    expect(map.cols).toBe(9);
+    expect(map.rows).toBe(5);
+    expect(cellAt(map, 8, 4)).toEqual({
+      height: oblong.cell(8, 4).height,
+      surface: oblong.cell(8, 4).surface,
+    });
   });
 });
 

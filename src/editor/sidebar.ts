@@ -21,6 +21,8 @@ export interface MapActions {
   onSave: () => void;
   /** Pick a map file and load it onto the board. */
   onOpen: () => void;
+  /** Load the world the game is playing onto the board. */
+  onLoadGameWorld: () => void;
 }
 
 export function clampHeight(h: number): number {
@@ -155,6 +157,7 @@ export function buildSidebar(
   };
   button("Save map", actions.onSave);
   button("Open map…", actions.onOpen);
+  button("Load game world", actions.onLoadGameWorld);
   root.appendChild(mapButtons);
 
   const hint = document.createElement("div");

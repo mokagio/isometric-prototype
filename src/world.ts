@@ -71,6 +71,8 @@ export interface World {
 
 export const isLiquidTile = (tile: Tile): boolean => tile[1] === LIQUID_SHEET_ROW;
 
+export const randomSeed = (): number => Math.floor(Math.random() * 1_000_000);
+
 /** Wraps a grid of cells as a `World`, reading out of bounds as the nearest edge cell. */
 export function makeWorld(cells: Cell[][]): World {
   const rows = cells.length;

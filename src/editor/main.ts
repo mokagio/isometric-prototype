@@ -1,6 +1,6 @@
 import { loadTileset } from "../tileset";
 import { unproject } from "../iso";
-import { MAP_SIZE } from "../world";
+import { generateWorld, MAP_SIZE, randomSeed } from "../world";
 import tilesheetUrl from "../../isometric_fantasy_tiles.png";
 import { Board } from "./board";
 import { PALETTE } from "./palette";
@@ -9,8 +9,9 @@ import { renderEditor, type Cell } from "./render";
 import { centreView, panView, viewOrigin, type PanDir } from "./view";
 import { createPanPad } from "./panPad";
 import { boardToMap, loadMapIntoBoard, mapFilename } from "./mapIO";
-import { decodeMap, encodeMap } from "../mapFormat";
+import { decodeMap, encodeMap, mapFromWorld } from "../mapFormat";
 import { downloadText, pickTextFile } from "./files";
+import { recallWorldSeed } from "../handoff";
 
 const PAN_KEYS: Record<string, PanDir> = {
   arrowup: "up",
@@ -50,7 +51,17 @@ async function main(): Promise<void> {
 
   const saveMap = (): void => downloadText(mapFilename(new Date()), encodeMap(boardToMap(board)));
 
+  // Loading replaces the board, so anything already built gets a say first.
+  const mayReplaceBoard = (): boolean =>
+    board.placed === 0 || confirm("This replaces what you have built. Save it first if you want to keep it.");
+
+  const showBoard = (): void => {
+    view = centreView(board.size);
+    requestRender();
+  };
+
   const openMap = async (): Promise<void> => {
+    if (!mayReplaceBoard()) return;
     const text = await pickTextFile();
     if (text === null) return;
     try {
@@ -59,13 +70,23 @@ async function main(): Promise<void> {
       alert(e instanceof Error ? e.message : "That map could not be opened.");
       return;
     }
-    view = centreView(board.size);
-    requestRender();
+    showBoard();
+  };
+
+  // Worlds are a pure function of their seed, so the game stashing its seed is
+  // enough for the editor to rebuild the exact world being played. Never having
+  // played leaves no seed, and a fresh world is a fine thing to start from.
+  const loadGameWorld = (): void => {
+    if (!mayReplaceBoard()) return;
+    const world = generateWorld(board.size, board.size, recallWorldSeed() ?? randomSeed());
+    loadMapIntoBoard(board, mapFromWorld(world));
+    showBoard();
   };
 
   const sidebar = buildSidebar(sidebarEl, tileset, state, requestRender, {
     onSave: saveMap,
     onOpen: () => void openMap(),
+    onLoadGameWorld: loadGameWorld,
   });
 
   function draw(): void {

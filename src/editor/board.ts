@@ -45,6 +45,11 @@ export class Board {
     this.cells.clear();
   }
 
+  /** How many cells have been built on — 0 means there is nothing to lose. */
+  get placed(): number {
+    return this.cells.size;
+  }
+
   forEach(fn: (col: number, row: number, column: Column) => void): void {
     for (const [key, column] of this.cells) {
       fn(key % this.size, Math.floor(key / this.size), column);

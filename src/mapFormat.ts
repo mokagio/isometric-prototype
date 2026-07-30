@@ -117,6 +117,18 @@ export function decodeMap(text: string): MapData {
   return { cols: cols as number, rows: rows as number, cells };
 }
 
+/** Every cell of a world as a finished map, so the editor can open a generated one. */
+export function mapFromWorld(world: World): MapData {
+  const cells: MapCell[] = [];
+  for (let row = 0; row < world.rows; row++) {
+    for (let col = 0; col < world.cols; col++) {
+      const cell = world.cell(col, row);
+      cells.push({ height: cell.height, surface: cell.surface });
+    }
+  }
+  return { cols: world.cols, rows: world.rows, cells };
+}
+
 /** A playable `World` from a finished map. Liquid-capped columns become water. */
 export function worldFromMap(map: MapData): World {
   const grid: Cell[][] = [];

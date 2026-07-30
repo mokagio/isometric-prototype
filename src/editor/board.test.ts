@@ -32,6 +32,20 @@ describe("Board", () => {
     expect(count).toBe(0);
   });
 
+  it("counts what has been built, so a load can ask before wiping it", () => {
+    const b = new Board(10);
+    expect(b.placed).toBe(0);
+    b.place(1, 1, GRASS, 0);
+    b.place(2, 2, GRASS, 0);
+    expect(b.placed).toBe(2);
+    b.place(2, 2, STONE, 1); // replacing a cell is not a new one
+    expect(b.placed).toBe(2);
+    b.erase(1, 1);
+    expect(b.placed).toBe(1);
+    b.clear();
+    expect(b.placed).toBe(0);
+  });
+
   it("reports bounds correctly and round-trips (col,row) through forEach", () => {
     const b = new Board(16);
     expect(b.inBounds(0, 0)).toBe(true);

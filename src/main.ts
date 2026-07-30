@@ -1,5 +1,6 @@
 import { loadTileset } from "./tileset";
-import { generateWorld, findSpawn, MAP_SIZE } from "./world";
+import { generateWorld, findSpawn, MAP_SIZE, randomSeed, type World } from "./world";
+import { rememberWorldSeed } from "./handoff";
 import { render, type Entity } from "./renderer";
 import { project, SY, type Origin } from "./iso";
 import { Camera } from "./camera";
@@ -19,7 +20,13 @@ import { Swing } from "./swing";
 import { drawArea, drawBox, HERO_BOX, MONSTER_BOX } from "./debug";
 import tilesheetUrl from "../isometric_fantasy_tiles.png";
 
-const randomSeed = (): number => Math.floor(Math.random() * 1_000_000);
+// The seed is stashed as the world is made, so the editor can open the very
+// world you are walking around in.
+function newWorld(): World {
+  const seed = randomSeed();
+  rememberWorldSeed(seed);
+  return generateWorld(MAP_SIZE, MAP_SIZE, seed);
+}
 
 async function main(): Promise<void> {
   const canvas = document.getElementById("game") as HTMLCanvasElement;
@@ -27,7 +34,7 @@ async function main(): Promise<void> {
   const tileset = await loadTileset(tilesheetUrl);
   const input = new Input(window);
 
-  let world = generateWorld(MAP_SIZE, MAP_SIZE, randomSeed());
+  let world = newWorld();
   let spawn = findSpawn(world);
   let hero = new Hero(spawn.col, spawn.row, world);
   // Height tracks the ground under the hero, not the hero's own z, so a jump
@@ -47,7 +54,7 @@ async function main(): Promise<void> {
   };
 
   function restart(): void {
-    world = generateWorld(MAP_SIZE, MAP_SIZE, randomSeed());
+    world = newWorld();
     spawn = findSpawn(world);
     hero = new Hero(spawn.col, spawn.row, world);
     camera.snap(hero.z);
