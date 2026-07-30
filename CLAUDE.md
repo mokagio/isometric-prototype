@@ -58,7 +58,8 @@ Trunks are solid: `blockedByTree` guards the roots only, and `walk` tries each a
 
 `woods/wood.ts` holds everything the wood remembers between frames, since the field itself is a pure function of its seed: how many blows each tree has taken, which are shuddering, and `inReach` for the tree the action button would swing at.
 Trees stand still until hit — the pack's 4-frame sway plays once, fast, as a shudder.
-`Chop` is the swing clock: frame 6 of the axe strip carries the impact star, so that is the frame the blow lands on, and after `CHOPS_TO_FELL` the tree draws as `stump.png` instead.
+`Chop` is the swing clock: frame 6 of the axe strip carries the impact star, so that is the frame the blow lands on, and after `CHOPS_TO_FELL` the tree draws as the tileset's own cut stump instead.
+The action button and the spacebar both go through one `swingAxe`, so they cannot drift apart; `Input.jump` is the spacebar, and the press is edge-detected because holding it should not chop twice.
 
 ## Maps
 

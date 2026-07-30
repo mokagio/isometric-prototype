@@ -13,10 +13,6 @@
   ```
 
   `tree.png` is `spr_deco_tree_01_strip4` and `shadow.png` the pack's `spr_deco_charactershadow`.
-  `grass.png` is four 16px tiles cut from `spr_tileset_sunnysideworld_16px.png`, and `stump.png` is what is left of a tree once its crown is cropped off:
-
-  ```
-  magick public/sunnyside/tree.png -crop 32x11+0+23 +repage public/sunnyside/stump.png
-  ```
+  `grass.png` (four ground tiles) and `stump.png` (the cut stump at 512, 80) are tiles out of `spr_tileset_sunnysideworld_16px.png`.
 
 - [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) — SIL Open Font License, text in `public/fonts/OFL.txt`

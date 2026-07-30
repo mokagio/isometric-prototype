@@ -50,12 +50,11 @@ const TREE_ANCHOR_Y = 32;
 // A tree hangs two tiles above its base, so one just off screen still shows.
 const TREE_PAD = 3;
 
-// What is left after three chops: the bottom of the same sprite, cropped at
-// vendoring time, so the roots stay exactly where the tree's were.
-const STUMP_W = 32;
-const STUMP_H = 11;
-const STUMP_ANCHOR_X = 16;
-const STUMP_ANCHOR_Y = 9;
+// What is left after three chops: the pack's own cut stump, one 16px tile out of
+// the tileset, standing on the bottom of its roots.
+const STUMP_CELL = 16;
+const STUMP_ANCHOR_X = 8;
+const STUMP_ANCHOR_Y = 15;
 
 const ZOOM = 4;
 
@@ -100,10 +99,11 @@ function main(): void {
 
   const wood = new Wood();
   const chop = new Chop();
-  const action = createActionButton(() => {
+  const swingAxe = (): void => {
     const target = wood.inReach(pos);
     if (target) chop.start(target);
-  });
+  };
+  const action = createActionButton(swingAxe);
 
   let debug = false;
   createMenu("Whispering Woods", {
@@ -120,10 +120,16 @@ function main(): void {
   let facing: Facing = "right";
   let walkT = 0; // reset on stopping, so every step starts from a standstill
   let animT = 0; // never reset — the idle breath and the trees keep going
+  // `Input.jump` is the spacebar, which is the action key here. Held is not
+  // pressed: one swing per press, however long the key is down for.
+  let actionHeld = false;
 
   const step = (dt: number): void => {
     viewport.fit();
     viewport.applyTransform(ctx);
+
+    if (input.jump && !actionHeld) swingAxe();
+    actionHeld = input.jump;
 
     // Mid-swing the character is planted: an axe animation that slides along the
     // ground reads as a bug.
@@ -181,8 +187,8 @@ function main(): void {
             y: base.y,
             draw: () =>
               blitFrame(ctx, felled ? stumpSheet.img : treeSheet.img, at.x, at.y, {
-                cell: felled ? STUMP_W : TREE_W,
-                cellH: felled ? STUMP_H : TREE_H,
+                cell: felled ? STUMP_CELL : TREE_W,
+                cellH: felled ? STUMP_CELL : TREE_H,
                 scale: ZOOM,
                 anchorX: felled ? STUMP_ANCHOR_X : TREE_ANCHOR_X,
                 anchorY: felled ? STUMP_ANCHOR_Y : TREE_ANCHOR_Y,
