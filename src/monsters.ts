@@ -34,12 +34,21 @@ const FADE_TAIL = 0.3; // last fraction of the death that fades — the rest is 
 export const KNOCKBACK = 1.6; // cells a killed monster is thrown, over the fade
 export const SPAWN_MIN = 7;
 export const SPAWN_MAX = 12;
-// "lurk" mode: the monster guards a 5x5 square (this many cells each way).
+// "lurk" mode: the monster guards a 5x5 square (this many cells each way),
+// centred on where it spawned rather than on where it currently stands, so an
+// ambling monster cannot walk its own guard square across the map.
 export const AGGRO_HALF = 2;
 // It wakes when the hero's footprint (one cell) *touches* that square, not once
 // the hero is fully inside it — the Minkowski sum of the square's edge (+0.5)
 // and the footprint's half-width (0.5). "hunt" mode ignores this.
 export const AGGRO_REACH = AGGRO_HALF + 0.5 + 0.5;
+
+// Idle wandering while it lurks: amble to a waypoint inside the guard square,
+// stand still for a beat, pick another. Displaced monsters wander home again,
+// since every waypoint is drawn from the square around `home`.
+export const WANDER_SPEED = 0.9; // cells/sec — an amble, well under a chase
+export const WANDER_PAUSE = 1.6; // max seconds of stillness between legs
+export const WANDER_ARRIVE = 0.15; // cells: close enough to call the waypoint reached
 
 // hunt: always close on the hero. lurk: only once the hero enters the square.
 export type AggroMode = "hunt" | "lurk";
@@ -65,6 +74,11 @@ export interface Monster {
   dyingT: number;
   faceLeft: boolean;
   knock: Knock | null;
+  /** Where it spawned: the centre of the square it guards and wanders inside. */
+  home: Pos;
+  waypoint: Pos;
+  /** Seconds it stands still before setting off for the waypoint. */
+  pause: number;
 }
 
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
@@ -126,6 +140,10 @@ export class MonsterField {
         dyingT: 0,
         faceLeft: false,
         knock: null,
+        home: { col, row },
+        waypoint: { col, row },
+        // Staggered, or a wave would amble off in lockstep.
+        pause: Math.random() * WANDER_PAUSE,
       });
     }
   }
@@ -161,6 +179,40 @@ export class MonsterField {
     }
   }
 
+  /** A fresh waypoint inside the guard square, and a beat of stillness before it sets off. */
+  private restWaypoint(m: Monster, world: World): void {
+    m.pause = Math.random() * WANDER_PAUSE;
+    m.waypoint = {
+      col: clamp(m.home.col + (Math.random() * 2 - 1) * AGGRO_HALF, 1, world.cols - 2),
+      row: clamp(m.home.row + (Math.random() * 2 - 1) * AGGRO_HALF, 1, world.rows - 2),
+    };
+  }
+
+  /** Amble toward the current waypoint, then rest and pick another. */
+  private wander(m: Monster, dt: number, world: World): void {
+    if (m.pause > 0) {
+      m.pause -= dt;
+      return;
+    }
+    const dx = m.waypoint.col - m.col;
+    const dy = m.waypoint.row - m.row;
+    const d = Math.hypot(dx, dy);
+    if (d <= WANDER_ARRIVE) {
+      this.restWaypoint(m, world);
+      return;
+    }
+    m.faceLeft = dx - dy < 0;
+    const step = Math.min(WANDER_SPEED * dt, d);
+    const before = { col: m.col, row: m.row };
+    const nc = m.col + (dx / d) * step;
+    if (!world.isWater?.(Math.round(nc), Math.round(m.row))) m.col = nc;
+    const nr = m.row + (dy / d) * step;
+    if (!world.isWater?.(Math.round(m.col), Math.round(nr))) m.row = nr;
+    // Walled off from the waypoint by water: rest and choose somewhere reachable
+    // instead of grinding against the shore for the rest of the wave.
+    if (m.col === before.col && m.row === before.row) this.restWaypoint(m, world);
+  }
+
   update(dt: number, hero: Pos, world: World): void {
     if (!this.ready) return;
     for (const m of this.mons) {
@@ -181,10 +233,17 @@ export class MonsterField {
       const dx = hero.col - m.col;
       const dy = hero.row - m.row;
       const d = Math.hypot(dx, dy);
+      // In lurk mode a monster only stirs once the hero enters its square, and
+      // ambles around inside it until then.
+      const awake =
+        this.mode === "hunt" ||
+        (Math.abs(hero.col - m.home.col) <= AGGRO_REACH && Math.abs(hero.row - m.home.row) <= AGGRO_REACH);
+      if (!awake) {
+        this.wander(m, dt, world);
+        continue;
+      }
       m.faceLeft = dx - dy < 0; // the hero's screen-x direction from the monster
-      // In lurk mode a monster only stirs once the hero is inside its square.
-      const awake = this.mode === "hunt" || (Math.abs(dx) <= AGGRO_REACH && Math.abs(dy) <= AGGRO_REACH);
-      if (awake && d > CONTACT) {
+      if (d > CONTACT) {
         const step = SPEED * dt;
         // Per-axis, blocked by water, so a slime slides along the shore.
         const nc = m.col + (dx / d) * step;

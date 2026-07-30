@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AGGRO_HALF,
   AGGRO_REACH,
@@ -13,6 +13,9 @@ import {
   SPAWN_MIN,
   SEPARATION,
   SPEED,
+  WANDER_ARRIVE,
+  WANDER_PAUSE,
+  WANDER_SPEED,
   WAVE_BREAK,
   WAVE_SIZE,
   WAVE_STAGGER,
@@ -61,6 +64,14 @@ function loaded(): MonsterField {
 // Somewhere the rest of a wave cannot reach the hero or each other during a test.
 const OFFSTAGE = 900;
 
+/** Move a monster as though it had spawned there: post, waypoint and all. */
+function park(m: Monster, col: number, row: number): void {
+  m.col = col;
+  m.row = row;
+  m.home = { col, row };
+  m.waypoint = { col, row };
+}
+
 /**
  * A loaded field holding one monster parked at (col, row), with the rest of its
  * wave sent offstage — so a test about one monster is about one monster, while
@@ -69,12 +80,8 @@ const OFFSTAGE = 900;
 function fieldWith(col: number, row: number): { field: MonsterField; mon: Monster } {
   const field = loaded();
   const [mon, ...rest] = field.list();
-  mon!.col = col;
-  mon!.row = row;
-  rest.forEach((m, i) => {
-    m.col = OFFSTAGE + i * SEPARATION * 4;
-    m.row = OFFSTAGE;
-  });
+  park(mon!, col, row);
+  rest.forEach((m, i) => park(m, OFFSTAGE + i * SEPARATION * 4, OFFSTAGE));
   return { field, mon: mon! };
 }
 
@@ -511,7 +518,19 @@ describe("MonsterField.draw", () => {
   it("draws nothing before the sheets have loaded", () => {
     const field = new MonsterField(BASE);
     const { ctx, calls } = recordingCtx();
-    field.draw(ctx, { col: 0, row: 0, animT: 0, dying: false, dyingT: 0, faceLeft: false, knock: null }, 0, 0);
+    const mon: Monster = {
+      col: 0,
+      row: 0,
+      animT: 0,
+      dying: false,
+      dyingT: 0,
+      faceLeft: false,
+      knock: null,
+      home: { col: 0, row: 0 },
+      waypoint: { col: 0, row: 0 },
+      pause: 0,
+    };
+    field.draw(ctx, mon, 0, 0);
     expect(calls).toHaveLength(0);
   });
 
@@ -565,6 +584,12 @@ describe("MonsterField.draw", () => {
 });
 
 describe("MonsterField aggro modes", () => {
+  // Waypoints are drawn about `home`, so a fixed 0.5 always picks the post the
+  // monster already stands on: the only movement left in these tests is a chase.
+  const noWander = (): void => void vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+  afterEach(() => vi.restoreAllMocks());
+
   it("hunt (the default) closes even from well outside the square", () => {
     const { field, mon } = fieldWith(HERO.col + 8, HERO.row);
     const before = mon.col;
@@ -572,7 +597,8 @@ describe("MonsterField aggro modes", () => {
     expect(mon.col).toBeLessThan(before);
   });
 
-  it("lurk holds a monster still while the hero is beyond reach", () => {
+  it("lurk leaves the hero alone while they are beyond reach", () => {
+    noWander();
     const { field, mon } = fieldWith(HERO.col + AGGRO_REACH + 1, HERO.row);
     field.setMode("lurk");
     const { col, row } = mon;
@@ -584,6 +610,7 @@ describe("MonsterField aggro modes", () => {
   it("lurk wakes on touch, not full enclosure", () => {
     // Just inside reach wakes; a hair past it does not — the footprint touching
     // the square is enough, the hero need not be inside it.
+    noWander();
     const inside = fieldWith(HERO.col + AGGRO_REACH - 0.1, HERO.row);
     inside.field.setMode("lurk");
     const wasInside = inside.mon.col;
@@ -597,13 +624,90 @@ describe("MonsterField aggro modes", () => {
     expect(outside.mon.col).toBe(wasOutside);
   });
 
+  it("measures reach from the post, not from where wandering left it", () => {
+    // Ambling toward the hero must not drag the guard square along with it, or a
+    // lurking monster would creep into a chase from anywhere on the map.
+    noWander();
+    const { field, mon } = fieldWith(HERO.col + AGGRO_REACH + 4, HERO.row);
+    field.setMode("lurk");
+    mon.col = HERO.col + 1; // inside reach of the hero, but its post is not
+    field.update(DT, HERO, WORLD);
+    expect(mon.col).toBe(HERO.col + 1);
+  });
+
   it("the square is measured per-axis, not by straight-line distance", () => {
     // A corner cell (AGGRO_HALF, AGGRO_HALF) is ~2.8 away yet still inside a 5x5.
+    noWander();
     const { field, mon } = fieldWith(HERO.col + AGGRO_HALF, HERO.row + AGGRO_HALF);
     field.setMode("lurk");
     const before = Math.hypot(mon.col - HERO.col, mon.row - HERO.row);
     field.update(DT, HERO, WORLD);
     expect(Math.hypot(mon.col - HERO.col, mon.row - HERO.row)).toBeLessThan(before);
+  });
+});
+
+describe("MonsterField wandering", () => {
+  /** A lurking monster posted far from the hero, left to its own devices for `secs`. */
+  function amble(secs: number, at = { col: HERO.col + 30, row: HERO.row + 30 }, world = WORLD) {
+    const { field, mon } = fieldWith(at.col, at.row);
+    field.setMode("lurk");
+    let furthest = 0;
+    let onWater = false;
+    for (let i = 0; i < secs / DT; i++) {
+      field.update(DT, HERO, world);
+      furthest = Math.max(furthest, Math.hypot(mon.col - at.col, mon.row - at.row));
+      onWater ||= world.isWater?.(Math.round(mon.col), Math.round(mon.row)) === true;
+    }
+    return { field, mon, furthest, onWater };
+  }
+
+  it("ambles about instead of standing sentry", () => {
+    expect(amble(20).furthest).toBeGreaterThan(WANDER_ARRIVE);
+  });
+
+  it("keeps its wandering inside the square it guards", () => {
+    const { mon } = amble(60);
+    expect(Math.abs(mon.col - mon.home.col)).toBeLessThanOrEqual(AGGRO_HALF);
+    expect(Math.abs(mon.row - mon.home.row)).toBeLessThanOrEqual(AGGRO_HALF);
+  });
+
+  it("ambles slower than it chases", () => {
+    const { furthest } = amble(1);
+    expect(furthest).toBeLessThanOrEqual(WANDER_SPEED);
+    expect(furthest).toBeLessThan(SPEED);
+  });
+
+  it("wanders back to its post after being knocked clear of it", () => {
+    const { field, mon } = fieldWith(HERO.col + 30, HERO.row + 30);
+    field.setMode("lurk");
+    mon.col = mon.home.col + 10;
+    const strayed = Math.abs(mon.col - mon.home.col);
+    for (let i = 0; i < (WANDER_PAUSE + 5) / DT; i++) field.update(DT, HERO, WORLD);
+    expect(Math.abs(mon.col - mon.home.col)).toBeLessThan(strayed);
+  });
+
+  it("keeps its feet dry when its square laps into water", () => {
+    // A river at 101-103; the post at 104 puts half the guard square in it.
+    const river = { cols: 200, rows: 200, isWater: (c: number) => c >= 101 && c <= 103 } as unknown as World;
+    expect(amble(60, { col: 104, row: HERO.row + 30 }, river).onWater).toBe(false);
+  });
+
+  it("faces the way it is walking, not the way the hero lies", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // waypoint = the post
+    const { field, mon } = fieldWith(HERO.col - 30, HERO.row);
+    field.setMode("lurk");
+    mon.home = { col: mon.col - 5, row: mon.row }; // its post is off to screen-left
+    for (let i = 0; i < (WANDER_PAUSE + 0.5) / DT; i++) field.update(DT, HERO, WORLD);
+    expect(mon.col).toBeLessThan(HERO.col - 30);
+    expect(mon.faceLeft).toBe(true); // the hero is away to screen-right
+    vi.restoreAllMocks();
+  });
+
+  it("does not amble in hunt mode", () => {
+    const { field, mon } = fieldWith(HERO.col + 30, HERO.row);
+    const before = mon.col;
+    field.update(DT, HERO, WORLD);
+    expect(before - mon.col).toBeCloseTo(SPEED * DT, 6); // straight at the hero, at chase pace
   });
 });
 
