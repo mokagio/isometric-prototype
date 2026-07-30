@@ -4,6 +4,7 @@ import {
   frameOf,
   isCliffFace,
   isLip,
+  isWater,
   ringOf,
   SEA_BLOCK,
   seaTile,
@@ -52,10 +53,19 @@ describe("shoreTile", () => {
     expect(shoreTile(LAST, MID)).toEqual({ col: 0, row: 1 });
   });
 
-  it("gives every corner its own tile, and no two the same", () => {
-    const corners = [shoreTile(0, 0), shoreTile(LAST, 0), shoreTile(0, LAST), shoreTile(LAST, LAST)];
-    for (const corner of corners) expect(corner).not.toBeNull();
-    expect(new Set(corners.map((c) => `${c!.col},${c!.row}`)).size).toBe(4);
+  it("tapers the bank round the two south corners, with a tile each", () => {
+    const sw = shoreTile(0, LAST);
+    const se = shoreTile(LAST, LAST);
+    expect(sw).not.toBeNull();
+    expect(se).not.toBeNull();
+    expect(sw).not.toEqual(se);
+  });
+
+  it("leaves the north corners bare, since there is no bank to taper", () => {
+    // Those cells touch the island only at a point: a corner tile there is a lone
+    // wedge of land out in the water.
+    expect(shoreTile(0, 0)).toBeNull();
+    expect(shoreTile(LAST, 0)).toBeNull();
   });
 });
 
@@ -146,5 +156,20 @@ describe("frameOf", () => {
     expect(frameOf(0.79, 0.8, SPARKLE_FRAMES)).toBe(0);
     expect(frameOf(0.8, 0.8, SPARKLE_FRAMES)).toBe(1);
     expect(frameOf(0.8 * SPARKLE_FRAMES, 0.8, SPARKLE_FRAMES)).toBe(0);
+  });
+});
+
+describe("isWater", () => {
+  it("makes the field's outermost ring water, so the shore tiles lie on the sea", () => {
+    expect(isWater(MID, 0)).toBe(true);
+    expect(isWater(MID, LAST)).toBe(true);
+    expect(isWater(0, MID)).toBe(true);
+    expect(isWater(LAST, MID)).toBe(true);
+    expect(isWater(0, 0)).toBe(true);
+  });
+
+  it("leaves everything inland dry", () => {
+    expect(isWater(1, MID)).toBe(false);
+    expect(isWater(MID, MID)).toBe(false);
   });
 });

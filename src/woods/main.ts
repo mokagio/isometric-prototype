@@ -14,7 +14,7 @@ import {
   isLip,
   ringOf,
   seaTile,
-  shoreHasBank,
+  isWater,
   shoreTile,
   SPARKLE_FRAMES,
   SPARKLE_SECONDS,
@@ -188,9 +188,9 @@ function main(): void {
         }
         if (ringOf(col, row) < 0) continue; // out at sea
 
-        // The lip and the bank tiles are their own ground; everywhere else on the
-        // island starts as grass.
-        const ownGround = (isLip(col, row) && lipSheet.ok) || shoreHasBank(col, row);
+        // Grass everywhere on the island but the lip, which is its own ground.
+        // Never on the coast ring: that is water, and the shore tiles go over it.
+        const ownGround = isWater(col, row) || (isLip(col, row) && lipSheet.ok);
         if (grassSheet.ok && !ownGround) drawTile(grassSheet.img, { col: tileVariant(col, row), row: 0 }, at);
         if (isLip(col, row) && lipSheet.ok) drawTile(lipSheet.img, { col: 0, row: 0 }, at);
         // The face is a wall, so it is drawn over the grass rather than instead of

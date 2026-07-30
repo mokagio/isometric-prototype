@@ -47,15 +47,17 @@ export function ringOf(col: number, row: number): number {
 }
 
 /**
- * Whether a shore cell's own tile carries the bank, and so needs no grass drawn
- * under it. The north and south tiles do; the east and west ones are only a rim,
- * transparent on both sides, and would show sea where the land should be.
+ * Whether a cell is water rather than land. The field's outermost ring is: the
+ * shore tiles are drawn over the sea, not over grass.
  *
- * It matters because the land half of a bank tile is opaque and its water half is
- * not: grass underneath would show through the water as a green strip.
+ * That is how the pack cuts them. Only the south tile carries any land — a band
+ * of bank across its top, then foam and rim, then transparent. The north, east and
+ * west tiles are a rim and nothing else, meant to be laid on the water cell facing
+ * the land. Grass under any of them shows through as a green strip beyond the rim,
+ * and at a corner as a tongue of grass sticking out into the sea.
  */
-export function shoreHasBank(col: number, row: number): boolean {
-  return ringOf(col, row) === 0 && (row === 0 || row === FIELD - 1);
+export function isWater(col: number, row: number): boolean {
+  return ringOf(col, row) === 0;
 }
 
 /** Whether a cell's nearest edge is the south one — the only shore with a face. */
@@ -71,10 +73,13 @@ export function shoreTile(col: number, row: number): Tile | null {
   const south = row === FIELD - 1;
   const west = col === 0;
   const east = col === FIELD - 1;
+  // The extreme corner cells touch the island only at a point. The ring's corner
+  // tiles carry a wedge of bank, which is what a south shore wants — the band
+  // tapers round the corner — but on the other three shores there is no bank to
+  // taper, so a wedge there is a lone triangle of land sitting out in the water.
   if (south && west) return RING.landAboveRight;
   if (south && east) return RING.landAboveLeft;
-  if (north && west) return RING.landBelowRight;
-  if (north && east) return RING.landBelowLeft;
+  if (north && (west || east)) return null;
   if (south) return RING.landAbove;
   if (north) return RING.landBelow;
   if (west) return RING.landRight;
