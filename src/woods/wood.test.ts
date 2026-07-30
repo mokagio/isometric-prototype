@@ -36,10 +36,10 @@ describe("Wood.inReach", () => {
     expect(new Wood().inReach({ x: at.x + 10, y: at.y })).toEqual(tree);
   });
 
-  it("comes live a good two tiles out, so you need not be against the bark", () => {
+  it("comes live well out from the trunk, so you need not be against the bark", () => {
     const tree = someTree();
     const at = base(tree);
-    expect(new Wood().inReach({ x: at.x + 2 * TILE, y: at.y })).toEqual(tree);
+    expect(new Wood().inReach({ x: at.x + 1.5 * TILE, y: at.y })).toEqual(tree);
   });
 
   // Trees stand three cells apart, so stepping out of one's reach can walk into

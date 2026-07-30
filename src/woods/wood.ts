@@ -12,11 +12,12 @@ export const CHOPS_TO_FELL = 3;
  * reaches, and no further.
  *
  * At the impact frame the drawn swing spans to x=85 of the 96px frame while the
- * figure stands on x=48, so axe and star together reach 37px from the feet. 34
- * keeps the star landing on the trunk rather than short of it, and being a little
- * over two tiles it brings the chop live well before you are up against the bark.
+ * figure stands on x=48, so axe and star together carry 37px from the feet. This
+ * has to stay inside that or the blow lands on nothing — just under two tiles,
+ * which brings the chop live before you are up against the bark without letting
+ * you swing at a tree an arm's length past the axe.
  */
-export const AXE_REACH = 34;
+export const AXE_REACH = 31;
 
 // Cells to search for something choppable: enough that a trunk a full reach away
 // is still in the net.
