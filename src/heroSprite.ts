@@ -1,4 +1,5 @@
 import type { HeroAction, HeroSkin } from "./heroSkin";
+import { SX, SY } from "./iso";
 import { frameAt, SheetLoader, type Sheet } from "./sprites";
 
 // Composites an LPC (Universal LPC Spritesheet) walk cycle for the hero.
@@ -37,12 +38,21 @@ const LAYER_DEFS: LayerDef[] = [
 
 export type Facing = 0 | 1 | 2 | 3; // up, left, down, right
 
-/** Movement direction → the nearest of LPC's four facings, or null when still. */
+/**
+ * Movement direction → the nearest of LPC's four facings, or null when still.
+ *
+ * Measured in pixels rather than grid steps: a step along screen-x covers SX and
+ * one along screen-y only SY, so holding two keys walks a shallow diagonal that
+ * is mostly sideways. Comparing raw steps called those diagonals up or down, and
+ * the hero slid across the screen showing its back.
+ */
 export function facingFromAxis(dc: number, dr: number): Facing | null {
-  const screenX = dc - dr;
-  const screenY = dc + dr;
+  const screenX = (dc - dr) * SX;
+  const screenY = (dc + dr) * SY;
   if (screenX === 0 && screenY === 0) return null;
-  if (Math.abs(screenY) >= Math.abs(screenX)) return screenY > 0 ? 2 : 0;
+  // A dead-on 45 degree screen diagonal turns sideways: facing the camera or
+  // away from it while visibly travelling across is the worse-looking half.
+  if (Math.abs(screenY) > Math.abs(screenX)) return screenY > 0 ? 2 : 0;
   return screenX > 0 ? 3 : 1;
 }
 

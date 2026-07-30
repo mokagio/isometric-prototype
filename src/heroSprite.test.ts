@@ -1,6 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CELL, FRAMES, facingFromAxis, HeroSprite, WALK_FPS, type Facing } from "./heroSprite";
 import type { HeroAction } from "./heroSkin";
+import { Input } from "./input";
+
+/** Stands in for `window`, so held keys can drive the real axis without a DOM. */
+class FakeTarget {
+  private handlers = new Map<string, (e: never) => void>();
+
+  addEventListener(type: string, handler: (e: never) => void): void {
+    this.handlers.set(type, handler);
+  }
+
+  press(key: string): void {
+    this.handlers.get("keydown")?.({ key, preventDefault: () => {} } as never);
+  }
+}
 
 // `new Image()` is absent in the node test environment. Handlers attach before
 // `src`, so nothing settles until a test fires it by hand.
@@ -162,5 +176,59 @@ describe("facingFromAxis", () => {
   it("picks left/right when screen-x dominates", () => {
     expect(facingFromAxis(1, -1)).toBe(3); // screen-right
     expect(facingFromAxis(-1, 1)).toBe(1); // screen-left
+  });
+
+  it("turns sideways on a diagonal, which is mostly sideways on screen", () => {
+    // Two keys held is a shallow diagonal: SX per screen-x step against SY per
+    // screen-y step means twice as much travel across as up. Facing up or down
+    // through that shows the hero's back while it slides across.
+    expect(facingFromAxis(-2, 0)).toBe(1); // up and left
+    expect(facingFromAxis(0, -2)).toBe(3); // up and right
+    expect(facingFromAxis(0, 2)).toBe(1); // down and left
+    expect(facingFromAxis(2, 0)).toBe(3); // down and right
+  });
+
+  it("keeps facing up or down when that is the whole of the movement", () => {
+    // The one-key directions must not get swept up by the diagonal rule.
+    expect(facingFromAxis(-3, -3)).toBe(0);
+    expect(facingFromAxis(3, 3)).toBe(2);
+  });
+
+  it("turns sideways rather than face-on at exactly 45 degrees on screen", () => {
+    // Half a screen-y step per screen-x step is the crossover, reachable by the
+    // analog stick even though the keys cannot land on it.
+    const dc = 1.5;
+    const dr = 0.5; // screenX = 1 * SX, screenY = 2 * SY — equal in pixels
+    expect(facingFromAxis(dc, dr)).toBe(3);
+    expect(facingFromAxis(-dc, -dr)).toBe(1);
+  });
+});
+
+describe("which way the hero faces for the keys you hold", () => {
+  /** The facing after holding `keys`, through the real key-to-axis mapping. */
+  const facingFor = (...keys: string[]): Facing | null => {
+    const target = new FakeTarget();
+    const input = new Input(target as unknown as Window);
+    for (const key of keys) target.press(key);
+    return facingFromAxis(input.axis.dc, input.axis.dr);
+  };
+
+  it("faces the single direction pressed", () => {
+    expect(facingFor("ArrowUp")).toBe(0);
+    expect(facingFor("ArrowLeft")).toBe(1);
+    expect(facingFor("ArrowDown")).toBe(2);
+    expect(facingFor("ArrowRight")).toBe(3);
+  });
+
+  it("turns to the side on every diagonal instead of walking on backwards", () => {
+    expect(facingFor("ArrowUp", "ArrowLeft")).toBe(1);
+    expect(facingFor("ArrowUp", "ArrowRight")).toBe(3);
+    expect(facingFor("ArrowDown", "ArrowLeft")).toBe(1);
+    expect(facingFor("ArrowDown", "ArrowRight")).toBe(3);
+  });
+
+  it("stands still facing nowhere in particular on opposing keys", () => {
+    expect(facingFor("ArrowUp", "ArrowDown")).toBeNull();
+    expect(facingFor("ArrowLeft", "ArrowRight")).toBeNull();
   });
 });
