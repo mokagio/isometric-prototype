@@ -10,11 +10,8 @@ describe("GAMES", () => {
     }
   });
 
-  it("names every game, and says something about it", () => {
-    for (const game of GAMES) {
-      expect(game.name.trim().length).toBeGreaterThan(0);
-      expect(game.blurb.trim().length).toBeGreaterThan(0);
-    }
+  it("names every game", () => {
+    for (const game of GAMES) expect(game.name.trim().length).toBeGreaterThan(0);
   });
 
   it("lists each page once", () => {

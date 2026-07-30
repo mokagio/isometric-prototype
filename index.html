@@ -15,7 +15,6 @@
 
       :root {
         --ww-ink: #f4e4c1;
-        --ww-ink-dim: #c9a86a;
         --ww-panel: #3b2a1c;
         --ww-edge: #6b4f34;
         --ww-pixel: "Press Start 2P", "Courier New", monospace;
@@ -25,7 +24,7 @@
         min-height: 100%;
         background: #1b2b1a;
         color: var(--ww-ink);
-        font-family: Georgia, "Times New Roman", serif;
+        font-family: var(--ww-pixel);
         -webkit-tap-highlight-color: transparent;
       }
       /* The grass is drawn once per size and sits still while the list scrolls. */
@@ -44,21 +43,13 @@
         max-width: 560px;
         margin: 0 auto;
         padding: 56px 20px 40px;
-      }
-      /* Both sit straight on bright grass, so both need an outline to read. */
-      .ww-title, .ww-lede {
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+        text-align: center;
       }
       .ww-title {
-        margin: 0 0 14px;
-        font-family: var(--ww-pixel);
-        font-size: clamp(20px, 6vw, 32px);
+        margin: 0 0 40px;
+        font-size: clamp(26px, 8vw, 44px);
         line-height: 1.4;
-      }
-      .ww-lede {
-        margin: 0 0 32px;
-        font-size: 17px;
-        line-height: 1.5;
+        text-shadow: 0 3px 5px rgba(0, 0, 0, 0.8); /* it sits straight on bright grass */
       }
 
       .ww-games {
@@ -69,38 +60,18 @@
         flex-direction: column;
         gap: 18px;
       }
-      .ww-card {
-        padding: 22px 22px 24px;
-        background: var(--ww-panel);
-        border: 3px solid var(--ww-edge);
-        border-radius: 14px;
-        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
-      }
-      .ww-card-name {
-        margin: 0 0 14px;
-        font-family: var(--ww-pixel);
-        font-size: clamp(15px, 4.5vw, 19px);
-        line-height: 1.4;
-        color: var(--ww-ink);
-      }
-      .ww-card-blurb {
-        margin: 0 0 20px;
-        font-size: 16px;
-        line-height: 1.5;
-        color: var(--ww-ink-dim);
-      }
-      /* The menu button's shape and press, widened to hold a word. */
+      /* The menu button's shape and press, widened to hold a name. */
       .ww-play {
-        display: inline-block;
-        padding: 12px 26px;
-        font-family: var(--ww-pixel);
-        font-size: 14px;
+        display: block;
+        padding: 20px 22px;
+        font-size: clamp(14px, 4vw, 19px);
+        line-height: 1.4;
         text-decoration: none;
         color: var(--ww-ink);
         background: var(--ww-panel);
         border: 3px solid var(--ww-edge);
-        border-radius: 10px;
-        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+        border-radius: 14px;
+        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
         cursor: pointer;
         -webkit-user-select: none;
         user-select: none;
@@ -113,35 +84,7 @@
       }
       .ww-play:active {
         transform: translateY(2px);
-        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
-      }
-
-      .ww-foot {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 26px;
-      }
-      /* Small panels rather than bare text: dim gold on bright grass is a squint. */
-      .ww-foot a {
-        padding: 8px 14px;
-        font-size: 15px;
-        color: var(--ww-ink-dim);
-        text-decoration: none;
-        background: var(--ww-panel);
-        border: 3px solid var(--ww-edge);
-        border-radius: 10px;
-        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
-      }
-      @media (hover: hover) {
-        .ww-foot a:hover {
-          color: var(--ww-ink);
-          background: #4a3524;
-        }
-      }
-      .ww-foot a:active {
-        transform: translateY(2px);
-        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+        box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
       }
     </style>
   </head>
@@ -149,12 +92,7 @@
     <canvas id="backdrop"></canvas>
     <main class="ww-home">
       <h1 class="ww-title">Games Playground</h1>
-      <p class="ww-lede">A sandbox of little games, for kids and grownups.</p>
       <ul class="ww-games" id="games"></ul>
-      <nav class="ww-foot">
-        <a href="editor.html">World Editor</a>
-        <a href="credits.html">Credits</a>
-      </nav>
     </main>
     <script type="module" src="/src/home.ts"></script>
   </body>

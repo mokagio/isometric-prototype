@@ -63,4 +63,4 @@ The game and the editor hand work to each other through `handoff.ts`, never in m
 Each page keeps its styles in its own `<style>` block, not in the TypeScript — the game's chrome in `game.html`, the list's in `index.html`.
 Shared sizing goes through the `--ww-*` custom properties defined on `:root` so the stick, action pad, and menu stay in step.
 Class names are `ww-` prefixed, and the storage keys are `ww:` — from Whispering Woods, which is what this was called before it became a playground with more than one game in it.
-The list page borrows the menu button's shape for its Play link, and its backdrop is the game's own grass tiles: `backdrop.ts` renders a water-free flat world through `renderer.ts` rather than shipping a second copy of the art.
+The list page is a title and one button per game, borrowing the menu button's shape, and its backdrop is the game's own grass tiles: `backdrop.ts` renders a water-free flat world through `renderer.ts` rather than shipping a second copy of the art.

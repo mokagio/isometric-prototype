@@ -4,27 +4,16 @@ import { GAMES } from "./games";
 import { loadTileset } from "./tileset";
 import { Viewport } from "./viewport";
 
-/** One card per game, built from `GAMES` so adding a game is a one-line change. */
+/** One button per game, built from `GAMES` so adding a game is a one-line change. */
 function buildList(list: HTMLElement): void {
   for (const game of GAMES) {
-    const card = document.createElement("li");
-    card.className = "ww-card";
-
-    const name = document.createElement("h2");
-    name.className = "ww-card-name";
-    name.textContent = game.name;
-
-    const blurb = document.createElement("p");
-    blurb.className = "ww-card-blurb";
-    blurb.textContent = game.blurb;
-
+    const item = document.createElement("li");
     const play = document.createElement("a");
     play.className = "ww-play";
     play.href = game.href;
-    play.textContent = "▶ Play";
-
-    card.append(name, blurb, play);
-    list.appendChild(card);
+    play.textContent = game.name;
+    item.appendChild(play);
+    list.appendChild(item);
   }
 }
 
