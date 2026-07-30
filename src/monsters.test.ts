@@ -507,11 +507,11 @@ function recordingCtx(): { ctx: CanvasRenderingContext2D; calls: DrawCall[] } {
 }
 
 /** The one draw call a monster in the given state produces. */
-function drawOnce(mutate: (m: Monster) => void, feetX = 0, feetY = 0): DrawCall {
+function drawOnce(mutate: (m: Monster) => void, feetX = 0, feetY = 0, alphaScale?: number): DrawCall {
   const { field, mon } = fieldWith(HERO.col, HERO.row);
   mutate(mon);
   const { ctx, calls } = recordingCtx();
-  field.draw(ctx, mon, feetX, feetY);
+  field.draw(ctx, mon, feetX, feetY, alphaScale);
   return calls[0]!;
 }
 
@@ -568,6 +568,19 @@ describe("MonsterField.draw", () => {
   it("holds the death animation on its last frame rather than looping", () => {
     const last = drawOnce((m) => ((m.dying = true), (m.dyingT = FADE))).args[0]!;
     expect(drawOnce((m) => ((m.dying = true), (m.dyingT = FADE * 5))).args[0]!).toBe(last);
+  });
+
+  it("dims the whole sprite by the alpha it is handed", () => {
+    // A caller cannot dim it from outside — the blit sets alpha outright — so
+    // drawing a monster as a ghost behind terrain has to go through this.
+    expect(drawOnce(() => {}, 0, 0, 0.4).alpha).toBeCloseTo(0.4);
+    expect(drawOnce(() => {}).alpha).toBe(1);
+  });
+
+  it("dims a fading corpse on top of its own fade, not instead of it", () => {
+    const fading = drawOnce((m) => ((m.dying = true), (m.dyingT = FADE * 0.95))).alpha;
+    const ghosted = drawOnce((m) => ((m.dying = true), (m.dyingT = FADE * 0.95)), 0, 0, 0.5).alpha;
+    expect(ghosted).toBeCloseTo(fading * 0.5);
   });
 
   it("mirrors the sprite only when facing left", () => {

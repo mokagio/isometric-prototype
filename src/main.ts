@@ -9,6 +9,7 @@ import {
 } from "./handoff";
 import { decodeMap, encodeMap, fillEmpty, isComplete, readyToPlay, worldFromMap, type MapData } from "./mapFormat";
 import { pickTextFile } from "./files";
+import { isHidden } from "./occlusion";
 import { render, type Entity } from "./renderer";
 import { project, SY, type Origin } from "./iso";
 import { Camera } from "./camera";
@@ -27,6 +28,9 @@ import { createHud } from "./hud";
 import { Swing } from "./swing";
 import { drawArea, drawBox, HERO_BOX, MONSTER_BOX } from "./debug";
 import tilesheetUrl from "../isometric_fantasy_tiles.png";
+
+// How faintly a figure shows through whatever is standing in front of it.
+const GHOST_ALPHA = 0.35;
 
 // The seed is stashed as the world is made, so the editor can open the very
 // world you are walking around in.
@@ -122,7 +126,7 @@ async function main(): Promise<void> {
 
   const viewport = new Viewport(canvas);
 
-  function drawHero(o: Origin): void {
+  function drawHero(o: Origin, ghost = false): void {
     const feet = project(hero.col, hero.row, hero.z, o);
     const groundZ = world.heightAt(Math.round(hero.col), Math.round(hero.row));
     const shadowY = project(hero.col, hero.row, groundZ, o).y + SY;
@@ -131,8 +135,10 @@ async function main(): Promise<void> {
     ctx.save();
     // Blink through the immunity window while alive; on death the fall-down
     // animation plays at full opacity — no fade-out.
-    ctx.globalAlpha = lives.alive ? lives.alpha() : 1;
-    drawHeroShadow(ctx, feetX, shadowY);
+    ctx.globalAlpha = (lives.alive ? lives.alpha() : 1) * (ghost ? GHOST_ALPHA : 1);
+    // The shadow belongs on ground that is hidden anyway; over a wall it reads
+    // as a smudge rather than as the hero being behind something.
+    if (!ghost) drawHeroShadow(ctx, feetX, shadowY);
     if (!lives.alive) {
       // Defeated: play the fall-down death animation (skins without one hold idle).
       if (
@@ -149,6 +155,19 @@ async function main(): Promise<void> {
       }
     }
     ctx.restore();
+  }
+
+  // Anything a tall column hides gets drawn again over the top of it, faintly.
+  // Without this the hero can vanish behind their own tower — and worse, so can a
+  // slime that is still perfectly able to take a heart off you.
+  function drawGhosts(o: Origin): void {
+    if (isHidden(world, hero.col, hero.row, hero.z)) drawHero(o, true);
+    for (const m of monsters.list()) {
+      const groundZ = world.heightAt(Math.round(m.col), Math.round(m.row));
+      if (!isHidden(world, m.col, m.row, groundZ)) continue;
+      const feet = project(m.col, m.row, 0, o);
+      monsters.draw(ctx, m, feet.x, feet.y + SY, GHOST_ALPHA);
+    }
   }
 
   const step = (dt: number): void => {
@@ -195,6 +214,7 @@ async function main(): Promise<void> {
       });
     }
     render(ctx, tileset, world, origin, viewport.width, viewport.height, entities);
+    drawGhosts(origin);
 
     if (debug) {
       const hf = project(hero.col, hero.row, hero.z, origin);

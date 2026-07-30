@@ -291,8 +291,11 @@ export class MonsterField {
     }
   }
 
-  /** Draw one monster with its feet at (feetX, feetY). */
-  draw(ctx: CanvasRenderingContext2D, m: Monster, feetX: number, feetY: number): void {
+  /**
+   * Draw one monster with its feet at (feetX, feetY). `alphaScale` dims the whole
+   * sprite — the blit sets alpha outright, so a caller cannot dim it from outside.
+   */
+  draw(ctx: CanvasRenderingContext2D, m: Monster, feetX: number, feetY: number, alphaScale = 1): void {
     if (!this.ready) return;
     const sheet = m.dying ? this.death : this.walk;
     if (!sheet.ok) return;
@@ -308,6 +311,7 @@ export class MonsterField {
     } else {
       frame = frameAt(m.animT, MON_FPS, FRAMES, true);
     }
+    alpha *= alphaScale;
 
     blitFrame(ctx, sheet.img, feetX, feetY, {
       cell: CELL,
