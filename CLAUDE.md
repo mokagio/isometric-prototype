@@ -39,6 +39,17 @@ Every new sheet loader needs a test covering the base prefix, as `monsters.test.
 
 Any new art goes in `CREDITS.md`.
 
+## Maps
+
+Every map is `MAP_SIZE` (56) square, generated or hand-built, so the editor can open the world you are playing and the game can play a board you drew.
+`mapFormat.ts` owns the file format: `encodeMap`/`decodeMap` (versioned, and validating — a map arrives from a file the player picked), `mapFromWorld`/`worldFromMap` to cross between the two representations, and `readyToPlay` for the unfinished-map offer.
+A cell absent from an editor board is a *gap*, `null` in a `MapData`; only `fillEmpty` turns gaps into ground.
+
+Hand-placed tiles carry no water flag, so `isLiquidTile` in `world.ts` is the single rule for what blocks movement: sheet row 10, the cracked-pool cube in four hues.
+A new impassable brush belongs in that row, or the rule needs revisiting — `palette.test.ts` pins every impassable brush to a pool-sounding label.
+
+The two pages hand work to each other through `handoff.ts`, never in memory: the game stashes its world seed (a world is a pure function of it), the editor stashes a map and asks for it back with `?map=local`.
+
 ## UI chrome
 
 Overlay styles live in the `<style>` block in `index.html`, not in the TypeScript.
