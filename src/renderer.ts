@@ -1,25 +1,6 @@
-import { DRAW, project, SX, SY, SZ, type Origin } from "./iso";
+import { DRAW, project, SX, type Origin } from "./iso";
 import type { Tileset } from "./tileset";
 import type { World } from "./world";
-
-/** Tiles per side needed to cover a viewport, with margin for the raised terrain. */
-export function gridSizeFor(viewW: number, viewH: number): { cols: number; rows: number } {
-  // A diamond-shaped map leaves triangular gaps at the rectangle's corners, so
-  // oversize it: half-width plus half-height in tiles covers the far corners,
-  // with extra for the raised terrain climbing up the screen.
-  const span = Math.ceil(viewW / (2 * SX) + viewH / (2 * SY)) + 8;
-  return { cols: span, rows: span };
-}
-
-/** Places the map's centre column near the viewport centre. */
-export function originFor(world: World, viewW: number, viewH: number): Origin {
-  const cCol = world.cols / 2;
-  const cRow = world.rows / 2;
-  return {
-    x: viewW / 2 - (cCol - cRow) * SX,
-    y: viewH / 2 - (cCol + cRow) * SY + world.cell(cCol | 0, cRow | 0).height * SZ * 0.5,
-  };
-}
 
 // A point actor (e.g. the hero) drawn interleaved with terrain so columns in
 // front of its cell occlude it. `draw` runs right after that cell's column.
