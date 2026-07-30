@@ -2,7 +2,9 @@ export interface MenuActions {
   onNewWorld: () => void;
   onEditor: () => void;
   /** Pick a saved map file and play it. */
-  onOpenMap: () => void;
+  onLoadMap: () => void;
+  /** Open the editor on the map being played. */
+  onEditMap: () => void;
   /** true = "lurk" (enemies wake only in their area); false = "hunt" (always chase). */
   onEnemyMode: (lurk: boolean) => void;
   /** true = draw entity bounding boxes. */
@@ -143,7 +145,8 @@ export function createMenu(actions: MenuActions): void {
   };
 
   addItem("New Random World", actions.onNewWorld);
-  addItem("Open Map…", actions.onOpenMap);
+  addItem("Load Map…", actions.onLoadMap);
+  addItem("Edit Map", actions.onEditMap);
   addItem("World Editor", actions.onEditor);
   addModeToggle();
   addToggle("Debug boxes", actions.onDebug);

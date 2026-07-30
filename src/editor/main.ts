@@ -11,7 +11,7 @@ import { createPanPad } from "./panPad";
 import { boardToMap, loadMapIntoBoard, mapFilename } from "./mapIO";
 import { decodeMap, encodeMap, mapFromWorld, readyToPlay } from "../mapFormat";
 import { downloadText, pickTextFile } from "../files";
-import { PLAY_STASHED_MAP_URL, recallWorldSeed, stashMap } from "../handoff";
+import { PLAY_STASHED_MAP_URL, recallMap, recallWorldSeed, stashMap, wantsStashedMap } from "../handoff";
 
 const PAN_KEYS: Record<string, PanDir> = {
   arrowup: "up",
@@ -176,6 +176,17 @@ async function main(): Promise<void> {
   });
 
   createPanPad(editorEl, pan);
+
+  // Arrived from the game's Edit Map: open what was being played. An empty board
+  // is a fine fallback, so a stash that will not read is worth a word and no more.
+  if (wantsStashedMap(location.search)) {
+    const text = recallMap();
+    try {
+      if (text !== null) loadMapIntoBoard(board, decodeMap(text));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "That map could not be opened.");
+    }
+  }
 
   window.addEventListener("resize", requestRender);
   draw();

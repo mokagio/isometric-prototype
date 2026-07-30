@@ -1,13 +1,23 @@
 import { loadTileset } from "./tileset";
 import { generateWorld, findSpawn, GRASS, MAP_SIZE, randomSeed, type World } from "./world";
 import {
+  EDIT_STASHED_MAP_URL,
   PLAY_STASHED_MAP_QUERY,
   recallMap,
   rememberWorldSeed,
   stashMap,
   wantsStashedMap,
 } from "./handoff";
-import { decodeMap, encodeMap, fillEmpty, isComplete, readyToPlay, worldFromMap, type MapData } from "./mapFormat";
+import {
+  decodeMap,
+  encodeMap,
+  fillEmpty,
+  isComplete,
+  mapFromWorld,
+  readyToPlay,
+  worldFromMap,
+  type MapData,
+} from "./mapFormat";
 import { pickTextFile } from "./files";
 import { isHidden } from "./occlusion";
 import { render, type Entity } from "./renderer";
@@ -96,8 +106,17 @@ async function main(): Promise<void> {
     resetTo(stashedWorld() ?? newWorld());
   }
 
+  /** Hand the ground you are standing on to the editor, generated or hand-built alike. */
+  function editMap(): void {
+    if (!stashMap(encodeMap(mapFromWorld(world)))) {
+      alert("This browser will not let the game pass a map to the editor.");
+      return;
+    }
+    location.href = EDIT_STASHED_MAP_URL;
+  }
+
   /** Play a map from a file: stashed and marked in the URL, so it survives a reload. */
-  async function openMap(): Promise<void> {
+  async function loadMap(): Promise<void> {
     const text = await pickTextFile();
     if (text === null) return;
     let map: MapData;
@@ -233,7 +252,8 @@ async function main(): Promise<void> {
 
   createMenu({
     onNewWorld: newRandomWorld,
-    onOpenMap: () => void openMap(),
+    onLoadMap: () => void loadMap(),
+    onEditMap: editMap,
     onEditor: () => {
       location.href = "editor.html";
     },
