@@ -3,6 +3,7 @@ import {
   blockedByTree,
   CLIFF_RINGS,
   COAST_RINGS,
+  FENCE_RING,
   cameraAt,
   FIELD,
   FIELD_PX,
@@ -79,15 +80,17 @@ describe("treeAt", () => {
     }
   });
 
-  it("stands far enough in that a felled tree cannot drop its logs in the void", () => {
-    // The edge rule exists for this: a log lands up to LOG_REACH from the stump,
-    // and LOG_CLEARANCE adds the half sprite so none of it hangs over the grass.
+  it("stands far enough in that a felled tree cannot throw a log past the fence", () => {
+    // A log lands up to LOG_REACH from the stump and LOG_CLEARANCE adds its own
+    // half-width. Past the rails it would lie in plain sight and out of reach,
+    // since the walker stops inside them.
+    const inside = (FENCE_RING + 1) * TILE;
     for (const [col, row] of all()) {
       const base = { x: col * TILE + TILE / 2, y: row * TILE + TILE / 2 };
-      expect(base.x - LOG_CLEARANCE, `${col},${row}`).toBeGreaterThanOrEqual(0);
-      expect(base.x + LOG_CLEARANCE, `${col},${row}`).toBeLessThanOrEqual(FIELD_PX);
-      expect(base.y - LOG_CLEARANCE, `${col},${row}`).toBeGreaterThanOrEqual(0);
-      expect(base.y + LOG_CLEARANCE, `${col},${row}`).toBeLessThanOrEqual(FIELD_PX);
+      expect(base.x - LOG_CLEARANCE, `${col},${row}`).toBeGreaterThanOrEqual(inside);
+      expect(base.x + LOG_CLEARANCE, `${col},${row}`).toBeLessThanOrEqual(FIELD_PX - inside);
+      expect(base.y - LOG_CLEARANCE, `${col},${row}`).toBeGreaterThanOrEqual(inside);
+      expect(base.y + LOG_CLEARANCE, `${col},${row}`).toBeLessThanOrEqual(FIELD_PX - inside);
     }
   });
 

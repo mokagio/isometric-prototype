@@ -28,10 +28,12 @@ const CLEARING = 3;
 /** Cells of the field given over to the island's edge — `coast.ts` draws them. */
 export const COAST_RINGS = 1; // the water's edge itself
 export const CLIFF_RINGS = 1; // the bank's face above it, on the south shore only
-// Tiles kept clear along the edge: enough that the logs a tree drops cannot land
-// in the sea where nobody could pick them up, and enough to keep the wood back off
-// the coast, lip included.
-const EDGE = Math.max(COAST_RINGS + CLIFF_RINGS + 1, Math.ceil(LOG_CLEARANCE / TILE));
+/** The fence rings the island here, and the walkable grass starts inside it. */
+export const FENCE_RING = COAST_RINGS + CLIFF_RINGS;
+// Tiles kept clear along the edge, measured from the fence rather than the water:
+// a tree standing this far in cannot throw a log past the rails, where it would
+// lie in plain sight with no way to reach it.
+const EDGE = FENCE_RING + 1 + Math.ceil(LOG_CLEARANCE / TILE);
 
 /**
  * What a trunk blocks, in world pixels around the base it stands on: its roots,
