@@ -1,3 +1,4 @@
+import { variantAt } from "../sunnyside/library";
 import { LOG_CLEARANCE } from "./logs";
 import type { Bounds, Pos } from "./walker";
 
@@ -9,12 +10,7 @@ export const TILE = 16; // one Sunnyside ground tile, in sprite pixels
 export const FIELD = 40; // tiles a side
 export const GRASS_VARIANTS = 4; // frames in `grass.png`: plain, then three sprinklings
 
-const SEED = 6421;
 const TREE_SEED = 91177;
-// Keeps the plain tile in the majority, so the sprinkled ones read as detail
-// rather than as a pattern.
-const PLAIN_SHARE = 0.72;
-
 // Candidates, before spacing thins them out — most of a cluster loses to its
 // neighbour, so this is well above the share of cells that end up wooded.
 const TREE_SHARE = 0.5;
@@ -23,8 +19,8 @@ const TREE_SHARE = 0.5;
 // touching. `TREE_REACH` is how far one has to look to find a rival.
 const TREE_SPACING = 3;
 const TREE_REACH = TREE_SPACING - 1;
-// Tiles kept clear around the middle, so nobody starts inside a trunk.
-const CLEARING = 3;
+/** Tiles kept clear around the middle, so nobody starts inside anything. */
+export const CLEARING = 3;
 /** Cells of the field given over to the island's edge — `coast.ts` draws them. */
 export const COAST_RINGS = 1; // the water's edge itself
 export const CLIFF_RINGS = 1; // the bank's face above it, on the south shore only
@@ -106,12 +102,12 @@ export function blockedByTree(feet: Pos): boolean {
   return false;
 }
 
-/** Which frame of `grass.png` a cell is painted with. */
+/**
+ * Which frame of `grass.png` a cell is painted with. Shared with the editor's
+ * brushes, so a cell someone paints grass draws the same tile the field does.
+ */
 export function tileVariant(col: number, row: number): number {
-  const v = hash(col, row, SEED);
-  if (v < PLAIN_SHARE) return 0;
-  const rest = (v - PLAIN_SHARE) / (1 - PLAIN_SHARE);
-  return 1 + Math.min(GRASS_VARIANTS - 2, Math.floor(rest * (GRASS_VARIANTS - 1)));
+  return variantAt(GRASS_VARIANTS, col, row);
 }
 
 /**
