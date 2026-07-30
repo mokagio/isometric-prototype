@@ -33,6 +33,24 @@ export function drawBox(
   ctx.restore();
 }
 
+/** Ring a radius around a point — a reach, rather than a bounding box. */
+export function drawCircle(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  color: string,
+): void {
+  ctx.save();
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 /** Outline the (2*half+1) square of cells centred on (col, row) — the lurk area. */
 export function drawArea(
   ctx: CanvasRenderingContext2D,

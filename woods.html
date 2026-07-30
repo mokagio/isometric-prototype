@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Whispering Woods | Games Playground</title>
     <style>
+      /* Relative, not root-absolute: in production the site is served from
+         /<repo>/, where /fonts/... is somebody else's page. */
+      @font-face {
+        font-family: "Press Start 2P";
+        src: url("fonts/PressStart2P-Regular.woff2") format("woff2");
+        font-display: swap;
+      }
+
       /* The menu and stick rules below are a copy of the ones in `game.html`.
          Two pages is not yet worth a shared stylesheet; a third would be. */
       :root {
@@ -23,6 +31,30 @@
         display: block;
         image-rendering: pixelated;
         image-rendering: crisp-edges;
+      }
+
+      /* The tally of logs carried, top-left where Peaceful Plains keeps its hearts. */
+      .ww-logs {
+        position: fixed;
+        top: var(--ww-inset);
+        left: var(--ww-inset);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-family: "Press Start 2P", "Courier New", monospace;
+        font-size: 24px;
+        color: #f4e4c1;
+        /* It sits straight on bright grass, so it needs an outline to read. */
+        text-shadow: 0 2px 3px rgba(0, 0, 0, 0.8);
+        pointer-events: none;
+        user-select: none;
+      }
+      .ww-logs-icon {
+        width: 44px;
+        height: 44px;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
       }
 
       .ww-menu {

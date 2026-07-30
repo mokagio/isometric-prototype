@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FIELD, MIDDLE, TILE, treeAt } from "./field";
 import {
+  AXE_REACH,
   BOUNCE_FPS,
   BOUNCE_FRAMES,
   CHOP_FPS,
@@ -8,7 +9,6 @@ import {
   Chop,
   CHOPS_TO_FELL,
   IMPACT_FRAME,
-  REACH_X,
   Wood,
 } from "./wood";
 
@@ -36,9 +36,27 @@ describe("Wood.inReach", () => {
     expect(new Wood().inReach({ x: at.x + 10, y: at.y })).toEqual(tree);
   });
 
-  it("does not reach across the clearing for one", () => {
-    const at = base(someTree());
-    expect(new Wood().inReach({ x: at.x + REACH_X + 1, y: at.y })).toBeNull();
+  it("comes live a good two tiles out, so you need not be against the bark", () => {
+    const tree = someTree();
+    const at = base(tree);
+    expect(new Wood().inReach({ x: at.x + 2 * TILE, y: at.y })).toEqual(tree);
+  });
+
+  // Trees stand three cells apart, so stepping out of one's reach can walk into
+  // the next one's: these ask whether *this* tree is still on offer.
+  it("stops where the axe stops — a tree past AXE_REACH is not offered", () => {
+    const tree = someTree();
+    const at = base(tree);
+    expect(new Wood().inReach({ x: at.x + AXE_REACH + 1, y: at.y })).not.toEqual(tree);
+    expect(new Wood().inReach({ x: at.x, y: at.y - (AXE_REACH + 1) })).not.toEqual(tree);
+  });
+
+  it("measures the reach as a distance, not per axis", () => {
+    // Diagonally further than the reach, though within it on either axis alone.
+    const tree = someTree();
+    const at = base(tree);
+    const step = AXE_REACH * 0.8;
+    expect(new Wood().inReach({ x: at.x + step, y: at.y + step })).not.toEqual(tree);
   });
 
   it("offers nothing once a tree is a stump", () => {

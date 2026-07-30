@@ -1,4 +1,4 @@
-import { drawBox, type Box } from "../debug";
+import { drawBox, drawCircle, type Box } from "../debug";
 import { Input } from "../input";
 import { Loop } from "../loop";
 import { blitFrame, frameAt, SheetLoader } from "../sprites";
@@ -6,6 +6,8 @@ import { createStick } from "../stick";
 import { createMenu } from "../ui";
 import { Viewport } from "../viewport";
 import { createActionButton } from "./actionButton";
+import { createLogCounter } from "./logCounter";
+import { Logs } from "./logs";
 import {
   blockedByTree,
   cameraAt,
@@ -19,7 +21,7 @@ import {
   visibleTiles,
 } from "./field";
 import { facingFrom, walk, type Facing, type Pos } from "./walker";
-import { Chop, CHOP_FRAMES, Wood } from "./wood";
+import { AXE_REACH, Chop, CHOP_FRAMES, Wood } from "./wood";
 
 // Sunnyside sheet contract: horizontal strips of 96x64 frames, played at 12 fps,
 // drawn in one facing only — so left is right mirrored.
@@ -56,6 +58,11 @@ const STUMP_CELL = 16;
 const STUMP_ANCHOR_X = 8;
 const STUMP_ANCHOR_Y = 15;
 
+// The log the demo project drops, lying on the point it landed on.
+const LOG_CELL = 11;
+const LOG_ANCHOR_X = 5.5;
+const LOG_ANCHOR_Y = 10;
+
 const ZOOM = 4;
 
 // Debug boxes, in screen pixels from the point each thing stands on: the figure
@@ -85,7 +92,7 @@ function main(): void {
   const ctx = canvas.getContext("2d")!;
   const viewport = new Viewport(canvas);
 
-  const sheets = new SheetLoader(7);
+  const sheets = new SheetLoader(8);
   const walkSheet = sheets.load(url("walk.png"));
   const idleSheet = sheets.load(url("idle.png"));
   const axeSheet = sheets.load(url("axe.png"));
@@ -93,6 +100,7 @@ function main(): void {
   const grassSheet = sheets.load(url("grass.png"));
   const treeSheet = sheets.load(url("tree.png"));
   const stumpSheet = sheets.load(url("stump.png"));
+  const logSheet = sheets.load(url("log.png"));
 
   const input = new Input();
   createStick(input);
@@ -104,6 +112,8 @@ function main(): void {
     if (target) chop.start(target);
   };
   const action = createActionButton(swingAxe);
+  const logs = new Logs();
+  const counter = createLogCounter(url("log.png"));
 
   let debug = false;
   createMenu("Whispering Woods", {
@@ -146,8 +156,13 @@ function main(): void {
       // Face the tree being chopped, whichever way it was reached from.
       facing = chop.target.col * TILE + TILE / 2 < pos.x ? "left" : "right";
     }
-    if (chop.update(dt) && chop.target) wood.hit(chop.target.col, chop.target.row);
+    if (chop.update(dt) && chop.target) {
+      const { col, row } = chop.target;
+      // The blow that fells it bursts its logs out of the stump.
+      if (wood.hit(col, row)) logs.spawn({ x: col * TILE + TILE / 2, y: row * TILE + TILE / 2 });
+    }
     wood.update(dt);
+    if (logs.update(dt, pos) > 0) counter.set(logs.collected);
     action.setEnabled(wood.inReach(pos) !== null);
 
     const camera = cameraAt(pos, viewport.width, viewport.height, ZOOM);
@@ -199,6 +214,23 @@ function main(): void {
       }
     }
 
+    if (logSheet.ok) {
+      for (const log of logs.list()) {
+        const at = screenAt({ x: log.x, y: log.y }, camera, ZOOM);
+        standing.push({
+          y: log.y,
+          draw: () =>
+            blitFrame(ctx, logSheet.img, at.x, at.y - log.z * ZOOM, {
+              cell: LOG_CELL,
+              scale: ZOOM,
+              anchorX: LOG_ANCHOR_X,
+              anchorY: LOG_ANCHOR_Y,
+              frame: 0,
+            }),
+        });
+      }
+    }
+
     const feet = screenAt(pos, camera, ZOOM);
     const sheet = swinging ? axeSheet : moving ? walkSheet : idleSheet;
     const frames = swinging ? CHOP_FRAMES : moving ? WALK_FRAMES : IDLE_FRAMES;
@@ -233,6 +265,8 @@ function main(): void {
 
     if (debug) {
       for (const trunk of trunks) drawBox(ctx, trunk.x, trunk.y, TRUNK_BOX, "#ff5a5a");
+      // How far the axe carries: a trunk's base inside this ring is choppable.
+      drawCircle(ctx, feet.x, feet.y, AXE_REACH * ZOOM, "#ffd24a");
       drawBox(ctx, feet.x, feet.y, FIGURE_BOX, "#7cff5a");
     }
   };

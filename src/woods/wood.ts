@@ -7,9 +7,20 @@ import type { Pos } from "./walker";
 
 export const CHOPS_TO_FELL = 3;
 
-/** How near the feet have to be to a trunk to swing at it, in world pixels. */
-export const REACH_X = 15;
-export const REACH_Y = 13;
+/**
+ * How near a trunk has to be to swing at it, in world pixels — as far as the art
+ * reaches, and no further.
+ *
+ * At the impact frame the drawn swing spans to x=85 of the 96px frame while the
+ * figure stands on x=48, so axe and star together reach 37px from the feet. 34
+ * keeps the star landing on the trunk rather than short of it, and being a little
+ * over two tiles it brings the chop live well before you are up against the bark.
+ */
+export const AXE_REACH = 34;
+
+// Cells to search for something choppable: enough that a trunk a full reach away
+// is still in the net.
+const REACH_CELLS = 3;
 
 // The pack's 4-frame sway, played once and fast: a shudder, not a breeze. Trees
 // stand still until something hits them.
@@ -46,15 +57,15 @@ export class Wood {
     const row0 = Math.floor(feet.y / TILE);
     let best: Cell | null = null;
     let nearest = Infinity;
-    for (let dr = -2; dr <= 2; dr++) {
-      for (let dc = -2; dc <= 2; dc++) {
+    for (let dr = -REACH_CELLS; dr <= REACH_CELLS; dr++) {
+      for (let dc = -REACH_CELLS; dc <= REACH_CELLS; dc++) {
         const col = col0 + dc;
         const row = row0 + dr;
         if (!treeAt(col, row) || this.isStump(col, row)) continue;
         const dx = feet.x - (col * TILE + TILE / 2);
         const dy = feet.y - (row * TILE + TILE / 2);
-        if (Math.abs(dx) > REACH_X || Math.abs(dy) > REACH_Y) continue;
         const away = Math.hypot(dx, dy);
+        if (away > AXE_REACH) continue;
         if (away < nearest) {
           nearest = away;
           best = { col, row };

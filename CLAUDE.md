@@ -60,6 +60,7 @@ Trunks are solid: `blockedByTree` guards the roots only, and `walk` tries each a
 Trees stand still until hit — the pack's 4-frame sway plays once, fast, as a shudder.
 `Chop` is the swing clock: frame 6 of the axe strip carries the impact star, so that is the frame the blow lands on, and after `CHOPS_TO_FELL` the tree draws as the tileset's own cut stump instead.
 The action button and the spacebar both go through one `swingAxe`, so they cannot drift apart; `Input.jump` is the spacebar, and the press is edge-detected because holding it should not chop twice.
+The felling blow bursts three logs out of the stump (`woods/logs.ts`): the only thing in this game that leaves the ground, so `z` lives there and nowhere else, and a log is only collectable once it has settled.
 
 ## Maps
 

@@ -12,7 +12,7 @@
   magick base_axe_strip10.png shorthair_axe_strip10.png -composite tools_axe_strip10.png -composite public/sunnyside/axe.png
   ```
 
-  `tree.png` is `spr_deco_tree_01_strip4` and `shadow.png` the pack's `spr_deco_charactershadow`.
+  `tree.png` is `spr_deco_tree_01_strip4`, `shadow.png` the pack's `spr_deco_charactershadow`, and `log.png` the `wood` sprite out of its GameMaker example project.
   `grass.png` (four ground tiles) and `stump.png` (the cut stump at 512, 80) are tiles out of `spr_tileset_sunnysideworld_16px.png`.
 
 - [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) — SIL Open Font License, text in `public/fonts/OFL.txt`
