@@ -1,21 +1,22 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Credits | Games Playground</title>
     <style>
       html, body {
-        margin: 0;
         min-height: 100%;
         background: #1b2b1a;
         color: #f4e4c1;
         font-family: Georgia, "Times New Roman", serif;
       }
       main {
+        box-sizing: border-box;
         max-width: 640px;
         margin: 0 auto;
-        padding: 48px 24px 64px;
+        /* Insets, not flat padding: the page is viewport-fit=cover, so in
+           landscape the notch would otherwise sit on the text. */
+        padding: max(48px, var(--ww-inset-top)) max(24px, var(--ww-inset-right))
+          max(64px, var(--ww-inset-bottom)) max(24px, var(--ww-inset-left));
       }
       .back {
         display: inline-block;

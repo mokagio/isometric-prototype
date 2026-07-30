@@ -38,7 +38,7 @@ Draw order is by `col + row` through `renderer.ts`'s `Entity` list.
 Spritesheets live in `public/` and load through `` `${import.meta.env.BASE_URL}...` ``.
 The site deploys to a GitHub *project* page served from `/<repo>/`, so a root-absolute path 404s in production.
 Every new sheet loader needs a test covering the base prefix, as `monsters.test.ts` does.
-The same trap catches anything else `public/` holds: the font in `index.html` is reached with a *relative* `url("fonts/…")`, and links between pages are relative for the same reason (`games.test.ts` pins it).
+The same trap catches anything else `public/` holds, and which escape works depends on where you are writing: from `src/chrome.css` the font is a *root-absolute* `url("/fonts/…")`, which Vite rebases at build, but a page's inline `<style>` gets no such rewrite, so anything there — and every link between pages (`games.test.ts` pins it) — has to be relative.
 
 Any new art or font goes in `CREDITS.md` and `credits.html`.
 
@@ -82,7 +82,15 @@ The game and the editor hand work to each other through `handoff.ts`, never in m
 
 ## UI chrome
 
-Each page keeps its styles in its own `<style>` block, not in the TypeScript — the game's chrome in `game.html`, the list's in `index.html`.
-Shared sizing goes through the `--ww-*` custom properties defined on `:root` so the stick, action pad, and menu stay in step.
+`src/chrome.css` holds what every page shares — the `--ww-*` custom properties, and the menu, stick and action-pad rules that `ui.ts`, `stick.ts` and `actionPad.ts` build against.
+A page's own `<style>` block holds only what is that page's, and loads after the shared sheet, so it wins any tie.
+Neither lives in the TypeScript.
+
+`sharedHead.ts` is the other half: a `transformIndexHtml` plugin that injects the shared `<head>` — charset, viewport, the Home Screen metas, the link to `chrome.css` — into every Rollup input.
+A new page therefore gets the chrome by being listed in `vite.config.ts` and nothing else, which is what `sharedHead.test.ts` pins, along with no page having grown its own copy of a meta.
+The injected `<link>` needs the hook to stay `order: "pre"`, or Vite's HTML pass never sees the href to hash it; and it is a `<link>` rather than an import from an entry module because `credits.html` has no script.
+
+Pages are `viewport-fit=cover`, so the layout runs under the notch and the home indicator, and the `--ww-inset-*` properties (never a flat `16px`) are what keep the chrome clear of them.
+What actually clears Safari's tab bar on an iPhone is Add to Home Screen, which the injected `apple-mobile-web-app-capable` enables.
 Class names are `ww-` prefixed, and the storage keys are `ww:` — from Whispering Woods, which is what this was called before it became a playground with more than one game in it.
 The list page is a title and one button per game, borrowing the menu button's shape, and its backdrop is the game's own grass tiles: `backdrop.ts` renders a water-free flat world through `renderer.ts` rather than shipping a second copy of the art.

@@ -1,12 +1,9 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Map Editor | Games Playground</title>
     <style>
       html, body {
-        margin: 0;
         height: 100%;
         overflow: hidden;
         background: #1b2b1a;
@@ -18,11 +15,16 @@
         position: relative;
       }
       #sidebar {
-        width: 200px;
-        flex: 0 0 200px;
+        /* The sidebar is against the left edge, the one a landscape notch eats.
+           Added to the width as well as the padding, so the cutout costs the
+           controls nothing rather than squeezing them. */
+        width: calc(200px + env(safe-area-inset-left, 0px));
+        flex: 0 0 auto;
         height: 100%;
         box-sizing: border-box;
-        padding: 14px 14px 24px;
+        padding: calc(14px + env(safe-area-inset-top, 0px)) 14px
+          calc(24px + env(safe-area-inset-bottom, 0px))
+          calc(14px + env(safe-area-inset-left, 0px));
         overflow-y: auto;
         background: #2c2016;
         border-right: 3px solid #6b4f34;
@@ -32,9 +34,6 @@
       #board-canvas {
         flex: 1 1 auto;
         min-width: 0;
-        display: block;
-        image-rendering: pixelated;
-        image-rendering: crisp-edges;
         cursor: crosshair;
       }
 
@@ -131,8 +130,8 @@
       /* Pan pad: a compass of arrows over the bottom-right of the board. */
       .ed-pan {
         position: absolute;
-        right: 16px;
-        bottom: 16px;
+        right: var(--ww-inset-right);
+        bottom: var(--ww-inset-bottom);
         display: grid;
         grid-template-areas: ". up ." "left . right" ". down .";
         gap: 4px;

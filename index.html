@@ -1,39 +1,23 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Games Playground</title>
     <style>
-      /* Relative, not root-absolute: in production the site is served from
-         /<repo>/, where /fonts/... is somebody else's page. */
-      @font-face {
-        font-family: "Press Start 2P";
-        src: url("fonts/PressStart2P-Regular.woff2") format("woff2");
-        font-display: swap;
-      }
-
       :root {
         --ww-ink: #f4e4c1;
         --ww-panel: #3b2a1c;
         --ww-edge: #6b4f34;
-        --ww-pixel: "Press Start 2P", "Courier New", monospace;
       }
       html, body {
-        margin: 0;
         min-height: 100%;
         background: #1b2b1a;
         color: var(--ww-ink);
         font-family: var(--ww-pixel);
-        -webkit-tap-highlight-color: transparent;
       }
       /* The grass is drawn once per size and sits still while the list scrolls. */
       #backdrop {
         position: fixed;
         inset: 0;
-        display: block;
-        image-rendering: pixelated;
-        image-rendering: crisp-edges;
         pointer-events: none;
       }
 
@@ -42,7 +26,10 @@
         box-sizing: border-box;
         max-width: 560px;
         margin: 0 auto;
-        padding: 56px 20px 40px;
+        /* Insets, not flat padding: the page is viewport-fit=cover, so in
+           landscape the notch would otherwise sit on the first button. */
+        padding: max(56px, var(--ww-inset-top)) max(20px, var(--ww-inset-right))
+          max(40px, var(--ww-inset-bottom)) max(20px, var(--ww-inset-left));
         text-align: center;
       }
       .ww-title {

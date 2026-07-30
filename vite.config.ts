@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
+import { sharedHead } from "./src/sharedHead";
 
 // Stamped into saved maps, so a file can be traced back to the code that wrote
 // it. Marked dirty when the tree has uncommitted changes, since then the commit
@@ -17,6 +18,7 @@ function buildCommit(): string {
 
 export default defineConfig({
   define: { __BUILD_COMMIT__: JSON.stringify(buildCommit()) },
+  plugins: [sharedHead()],
   server: { host: true },
   build: {
     rollupOptions: {

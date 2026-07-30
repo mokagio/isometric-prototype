@@ -1,47 +1,25 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Whispering Woods | Games Playground</title>
+    <!-- The menu, stick and action-button rules live in `src/chrome.css`, which
+         `sharedHead.ts` links into every page. What is below is this game's. -->
     <style>
-      /* Relative, not root-absolute: in production the site is served from
-         /<repo>/, where /fonts/... is somebody else's page. */
-      @font-face {
-        font-family: "Press Start 2P";
-        src: url("fonts/PressStart2P-Regular.woff2") format("woff2");
-        font-display: swap;
-      }
-
-      /* The menu and stick rules below are a copy of the ones in `game.html`.
-         Two pages is not yet worth a shared stylesheet; a third would be. */
-      :root {
-        --ww-inset: 16px;
-        --ww-btn: 54px;
-        --ww-stick: 144px;
-      }
       html, body {
-        margin: 0;
         height: 100%;
         overflow: hidden;
         background: #28501f;
-        -webkit-tap-highlight-color: transparent;
-      }
-      canvas {
-        display: block;
-        image-rendering: pixelated;
-        image-rendering: crisp-edges;
       }
 
       /* The tally of logs carried, top-left where Peaceful Plains keeps its hearts. */
       .ww-logs {
         position: fixed;
-        top: var(--ww-inset);
-        left: var(--ww-inset);
+        top: var(--ww-inset-top);
+        left: var(--ww-inset-left);
         display: flex;
         align-items: center;
         gap: 10px;
-        font-family: "Press Start 2P", "Courier New", monospace;
+        font-family: var(--ww-pixel);
         font-size: 24px;
         color: #f4e4c1;
         /* It sits straight on bright grass, so it needs an outline to read. */
@@ -57,152 +35,6 @@
         filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
       }
 
-      .ww-menu {
-        position: fixed;
-        top: var(--ww-inset);
-        right: var(--ww-inset);
-        /* Over the stick, which `woods/main.ts` appends later: in landscape on a
-           short screen the open panel reaches down across it. */
-        z-index: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        font-family: Georgia, "Times New Roman", serif;
-        user-select: none;
-      }
-      .ww-menu-btn {
-        box-sizing: border-box;
-        width: var(--ww-btn);
-        height: var(--ww-btn);
-        display: grid;
-        place-items: center;
-        font-size: 22px;
-        color: #f4e4c1;
-        background: #3b2a1c;
-        border: 3px solid #6b4f34;
-        border-radius: 10px;
-        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
-        cursor: pointer;
-        /* A long press on iOS otherwise selects the glyph and raises the loupe. */
-        -webkit-user-select: none;
-        user-select: none;
-        -webkit-touch-callout: none;
-      }
-      @media (hover: hover) {
-        .ww-menu-btn:hover {
-          background: #4a3524;
-        }
-      }
-      .ww-menu-btn:active {
-        transform: translateY(2px);
-        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
-      }
-      .ww-menu-panel {
-        margin-top: 8px;
-        min-width: 168px;
-        padding: 6px;
-        background: #3b2a1c;
-        border: 3px solid #6b4f34;
-        border-radius: 10px;
-        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
-      }
-      .ww-menu-title {
-        padding: 6px 10px 8px;
-        color: #c9a86a;
-        font-size: 13px;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-      }
-      .ww-menu-item {
-        display: block;
-        box-sizing: border-box;
-        width: 100%;
-        padding: 10px 12px;
-        text-align: left;
-        text-decoration: none;
-        font: inherit;
-        font-size: 16px;
-        color: #f4e4c1;
-        background: transparent;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-      }
-      /* Touch taps leave :hover stuck on the item, so keep it to pointer devices. */
-      @media (hover: hover) {
-        .ww-menu-item:hover {
-          background: #4a3524;
-        }
-      }
-
-      /* Under the right thumb, mirroring the stick. Sitting where the middle of
-         Peaceful Plains' two-button pad would be, so the reach is the same. */
-      .ww-action {
-        position: fixed;
-        right: calc(var(--ww-inset) + (var(--ww-stick) - var(--ww-btn)) / 2);
-        bottom: calc(var(--ww-inset) + (var(--ww-stick) - var(--ww-btn)) / 2);
-        font-size: 26px;
-        line-height: 1;
-      }
-      .ww-action:disabled {
-        opacity: 0.4;
-        cursor: default;
-        /* The button's own :active travel would otherwise fire on a dead press. */
-        pointer-events: none;
-      }
-
-      /* Sized border-box so the knob's travel (RADIUS in `stick.ts`) can be
-         checked against the well's half-width without unpacking the borders. */
-      .ww-stick {
-        position: fixed;
-        left: var(--ww-inset);
-        bottom: var(--ww-inset);
-        box-sizing: border-box;
-        width: var(--ww-stick);
-        height: var(--ww-stick);
-        display: grid;
-        place-items: center;
-        touch-action: none;
-        cursor: grab;
-        -webkit-user-select: none;
-        user-select: none;
-        -webkit-touch-callout: none;
-      }
-      /* The well is drawn on pseudo-elements, not on `.ww-stick` itself: a clip
-         on the element would crop the square knob where it overhangs the rim at
-         the diagonals. Both shapes are set in `stick.ts`. */
-      .ww-stick::before,
-      .ww-stick::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-      }
-      .ww-stick::before {
-        clip-path: var(--ww-stick-clip);
-        background: rgba(27, 43, 26, 0.5);
-      }
-      .ww-stick::after {
-        clip-path: var(--ww-stick-ring);
-        background: #6b4f34;
-      }
-      .ww-stick:active {
-        cursor: grabbing;
-      }
-      .ww-stick-knob {
-        /* The rim is `::after`, which paints after every real child, so without
-           the z-index it covers the knob wherever the two meet at full
-           deflection. `position: relative` alone does not beat a later sibling. */
-        position: relative;
-        z-index: 1;
-        box-sizing: border-box;
-        width: 54px;
-        height: 54px;
-        background: #3b2a1c;
-        border: 3px solid #6b4f34;
-        border-radius: 10px;
-        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
-        pointer-events: none;
-      }
     </style>
   </head>
   <body>
