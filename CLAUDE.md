@@ -45,6 +45,10 @@ Every map is `MAP_SIZE` (56) square, generated or hand-built, so the editor can 
 `mapFormat.ts` owns the file format: `encodeMap`/`decodeMap` (versioned, and validating — a map arrives from a file the player picked), `mapFromWorld`/`worldFromMap` to cross between the two representations, and `readyToPlay` for the unfinished-map offer.
 A cell absent from an editor board is a *gap*, `null` in a `MapData`; only `fillEmpty` turns gaps into ground.
 
+Bump `VERSION` whenever the arrays change shape — old files are then refused by name and version rather than half-read.
+Every file also records the commit that wrote it (`writtenBy`, from `__BUILD_COMMIT__`), so `git show <commit>:src/mapFormat.ts` is the code that understood it, which is what a converter gets written from.
+Unknown fields are ignored on read, so stamps like that can be added without breaking older maps.
+
 Hand-placed tiles carry no water flag, so `isLiquidTile` in `world.ts` is the single rule for what blocks movement: sheet row 10, the cracked-pool cube in four hues.
 A new impassable brush belongs in that row, or the rule needs revisiting — `palette.test.ts` pins every impassable brush to a pool-sounding label.
 

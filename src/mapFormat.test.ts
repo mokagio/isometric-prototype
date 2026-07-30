@@ -167,6 +167,14 @@ describe("map encoding", () => {
     expect(raw.format).toBe(FORMAT);
     expect(raw.version).toBe(VERSION);
   });
+
+  it("records which build wrote the file", () => {
+    // The version says which syntax; this says which code, so a later converter
+    // can be written from `git show <commit>:src/mapFormat.ts`.
+    const raw = JSON.parse(encodeMap(blank(1, 1))) as { writtenBy: unknown };
+    expect(typeof raw.writtenBy).toBe("string");
+    expect(raw.writtenBy).not.toBe("");
+  });
 });
 
 describe("map decoding", () => {
@@ -182,8 +190,18 @@ describe("map decoding", () => {
     expect(() => decodeMap("null")).toThrow(/not a Whispering Woods map/i);
   });
 
-  it("rejects a map from another version", () => {
-    expect(() => decodeMap(reheat(complete, (raw) => (raw.version = VERSION + 1)))).toThrow(/different version/i);
+  it("rejects a map from another version, naming both", () => {
+    // Both numbers, because the pair is what tells you which converter to write.
+    const newer = () => decodeMap(reheat(complete, (raw) => (raw.version = VERSION + 1)));
+    expect(newer).toThrow(new RegExp(`version ${VERSION + 1}`));
+    expect(newer).toThrow(new RegExp(`version ${VERSION}`));
+  });
+
+  it("ignores anything in the file it does not know about", () => {
+    // Stamps like `writtenBy` are for whoever reads the file, not for the game,
+    // so an unknown field is not a reason to refuse a map.
+    expect(() => decodeMap(reheat(complete, (raw) => (raw.writtenBy = 42)))).not.toThrow();
+    expect(() => decodeMap(reheat(complete, (raw) => (raw.somethingLater = { a: 1 })))).not.toThrow();
   });
 
   it("rejects sizes it will not allocate", () => {

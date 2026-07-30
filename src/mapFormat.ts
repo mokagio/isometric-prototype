@@ -4,7 +4,12 @@ import { isLiquidTile, makeWorld, type Cell, type Tile, type World } from "./wor
 // arrays, one of palette indices and one of column heights. Two arrays of small
 // integers stay readable in a text editor and stay small enough to download.
 export const FORMAT = "whispering-woods-map";
+// Bumped whenever the arrays below change shape. Old files are refused by name
+// and version rather than half-read, and every file also records the commit that
+// wrote it: `git show <commit>:src/mapFormat.ts` is the code that understood it,
+// which is what a converter for these maps gets written from.
 export const VERSION = 1;
+const WRITTEN_BY = typeof __BUILD_COMMIT__ === "undefined" ? "unknown" : __BUILD_COMMIT__;
 const EMPTY = -1; // palette index standing for "nothing placed here"
 // A map arrives from a file the player picked, so the dimensions are untrusted:
 // this is what stops a typo'd header from allocating a million cells.
@@ -71,7 +76,16 @@ export function encodeMap(map: MapData): string {
     tiles.push(index);
     heights.push(cell.height);
   }
-  return JSON.stringify({ format: FORMAT, version: VERSION, cols: map.cols, rows: map.rows, palette, tiles, heights });
+  return JSON.stringify({
+    format: FORMAT,
+    version: VERSION,
+    writtenBy: WRITTEN_BY,
+    cols: map.cols,
+    rows: map.rows,
+    palette,
+    tiles,
+    heights,
+  });
 }
 
 // Decode messages are shown to whoever picked the file, so they say what to do
@@ -107,7 +121,9 @@ export function decodeMap(text: string): MapData {
     fail("That file is not a map — it isn't even readable text.");
   }
   if (!raw! || typeof raw! !== "object" || raw!.format !== FORMAT) fail("That file is not a Whispering Woods map.");
-  if (raw!.version !== VERSION) fail("That map was saved by a different version of the game.");
+  if (raw!.version !== VERSION) {
+    fail(`That map is version ${String(raw!.version)}, and this game reads version ${VERSION}.`);
+  }
   const { cols, rows } = raw!;
   if (!isSide(cols) || !isSide(rows)) fail(`A map has to be between 1 and ${MAX_SIDE} tiles on each side.`);
 
