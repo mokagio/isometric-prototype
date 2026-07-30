@@ -22,6 +22,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(import.meta.dirname, "index.html"),
+        game: resolve(import.meta.dirname, "game.html"),
         editor: resolve(import.meta.dirname, "editor.html"),
         credits: resolve(import.meta.dirname, "credits.html"),
       },

@@ -1,7 +1,8 @@
-# Whispering Woods
+# Games Playground
 
 An isometric browser prototype: TypeScript, Vite, no framework, no runtime dependencies.
-Two pages — the game (`index.html`) and a world editor (`editor.html`) — both listed as Rollup inputs in `vite.config.ts`.
+Four pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), the game — Peaceful Plains — (`game.html`, entry `main.ts`), a world editor (`editor.html`), and credits (`credits.html`).
+A new game is an entry in `games.ts` plus its own page and Rollup input.
 
 ## Commands
 
@@ -36,8 +37,9 @@ Draw order is by `col + row` through `renderer.ts`'s `Entity` list.
 Spritesheets live in `public/` and load through `` `${import.meta.env.BASE_URL}...` ``.
 The site deploys to a GitHub *project* page served from `/<repo>/`, so a root-absolute path 404s in production.
 Every new sheet loader needs a test covering the base prefix, as `monsters.test.ts` does.
+The same trap catches anything else `public/` holds: the font in `index.html` is reached with a *relative* `url("fonts/…")`, and links between pages are relative for the same reason (`games.test.ts` pins it).
 
-Any new art goes in `CREDITS.md`.
+Any new art or font goes in `CREDITS.md` and `credits.html`.
 
 ## Maps
 
@@ -54,10 +56,11 @@ A cell carries only its height and surface tile, so `world.ts` is the single rul
 Monsters stay out of all four, so a river is an escape the hero can buy.
 A new brush of either kind belongs in that row, or the rule needs revisiting — `palette.test.ts` pins every pool tile to a pool-sounding label.
 
-The two pages hand work to each other through `handoff.ts`, never in memory: the game stashes its world seed (a world is a pure function of it), the editor stashes a map and asks for it back with `?map=local`.
+The game and the editor hand work to each other through `handoff.ts`, never in memory: the game stashes its world seed (a world is a pure function of it), the editor stashes a map and asks for it back with `?map=local`.
 
 ## UI chrome
 
-Overlay styles live in the `<style>` block in `index.html`, not in the TypeScript.
+Each page keeps its styles in its own `<style>` block, not in the TypeScript — the game's chrome in `game.html`, the list's in `index.html`.
 Shared sizing goes through the `--ww-*` custom properties defined on `:root` so the stick, action pad, and menu stay in step.
-Class names are `ww-` prefixed.
+Class names are `ww-` prefixed, and the storage keys are `ww:` — from Whispering Woods, which is what this was called before it became a playground with more than one game in it.
+The list page borrows the menu button's shape for its Play link, and its backdrop is the game's own grass tiles: `backdrop.ts` renders a water-free flat world through `renderer.ts` rather than shipping a second copy of the art.

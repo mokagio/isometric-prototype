@@ -71,6 +71,33 @@ describe("generateWorld (flat — the default)", () => {
   });
 });
 
+describe("generateWorld (dry — { water: false })", () => {
+  // What the games list is drawn on: grass to every corner, no shore in sight.
+  const world = generateWorld(40, 40, 42, { water: false });
+
+  it("lays no water at all", () => {
+    for (let row = 0; row < world.rows; row++) {
+      for (let col = 0; col < world.cols; col++) {
+        expect(isLiquidTile(world.cell(col, row).surface), `${col},${row}`).toBe(false);
+      }
+    }
+  });
+
+  it("still sprinkles the grass, so it does not read as one flat colour", () => {
+    const surfaces = new Set<string>();
+    for (let row = 0; row < world.rows; row++) {
+      for (let col = 0; col < world.cols; col++) surfaces.add(world.cell(col, row).surface.join(","));
+    }
+    expect(surfaces.size).toBeGreaterThan(1);
+  });
+
+  it("stays flat, so the field has no cliffs in it", () => {
+    for (let row = 0; row < world.rows; row++) {
+      for (let col = 0; col < world.cols; col++) expect(world.heightAt(col, row)).toBe(GROUND_HEIGHT);
+    }
+  });
+});
+
 describe("generateWorld (terraced — { flat: false })", () => {
   const world = generateWorld(40, 40, 42, { flat: false });
 

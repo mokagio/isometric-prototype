@@ -11,6 +11,8 @@ export interface MenuActions {
   onDebug: (on: boolean) => void;
   /** Open the credits page. */
   onCredits: () => void;
+  /** Leave the game for the list of games. */
+  onAllGames: () => void;
 }
 
 const LURK_KEY = "ww:lurk"; // remembered across reloads
@@ -68,7 +70,7 @@ export function createMenu(actions: MenuActions): void {
 
   const title = document.createElement("div");
   title.className = "ww-menu-title";
-  title.textContent = "Whispering Woods";
+  title.textContent = "Peaceful Plains";
   panel.appendChild(title);
 
   const setOpen = (open: boolean): void => {
@@ -151,6 +153,8 @@ export function createMenu(actions: MenuActions): void {
   addModeToggle();
   addToggle("Debug boxes", actions.onDebug);
   addItem("Credits", actions.onCredits);
+  // Last: leaving the game sits well clear of the thumb reaching for New World.
+  addItem("All Games", actions.onAllGames);
 
   button.addEventListener("click", (e) => {
     e.stopPropagation();

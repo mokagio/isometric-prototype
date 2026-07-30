@@ -11,7 +11,7 @@ const MAP_PARAM = "map";
 const MAP_PARAM_VALUE = "local";
 
 export const PLAY_STASHED_MAP_QUERY = `?${MAP_PARAM}=${MAP_PARAM_VALUE}`;
-export const PLAY_STASHED_MAP_URL = `index.html${PLAY_STASHED_MAP_QUERY}`;
+export const PLAY_STASHED_MAP_URL = `game.html${PLAY_STASHED_MAP_QUERY}`;
 /** The same stash, handed the other way: the editor opens the map being played. */
 export const EDIT_STASHED_MAP_URL = `editor.html${PLAY_STASHED_MAP_QUERY}`;
 

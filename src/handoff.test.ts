@@ -112,8 +112,8 @@ describe("the play-a-stashed-map request", () => {
     expect(wantsStashedMap(query)).toBe(true);
   });
 
-  it("goes to the game page", () => {
-    expect(PLAY_STASHED_MAP_URL.startsWith("index.html?")).toBe(true);
+  it("goes to the game page, not the games list", () => {
+    expect(PLAY_STASHED_MAP_URL.startsWith("game.html?")).toBe(true);
   });
 
   it("is not asked for by an ordinary visit", () => {

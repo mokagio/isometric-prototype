@@ -54,7 +54,7 @@ export function buildSidebar(
 
   const back = document.createElement("a");
   back.className = "ed-back";
-  back.href = "index.html";
+  back.href = "game.html";
   back.textContent = "← World";
   root.appendChild(back);
 

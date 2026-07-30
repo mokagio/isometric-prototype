@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Peaceful Plains | Games Playground</title>
+    <style>
+      :root {
+        --ww-inset: 16px; /* gap from the screen edge, shared by every overlay */
+        --ww-btn: 54px; /* menu and action buttons, borders included */
+        --ww-stick: 144px;
+        --ww-pad-gap: 10px; /* clear space between the two action buttons */
+        /* Shift per axis, not along the diagonal: offsetting two squares by
+           their centre-to-centre distance would overlap them at the corner. */
+        --ww-pad-step: calc(var(--ww-btn) + var(--ww-pad-gap));
+        /* Inset that centres the diagonal pair inside the stick-sized square. */
+        --ww-pad-edge: calc((var(--ww-stick) - var(--ww-btn) - var(--ww-pad-step)) / 2);
+      }
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #1b2b1a;
+        /* Suppress the flash the UA paints over a tapped element. */
+        -webkit-tap-highlight-color: transparent;
+      }
+      canvas {
+        display: block;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+
+      .ww-menu {
+        position: fixed;
+        top: var(--ww-inset);
+        right: var(--ww-inset);
+        /* Over the stick and action pad, which `main.ts` appends later: in
+           landscape on a short screen the open panel reaches down across them. */
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        font-family: Georgia, "Times New Roman", serif;
+        user-select: none;
+      }
+      .ww-menu-btn {
+        box-sizing: border-box;
+        width: var(--ww-btn);
+        height: var(--ww-btn);
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        color: #f4e4c1;
+        background: #3b2a1c;
+        border: 3px solid #6b4f34;
+        border-radius: 10px;
+        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+        cursor: pointer;
+        /* A long press on iOS otherwise selects the glyph and raises the loupe. */
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      @media (hover: hover) {
+        .ww-menu-btn:hover {
+          background: #4a3524;
+        }
+      }
+      .ww-menu-btn:active {
+        transform: translateY(2px);
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+      }
+      .ww-menu-panel {
+        margin-top: 8px;
+        min-width: 168px;
+        padding: 6px;
+        background: #3b2a1c;
+        border: 3px solid #6b4f34;
+        border-radius: 10px;
+        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+      }
+      .ww-menu-title {
+        padding: 6px 10px 8px;
+        color: #c9a86a;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .ww-menu-item {
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        padding: 10px 12px;
+        text-align: left;
+        text-decoration: none;
+        font: inherit;
+        font-size: 16px;
+        color: #f4e4c1;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      /* Touch taps leave :hover stuck on the item, so keep it to pointer devices. */
+      @media (hover: hover) {
+        .ww-menu-item:hover {
+          background: #4a3524;
+        }
+      }
+
+      .ww-hearts {
+        position: fixed;
+        top: var(--ww-inset);
+        left: var(--ww-inset);
+        /* Wrap rather than run under the menu button once the row outgrows the
+           screen, so raising MAX_LIVES stays a one-line change. */
+        max-width: calc(100% - var(--ww-btn) - var(--ww-inset) * 3);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+        font-size: 20px;
+        line-height: 1;
+        /* The row sits over whatever terrain scrolls under it, so both states
+           need an outline to stay legible on bright grass and pale sand. */
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+        pointer-events: none;
+        user-select: none;
+      }
+      .ww-heart-lost {
+        filter: grayscale(1) brightness(0.45);
+        opacity: 0.6;
+      }
+
+      .ww-gameover {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(12, 20, 12, 0.6);
+        font-family: Georgia, "Times New Roman", serif;
+        user-select: none;
+      }
+      /* `display: grid` above outranks the UA's `[hidden]` rule, so restate it. */
+      .ww-gameover[hidden] {
+        display: none;
+      }
+      .ww-gameover-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        padding: 28px 40px;
+        background: #3b2a1c;
+        border: 3px solid #6b4f34;
+        border-radius: 14px;
+        box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+      }
+      .ww-gameover-title {
+        color: #f4e4c1;
+        font-size: 34px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      /* Widened out of the menu button's fixed square. */
+      .ww-gameover-btn {
+        width: auto;
+        height: auto;
+        padding: 12px 30px;
+        font-family: inherit;
+        font-size: 20px;
+      }
+
+      .ww-pad {
+        position: fixed;
+        right: var(--ww-inset);
+        bottom: var(--ww-inset);
+        width: var(--ww-stick);
+        height: var(--ww-stick);
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      /* Offset on the diagonal like a SNES pad's B and A: the thumb rolls between
+         them rather than reaching across a flat row. */
+      .ww-pad-btn {
+        position: absolute;
+      }
+      .ww-pad-attack {
+        left: var(--ww-pad-edge);
+        bottom: var(--ww-pad-edge);
+      }
+      .ww-pad-jump {
+        right: var(--ww-pad-edge);
+        top: var(--ww-pad-edge);
+      }
+
+      /* Sized border-box so the knob's travel (RADIUS in `stick.ts`) can be
+         checked against the well's half-width without unpacking the borders. */
+      .ww-stick {
+        position: fixed;
+        left: var(--ww-inset);
+        bottom: var(--ww-inset);
+        box-sizing: border-box;
+        width: var(--ww-stick);
+        height: var(--ww-stick);
+        display: grid;
+        place-items: center;
+        touch-action: none;
+        cursor: grab;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      /* The well is drawn on pseudo-elements, not on `.ww-stick` itself: a clip
+         on the element would crop the square knob where it overhangs the rim at
+         the diagonals. Both shapes are set in `stick.ts`. */
+      .ww-stick::before,
+      .ww-stick::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+      }
+      .ww-stick::before {
+        clip-path: var(--ww-stick-clip);
+        background: rgba(27, 43, 26, 0.5);
+      }
+      .ww-stick::after {
+        clip-path: var(--ww-stick-ring);
+        background: #6b4f34;
+      }
+      .ww-stick:active {
+        cursor: grabbing;
+      }
+      .ww-stick-knob {
+        /* The rim is `::after`, which paints after every real child, so without
+           the z-index it covers the knob wherever the two meet at full
+           deflection. `position: relative` alone does not beat a later sibling. */
+        position: relative;
+        z-index: 1;
+        box-sizing: border-box;
+        width: 54px;
+        height: 54px;
+        background: #3b2a1c;
+        border: 3px solid #6b4f34;
+        border-radius: 10px;
+        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

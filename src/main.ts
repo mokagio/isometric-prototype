@@ -265,6 +265,9 @@ async function main(): Promise<void> {
     onCredits: () => {
       location.href = "credits.html";
     },
+    onAllGames: () => {
+      location.href = "index.html";
+    },
     onEnemyMode: (lurk) => monsters.setMode(lurk ? "lurk" : "hunt"),
     onDebug: (on) => {
       debug = on;

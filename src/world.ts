@@ -54,6 +54,8 @@ export const WATER_LEVEL = 2;
 export interface WorldOptions {
   /** Default true — a single flat level. `false` generates rolling terraces. */
   flat?: boolean;
+  /** Default true. `false` lays nothing but dry land, for a backdrop with no shore in it. */
+  water?: boolean;
 }
 
 // The surface tile decides what a cell does underfoot, so there is nothing here
@@ -149,10 +151,10 @@ function isWaterAt(col: number, row: number, seed: number): boolean {
   return river && !ford;
 }
 
-function flatCell(col: number, row: number, seed: number): Cell {
+function flatCell(col: number, row: number, seed: number, water: boolean): Cell {
   // Water pools and rivers; a hash sprinkles grass variants and the odd flower
   // patch onto the dry land. Every column stays at ground level.
-  if (isWaterAt(col, row, seed)) {
+  if (water && isWaterAt(col, row, seed)) {
     return { height: GROUND_HEIGHT, surface: WATER };
   }
   const v = hash(col, row, seed + 7);
@@ -182,11 +184,12 @@ function terracedCell(col: number, row: number, cols: number, rows: number, seed
 
 export function generateWorld(cols: number, rows: number, seed = 1337, options: WorldOptions = {}): World {
   const flat = options.flat ?? true;
+  const water = options.water ?? true;
   const cells: Cell[][] = [];
   for (let row = 0; row < rows; row++) {
     const line: Cell[] = [];
     for (let col = 0; col < cols; col++) {
-      line.push(flat ? flatCell(col, row, seed) : terracedCell(col, row, cols, rows, seed));
+      line.push(flat ? flatCell(col, row, seed, water) : terracedCell(col, row, cols, rows, seed));
     }
     cells.push(line);
   }
