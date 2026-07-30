@@ -52,6 +52,9 @@ The pack draws one facing, so left is `blitFrame`'s `flip` and walking up or dow
 `woods/field.ts` holds the ground: a finite `FIELD` square of `TILE` (16px) grass, painted from `grass.png` by a value hash so no map is stored, with dark green past its edge.
 World coordinates are **sprite pixels** — `walker.ts` and `field.ts` never see the zoom, and `screenAt` is the only conversion.
 The camera keeps the character mid-screen and is deliberately unclamped, so walking to the edge shows the void, as it does in Peaceful Plains.
+Trees come out of the same hash, thinned by a local-maximum rule — a cell keeps its tree only by out-claiming its neighbours — which spaces them without a placement pass to store, and is what guarantees no two crowns overlap.
+Standing things draw in order of how far down the field they are, so passing behind a crown hides you — deliberately, with no ghost of the kind `occlusion.ts` draws in the other game.
+Trunks are solid: `blockedByTree` guards the roots only, and `walk` tries each axis separately so walking into one at an angle slides round it.
 
 ## Maps
 

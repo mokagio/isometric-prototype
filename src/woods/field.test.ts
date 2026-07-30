@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  blockedByTree,
   cameraAt,
   FIELD,
   FIELD_PX,
@@ -13,7 +14,7 @@ import {
   treePhase,
   visibleTiles,
 } from "./field";
-import { walk } from "./walker";
+import { walk, type Pos } from "./walker";
 
 const ZOOM = 4;
 const VIEW = { w: 800, h: 600 };
@@ -63,6 +64,19 @@ describe("treeAt", () => {
     expect(share).toBeLessThan(0.1);
   });
 
+  it("never stands two trees close enough to overlap", () => {
+    // A crown is a little over two tiles wide and tall, so any pair within two
+    // cells on both axes would touch.
+    const trees = all();
+    for (const [col, row] of trees) {
+      for (const [otherCol, otherRow] of trees) {
+        if (col === otherCol && row === otherRow) continue;
+        const near = Math.abs(col - otherCol) <= 2 && Math.abs(row - otherRow) <= 2;
+        expect(near, `${col},${row} and ${otherCol},${otherRow}`).toBe(false);
+      }
+    }
+  });
+
   it("leaves the middle clear, so nobody starts inside a trunk", () => {
     const mid = FIELD / 2;
     for (let row = mid - 2; row <= mid + 2; row++) {
@@ -85,6 +99,45 @@ describe("treeAt", () => {
       expect(treePhase(col, row)).toBeGreaterThanOrEqual(0);
       expect(treePhase(col, row)).toBeLessThan(1);
     }
+  });
+});
+
+/** The first tree with clear ground around it, to stand a figure against. */
+const someTree = (): { col: number; row: number } => {
+  for (let row = 4; row < FIELD - 4; row++) {
+    for (let col = 4; col < FIELD - 4; col++) if (treeAt(col, row)) return { col, row };
+  }
+  throw new Error("the field has no trees to test against");
+};
+
+const base = (t: { col: number; row: number }): Pos => ({
+  x: t.col * TILE + TILE / 2,
+  y: t.row * TILE + TILE / 2,
+});
+
+describe("blockedByTree", () => {
+  it("refuses the trunk itself", () => {
+    expect(blockedByTree(base(someTree()))).toBe(true);
+  });
+
+  it("lets the figure walk behind the crown", () => {
+    // Two tiles above the trunk is under the leaves but clear of the wood.
+    const at = base(someTree());
+    expect(blockedByTree({ x: at.x, y: at.y - 2 * TILE })).toBe(false);
+  });
+
+  it("leaves the open field and the spawn clearing walkable", () => {
+    expect(blockedByTree(MIDDLE)).toBe(false);
+    const at = base(someTree());
+    expect(blockedByTree({ x: at.x + 2 * TILE, y: at.y })).toBe(false);
+  });
+
+  it("blocks a strip no wider than the roots", () => {
+    // Brushing past the side of a trunk has to stay possible, or a wood with
+    // three cells between trunks would still feel like a wall.
+    const at = base(someTree());
+    expect(blockedByTree({ x: at.x - 9, y: at.y })).toBe(false);
+    expect(blockedByTree({ x: at.x + 9, y: at.y })).toBe(false);
   });
 });
 

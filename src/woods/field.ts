@@ -14,11 +14,23 @@ const TREE_SEED = 91177;
 // rather than as a pattern.
 const PLAIN_SHARE = 0.72;
 
-// Scattered thinly: a tree sprite covers about two tiles each way, so a share
-// much past this closes into woodland with nowhere to walk.
-const TREE_SHARE = 0.06;
+// Candidates, before spacing thins them out — most of a cluster loses to its
+// neighbour, so this is well above the share of cells that end up wooded.
+const TREE_SHARE = 0.5;
+// Cells between trunks. A tree is drawn 32x34, a little over two tiles each way,
+// so three cells apart is the closest two can stand without their crowns
+// touching. `TREE_REACH` is how far one has to look to find a rival.
+const TREE_SPACING = 3;
+const TREE_REACH = TREE_SPACING - 1;
 // Tiles kept clear around the middle, so nobody starts inside a trunk.
 const CLEARING = 3;
+
+// What a trunk blocks, measured off `tree.png` relative to the base it stands
+// on: its roots, not its crown. Walking behind a tree is fine, and the crown
+// hiding you as you pass is the point of a wood.
+const TRUNK_HALF_W = 8;
+const TRUNK_TOP = 5;
+const TRUNK_BOTTOM = 2;
 
 /** Field size in world pixels. */
 export const FIELD_PX = FIELD * TILE;
@@ -33,12 +45,54 @@ function hash(x: number, y: number, seed: number): number {
 /** Where the character starts, and the middle of the field. */
 export const MIDDLE: Pos = { x: FIELD_PX / 2, y: FIELD_PX / 2 };
 
-/** Whether a tree stands on a cell. Deterministic, so the wood does not reshuffle. */
-export function treeAt(col: number, row: number): boolean {
-  if (col < 0 || row < 0 || col >= FIELD || row >= FIELD) return false;
+/** A cell's claim to a tree, or -1 where one may not stand at all. */
+function claim(col: number, row: number): number {
+  if (col < 0 || row < 0 || col >= FIELD || row >= FIELD) return -1;
   const mid = FIELD / 2;
-  if (Math.abs(col - mid) <= CLEARING && Math.abs(row - mid) <= CLEARING) return false;
-  return hash(col, row, TREE_SEED) < TREE_SHARE;
+  if (Math.abs(col - mid) <= CLEARING && Math.abs(row - mid) <= CLEARING) return -1;
+  const h = hash(col, row, TREE_SEED);
+  return h < TREE_SHARE ? h : -1;
+}
+
+/**
+ * Whether a tree stands on a cell. Deterministic, so the wood does not reshuffle,
+ * and spaced, so no two crowns overlap.
+ *
+ * A cell keeps its tree only by out-claiming every cell within `TREE_REACH` —
+ * the strongest claim in any neighbourhood wins and the rest lose theirs. That
+ * thins clusters without a placement pass to store, and equal claims fall to
+ * whichever cell comes first, so exactly one of the two survives.
+ */
+export function treeAt(col: number, row: number): boolean {
+  const mine = claim(col, row);
+  if (mine < 0) return false;
+  for (let dr = -TREE_REACH; dr <= TREE_REACH; dr++) {
+    for (let dc = -TREE_REACH; dc <= TREE_REACH; dc++) {
+      if (dc === 0 && dr === 0) continue;
+      const theirs = claim(col + dc, row + dr);
+      if (theirs > mine) return false;
+      if (theirs === mine && (dr < 0 || (dr === 0 && dc < 0))) return false;
+    }
+  }
+  return true;
+}
+
+/** Whether a trunk stands where the feet are trying to go. */
+export function blockedByTree(feet: Pos): boolean {
+  const col0 = Math.floor(feet.x / TILE);
+  const row0 = Math.floor(feet.y / TILE);
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      const col = col0 + dc;
+      const row = row0 + dr;
+      if (!treeAt(col, row)) continue;
+      const base = { x: col * TILE + TILE / 2, y: row * TILE + TILE / 2 };
+      const inTrunk =
+        Math.abs(feet.x - base.x) < TRUNK_HALF_W && feet.y > base.y - TRUNK_TOP && feet.y < base.y + TRUNK_BOTTOM;
+      if (inTrunk) return true;
+    }
+  }
+  return false;
 }
 
 /**

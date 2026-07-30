@@ -37,13 +37,28 @@ export function screenAxis(axis: Axis): Pos {
   return len === 0 ? { x: 0, y: 0 } : { x: x / len, y: y / len };
 }
 
-/** Where the walker is `dt` later, kept inside `bounds`. */
-export function walk(pos: Pos, axis: Axis, dt: number, bounds: Bounds): Pos {
+/**
+ * Where the walker is `dt` later, kept inside `bounds` and out of anywhere
+ * `blocked` refuses.
+ *
+ * The two axes are tried one at a time, so walking into a trunk at an angle
+ * slides along it instead of stopping dead — the same trick the monsters in the
+ * other game use against water.
+ */
+export function walk(
+  pos: Pos,
+  axis: Axis,
+  dt: number,
+  bounds: Bounds,
+  blocked: (at: Pos) => boolean = () => false,
+): Pos {
   const dir = screenAxis(axis);
-  return {
-    x: clamp(pos.x + dir.x * SPEED * dt, bounds.minX, bounds.maxX),
-    y: clamp(pos.y + dir.y * SPEED * dt, bounds.minY, bounds.maxY),
-  };
+  const next = { ...pos };
+  const x = clamp(pos.x + dir.x * SPEED * dt, bounds.minX, bounds.maxX);
+  if (!blocked({ x, y: next.y })) next.x = x;
+  const y = clamp(pos.y + dir.y * SPEED * dt, bounds.minY, bounds.maxY);
+  if (!blocked({ x: next.x, y })) next.y = y;
+  return next;
 }
 
 /**

@@ -63,6 +63,38 @@ describe("walk", () => {
   });
 });
 
+describe("walk past something solid", () => {
+  // A trunk-sized box to the east of the walker.
+  const trunk = { x0: 60, x1: 76, y0: 42, y1: 58 };
+  const blocked = (at: { x: number; y: number }): boolean =>
+    at.x > trunk.x0 && at.x < trunk.x1 && at.y > trunk.y0 && at.y < trunk.y1;
+
+  it("stops rather than walking into it", () => {
+    let pos = MIDDLE;
+    for (let i = 0; i < 40; i++) pos = walk(pos, RIGHT, 0.1, ROOM, blocked);
+    expect(pos.x).toBeLessThanOrEqual(trunk.x0);
+    expect(pos.y).toBe(MIDDLE.y);
+  });
+
+  it("slides along it when pushed in at an angle", () => {
+    // Down-and-right into the trunk's left face: the x move is refused while the
+    // y move is not, so the walker slips round it instead of sticking.
+    const downRight = { dc: 1, dr: 0 };
+    let pos = { x: 58, y: 50 };
+    for (let i = 0; i < 20; i++) {
+      pos = walk(pos, downRight, 0.05, ROOM, blocked);
+      expect(blocked(pos), `step ${i} at ${pos.x},${pos.y}`).toBe(false);
+    }
+    expect(pos.y).toBeGreaterThan(trunk.y1); // got round it
+    expect(pos.x).toBeGreaterThan(trunk.x1); // and carried on east once clear
+  });
+
+  it("goes where it likes with nothing in the way", () => {
+    const open = walk(MIDDLE, RIGHT, 0.1, ROOM);
+    expect(walk(MIDDLE, RIGHT, 0.1, ROOM, () => false)).toEqual(open);
+  });
+});
+
 describe("facingFrom", () => {
   it("faces the way it is travelling across the screen", () => {
     expect(facingFrom(1, "left")).toBe("right");

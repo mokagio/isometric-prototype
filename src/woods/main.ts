@@ -4,6 +4,7 @@ import { blitFrame, frameAt, SheetLoader } from "../sprites";
 import { createStick } from "../stick";
 import { Viewport } from "../viewport";
 import {
+  blockedByTree,
   cameraAt,
   fieldBounds,
   MIDDLE,
@@ -78,7 +79,7 @@ function main(): void {
 
     const axis = input.axis;
     const moving = axis.dc !== 0 || axis.dr !== 0;
-    const next = walk(pos, axis, dt, bounds);
+    const next = walk(pos, axis, dt, bounds, blockedByTree);
     facing = facingFrom(next.x - pos.x, facing);
     pos = next;
     walkT = moving ? walkT + dt : 0;
