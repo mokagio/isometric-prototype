@@ -106,3 +106,21 @@ describe("facingFrom", () => {
     expect(facingFrom(0, "right")).toBe("right");
   });
 });
+
+describe("walking out of somewhere blocked", () => {
+  const bounds = { minX: 0, maxX: 100, minY: 0, maxY: 100 };
+  const wall = (at: { x: number; y: number }): boolean => at.x < 20;
+
+  it("refuses a step that walks into something solid", () => {
+    const next = walk({ x: 30, y: 50 }, { dc: -1, dr: 1 }, 1, bounds, wall);
+    expect(next.x).toBe(30);
+  });
+
+  it("lets a walker who started inside it get out", () => {
+    // An island can be saved with a house on the spot the walker arrives at.
+    // Refusing every step there would leave them stuck for good.
+    const next = walk({ x: 10, y: 50 }, { dc: 1, dr: -1 }, 1, bounds, wall);
+    expect(next.x).toBeGreaterThan(10);
+  });
+});
+

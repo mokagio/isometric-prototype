@@ -44,6 +44,10 @@ export function screenAxis(axis: Axis): Pos {
  * The two axes are tried one at a time, so walking into a trunk at an angle
  * slides along it instead of stopping dead — the same trick the monsters in the
  * other game use against water.
+ *
+ * A step is only refused when it walks *into* somewhere blocked. Standing there
+ * already, every direction is allowed: a walker who somehow started inside a
+ * wall has to be able to get out, or the game is over before it began.
  */
 export function walk(
   pos: Pos,
@@ -53,11 +57,13 @@ export function walk(
   blocked: (at: Pos) => boolean = () => false,
 ): Pos {
   const dir = screenAxis(axis);
+  const stuck = blocked(pos);
+  const free = (at: Pos): boolean => stuck || !blocked(at);
   const next = { ...pos };
   const x = clamp(pos.x + dir.x * SPEED * dt, bounds.minX, bounds.maxX);
-  if (!blocked({ x, y: next.y })) next.x = x;
+  if (free({ x, y: next.y })) next.x = x;
   const y = clamp(pos.y + dir.y * SPEED * dt, bounds.minY, bounds.maxY);
-  if (!blocked({ x: next.x, y })) next.y = y;
+  if (free({ x: next.x, y })) next.y = y;
   return next;
 }
 
