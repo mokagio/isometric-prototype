@@ -9,7 +9,7 @@ const CELL_PX = 48;
 // `drawImage` identifies which cell was painted.
 function worldOf(cols: number, rows: number): World {
   const cells = Array.from({ length: rows }, (_, row) =>
-    Array.from({ length: cols }, (_, col) => ({ height: 0, surface: [col, row] as const, isWater: false })),
+    Array.from({ length: cols }, (_, col) => ({ height: 0, surface: [col, row] as const })),
   );
   return { cols, rows, cells, body: [0, 1] } as unknown as World;
 }

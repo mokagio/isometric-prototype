@@ -51,6 +51,8 @@ const worldOf = (cols: number, rows: number): World => ({ cols, rows }) as unkno
 
 const BASE = "/";
 const WORLD = worldOf(200, 200);
+// A hazard river three columns wide: crossable by the hero, not by a monster.
+const RIVER = { cols: 200, rows: 200, isHazard: (c: number) => c >= 101 && c <= 103 } as unknown as World;
 const HERO = { col: 100, row: 100 };
 const DT = 1 / 60;
 
@@ -670,7 +672,7 @@ describe("MonsterField wandering", () => {
     for (let i = 0; i < secs / DT; i++) {
       field.update(DT, HERO, world);
       furthest = Math.max(furthest, Math.hypot(mon.col - at.col, mon.row - at.row));
-      onWater ||= world.isWater?.(Math.round(mon.col), Math.round(mon.row)) === true;
+      onWater ||= world.isHazard?.(Math.round(mon.col), Math.round(mon.row)) === true;
     }
     return { field, mon, furthest, onWater };
   }
@@ -706,8 +708,8 @@ describe("MonsterField wandering", () => {
 
   it("keeps its feet dry when its square laps into water", () => {
     // A river at 101-103; the post at 104 puts half the guard square in it.
-    const river = { cols: 200, rows: 200, isWater: (c: number) => c >= 101 && c <= 103 } as unknown as World;
-    expect(amble(60, { col: 104, row: HERO.row + 30 }, river).onWater).toBe(false);
+    // Water is only a hazard to the hero, but monsters still will not paddle.
+    expect(amble(60, { col: 104, row: HERO.row + 30 }, RIVER).onWater).toBe(false);
   });
 
   it("faces the way it is walking, not the way the hero lies", () => {
@@ -730,12 +732,20 @@ describe("MonsterField wandering", () => {
 });
 
 describe("MonsterField water", () => {
-  it("stops a monster at the shore rather than walking into water", () => {
+  it("stops a monster at the shore rather than wading after the hero", () => {
     // A river three columns wide (101-103) between the monster (105) and hero (100).
-    const river = { cols: 200, rows: 200, isWater: (c: number) => c >= 101 && c <= 103 } as unknown as World;
+    // The hero can cross it at a heart a second; that only buys an escape if the
+    // slime will not follow.
     const { field, mon } = fieldWith(105, HERO.row);
-    for (let i = 0; i < 300; i++) field.update(DT, HERO, river);
+    for (let i = 0; i < 300; i++) field.update(DT, HERO, RIVER);
     expect(mon.col).toBeLessThan(105); // it did advance
     expect(Math.round(mon.col)).toBe(104); // but parked in the dry cell beside the river
+  });
+
+  it("stops at a blocking pool the same way", () => {
+    const pool = { cols: 200, rows: 200, blocks: (c: number) => c >= 101 && c <= 103 } as unknown as World;
+    const { field, mon } = fieldWith(105, HERO.row);
+    for (let i = 0; i < 300; i++) field.update(DT, HERO, pool);
+    expect(Math.round(mon.col)).toBe(104);
   });
 });

@@ -86,6 +86,11 @@ export interface Monster {
 
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
 
+// Monsters keep out of every pool, walls and hazards alike. The hero can wade a
+// river at a heart a second; nothing follows them in, which is the point.
+const barred = (world: World, col: number, row: number): boolean =>
+  world.blocks?.(col, row) === true || world.isHazard?.(col, row) === true;
+
 export class MonsterField {
   private walk: Sheet;
   private death: Sheet;
@@ -131,7 +136,7 @@ export class MonsterField {
       let col = clamp(hero.col + Math.cos(angle) * dist, 1, world.cols - 2);
       let row = clamp(hero.row + Math.sin(angle) * dist, 1, world.rows - 2);
       // Don't strand a spawn in the water — draw it in toward the hero to dry land.
-      for (let k = 0; k < 20 && world.isWater?.(Math.round(col), Math.round(row)); k++) {
+      for (let k = 0; k < 20 && barred(world, Math.round(col), Math.round(row)); k++) {
         col = clamp(col + (hero.col - col) * 0.15, 1, world.cols - 2);
         row = clamp(row + (hero.row - row) * 0.15, 1, world.rows - 2);
       }
@@ -208,9 +213,9 @@ export class MonsterField {
     const step = Math.min(WANDER_SPEED * dt, d);
     const before = { col: m.col, row: m.row };
     const nc = m.col + (dx / d) * step;
-    if (!world.isWater?.(Math.round(nc), Math.round(m.row))) m.col = nc;
+    if (!barred(world, Math.round(nc), Math.round(m.row))) m.col = nc;
     const nr = m.row + (dy / d) * step;
-    if (!world.isWater?.(Math.round(m.col), Math.round(nr))) m.row = nr;
+    if (!barred(world, Math.round(m.col), Math.round(nr))) m.row = nr;
     // Walled off from the waypoint by water: rest and choose somewhere reachable
     // instead of grinding against the shore for the rest of the wave.
     if (m.col === before.col && m.row === before.row) this.restWaypoint(m, world);
@@ -250,9 +255,9 @@ export class MonsterField {
         const step = SPEED * dt;
         // Per-axis, blocked by water, so a slime slides along the shore.
         const nc = m.col + (dx / d) * step;
-        if (!world.isWater?.(Math.round(nc), Math.round(m.row))) m.col = nc;
+        if (!barred(world, Math.round(nc), Math.round(m.row))) m.col = nc;
         const nr = m.row + (dy / d) * step;
-        if (!world.isWater?.(Math.round(m.col), Math.round(nr))) m.row = nr;
+        if (!barred(world, Math.round(m.col), Math.round(nr))) m.row = nr;
       }
     }
     this.mons = this.mons.filter((m) => !(m.dying && m.dyingT >= FADE));

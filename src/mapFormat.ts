@@ -1,4 +1,4 @@
-import { isLiquidTile, makeWorld, type Cell, type Tile, type World } from "./world";
+import { makeWorld, type Cell, type Tile, type World } from "./world";
 
 // The on-disk shape of a hand-built map: a tile palette plus two flat row-major
 // arrays, one of palette indices and one of column heights. Two arrays of small
@@ -167,7 +167,7 @@ export function worldFromMap(map: MapData): World {
     const line: Cell[] = [];
     for (let col = 0; col < map.cols; col++) {
       const cell = cellAt(map, col, row) ?? fail("This map still has empty tiles — fill them before playing it.");
-      line.push({ height: cell.height, surface: cell.surface, isWater: isLiquidTile(cell.surface) });
+      line.push({ height: cell.height, surface: cell.surface });
     }
     grid.push(line);
   }

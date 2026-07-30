@@ -49,8 +49,10 @@ Bump `VERSION` whenever the arrays change shape — old files are then refused b
 Every file also records the commit that wrote it (`writtenBy`, from `__BUILD_COMMIT__`), so `git show <commit>:src/mapFormat.ts` is the code that understood it, which is what a converter gets written from.
 Unknown fields are ignored on read, so stamps like that can be added without breaking older maps.
 
-Hand-placed tiles carry no water flag, so `isLiquidTile` in `world.ts` is the single rule for what blocks movement: sheet row 10, the cracked-pool cube in four hues.
-A new impassable brush belongs in that row, or the rule needs revisiting — `palette.test.ts` pins every impassable brush to a pool-sounding label.
+A cell carries only its height and surface tile, so `world.ts` is the single rule for what the ground does underfoot.
+`isLiquidTile` is sheet row 10, the cracked-pool cube in four hues; `isHazardTile` splits off water and lava, which the hero can wade at a heart a second (`hazard.ts`), from the teal and purple pools, which `blocksTile` keeps impassable.
+Monsters stay out of all four, so a river is an escape the hero can buy.
+A new brush of either kind belongs in that row, or the rule needs revisiting — `palette.test.ts` pins every pool tile to a pool-sounding label.
 
 The two pages hand work to each other through `handoff.ts`, never in memory: the game stashes its world seed (a world is a pure function of it), the editor stashes a map and asks for it back with `?map=local`.
 

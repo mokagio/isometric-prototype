@@ -20,6 +20,7 @@ import {
 } from "./mapFormat";
 import { pickTextFile } from "./files";
 import { isHidden } from "./occlusion";
+import { hazardToll } from "./hazard";
 import { render, type Entity } from "./renderer";
 import { project, SY, type Origin } from "./iso";
 import { Camera } from "./camera";
@@ -205,6 +206,10 @@ async function main(): Promise<void> {
       const bumping = monsters.contactAt(hero.col, hero.row);
       if (bumping && lives.hit()) {
         hero.knockback(hero.col - bumping.col, hero.row - bumping.row);
+        hud.setLives(lives.lives);
+      } else if (hazardToll(world, hero, lives)) {
+        // No shove: there is nothing to be thrown clear of, and being pushed out
+        // of a river would undo the choice to swim it.
         hud.setLives(lives.lives);
       }
     } else {

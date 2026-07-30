@@ -18,10 +18,15 @@ const FLOWERS: Tile[] = [
 ];
 const DIRT: Tile = [0, 1]; // cliff-face body cube
 const WATER: Tile = [0, 10]; // the bright blue water cube
+const LAVA: Tile = [3, 10];
 // Sheet row 10 is one cracked-pool cube in four hues — water, teal, purple,
 // lava. Anywhere one of them caps a column, generated or hand-placed, it is
-// liquid: impassable to the hero and monsters.
+// liquid.
 const LIQUID_SHEET_ROW = 10;
+// Water and lava can be waded, at a heart a second (`hazard.ts`); the teal and
+// purple pools are walls. So a river is an escape route the hero can buy and the
+// monsters cannot follow, while a pool still shapes the map.
+const HAZARDS: Tile[] = [WATER, LAVA];
 
 // One size for every map, generated or hand-built, so the editor can open the
 // world you are playing and the game can play a map you drew without either
@@ -51,10 +56,11 @@ export interface WorldOptions {
   flat?: boolean;
 }
 
+// The surface tile decides what a cell does underfoot, so there is nothing here
+// to keep in step with it.
 export interface Cell {
   height: number;
   surface: Tile;
-  isWater: boolean;
 }
 
 export interface World {
@@ -65,11 +71,19 @@ export interface World {
   cell(col: number, row: number): Cell;
   /** Surface height at a cell — where a character stands. */
   heightAt(col: number, row: number): number;
-  /** Whether a cell is water — impassable to the hero and monsters. */
-  isWater(col: number, row: number): boolean;
+  /** A pool nothing can cross. */
+  blocks(col: number, row: number): boolean;
+  /** Walkable, but it costs the hero a heart a second to stand in. */
+  isHazard(col: number, row: number): boolean;
 }
 
 export const isLiquidTile = (tile: Tile): boolean => tile[1] === LIQUID_SHEET_ROW;
+
+export const isHazardTile = (tile: Tile): boolean =>
+  HAZARDS.some(([col, row]) => col === tile[0] && row === tile[1]);
+
+/** Liquid that cannot be crossed at all, as opposed to liquid that merely hurts. */
+export const blocksTile = (tile: Tile): boolean => isLiquidTile(tile) && !isHazardTile(tile);
 
 export const randomSeed = (): number => Math.floor(Math.random() * 1_000_000);
 
@@ -86,7 +100,8 @@ export function makeWorld(cells: Cell[][]): World {
     body: DIRT,
     cell: at,
     heightAt: (col, row) => at(col, row).height,
-    isWater: (col, row) => at(col, row).isWater,
+    blocks: (col, row) => blocksTile(at(col, row).surface),
+    isHazard: (col, row) => isHazardTile(at(col, row).surface),
   };
 }
 
@@ -138,13 +153,13 @@ function flatCell(col: number, row: number, seed: number): Cell {
   // Water pools and rivers; a hash sprinkles grass variants and the odd flower
   // patch onto the dry land. Every column stays at ground level.
   if (isWaterAt(col, row, seed)) {
-    return { height: GROUND_HEIGHT, surface: WATER, isWater: true };
+    return { height: GROUND_HEIGHT, surface: WATER };
   }
   const v = hash(col, row, seed + 7);
   let surface = GRASS;
   if (v > 0.96) surface = FLOWERS[Math.floor(hash(col, row, seed + 13) * FLOWERS.length)]!;
   else if (v > 0.82) surface = GRASS_VARIANTS[Math.floor(hash(col, row, seed + 11) * GRASS_VARIANTS.length)]!;
-  return { height: GROUND_HEIGHT, surface, isWater: false };
+  return { height: GROUND_HEIGHT, surface };
 }
 
 function terracedCell(col: number, row: number, cols: number, rows: number, seed: number): Cell {
@@ -157,12 +172,12 @@ function terracedCell(col: number, row: number, cols: number, rows: number, seed
 
   const height = Math.max(0, Math.min(MAX_HEIGHT, Math.round(h * MAX_HEIGHT)));
   if (height <= WATER_LEVEL) {
-    return { height: WATER_LEVEL, surface: WATER, isWater: true };
+    return { height: WATER_LEVEL, surface: WATER };
   }
   const v = hash(col, row, seed + 7);
   const surface =
     v > 0.82 ? GRASS_VARIANTS[Math.floor(hash(col, row, seed + 11) * GRASS_VARIANTS.length)]! : GRASS;
-  return { height, surface, isWater: false };
+  return { height, surface };
 }
 
 export function generateWorld(cols: number, rows: number, seed = 1337, options: WorldOptions = {}): World {
@@ -182,11 +197,15 @@ export function generateWorld(cols: number, rows: number, seed = 1337, options: 
  * A dry cell on the largest connected landmass, nearest the map centre — so the
  * hero never wakes trapped on a little island. Land is 4-connected, matching a
  * hero who can't cut a diagonal corner between two water cells.
+ *
+ * Hazards count as sea rather than as land: they are crossable, but waking up
+ * standing in lava would spend the hero's hearts before they moved.
  */
 export function findSpawn(world: World): { col: number; row: number } {
   const { cols, rows } = world;
   const comp = new Int32Array(cols * rows).fill(-1); // land component id per cell, -1 = unvisited
   const at = (c: number, r: number): number => r * cols + c;
+  const sea = (c: number, r: number): boolean => world.blocks(c, r) || world.isHazard(c, r);
 
   let bestId = -1;
   let bestSize = 0;
@@ -194,7 +213,7 @@ export function findSpawn(world: World): { col: number; row: number } {
   let id = 0;
   for (let r0 = 0; r0 < rows; r0++) {
     for (let c0 = 0; c0 < cols; c0++) {
-      if (world.isWater(c0, r0) || comp[at(c0, r0)] !== -1) continue;
+      if (sea(c0, r0) || comp[at(c0, r0)] !== -1) continue;
       let size = 0;
       stack.length = 0;
       stack.push(at(c0, r0));
@@ -212,7 +231,7 @@ export function findSpawn(world: World): { col: number; row: number } {
         ];
         for (const [nc, nr] of neighbours) {
           if (nc! < 0 || nr! < 0 || nc! >= cols || nr! >= rows) continue;
-          if (comp[at(nc!, nr!)] !== -1 || world.isWater(nc!, nr!)) continue;
+          if (comp[at(nc!, nr!)] !== -1 || sea(nc!, nr!)) continue;
           comp[at(nc!, nr!)] = id;
           stack.push(at(nc!, nr!));
         }

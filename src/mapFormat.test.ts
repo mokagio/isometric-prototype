@@ -255,21 +255,26 @@ describe("worldFromMap", () => {
     expect(world.cell(1, 0).surface).toEqual(STONE);
   });
 
-  it("makes hand-placed liquid block movement, whatever its hue", () => {
+  it("makes hand-placed liquid cost something, whatever its hue", () => {
+    // Which of the two it costs — a heart or the crossing — is `world.ts`'s call.
     const world = worldFromMap(filled(4, 1, (col) => ground([col, 10])));
-    for (let col = 0; col < 4; col++) expect(world.isWater(col, 0)).toBe(true);
+    for (let col = 0; col < 4; col++) {
+      expect(world.isHazard(col, 0) || world.blocks(col, 0), `hue ${col}`).toBe(true);
+    }
   });
 
   it("leaves solid ground walkable", () => {
     const world = worldFromMap(filled(2, 1, (col) => ground(col === 0 ? GRASS : STONE)));
-    expect(world.isWater(0, 0)).toBe(false);
-    expect(world.isWater(1, 0)).toBe(false);
+    for (const col of [0, 1]) {
+      expect(world.isHazard(col, 0)).toBe(false);
+      expect(world.blocks(col, 0)).toBe(false);
+    }
   });
 
   it("reads past the edge as the nearest edge cell, like a generated world", () => {
     const world = worldFromMap(filled(2, 2, (col) => ground(col === 0 ? GRASS : WATER)));
-    expect(world.isWater(99, 0)).toBe(true);
-    expect(world.isWater(-99, 0)).toBe(false);
+    expect(world.isHazard(99, 0)).toBe(true);
+    expect(world.isHazard(-99, 0)).toBe(false);
   });
 
   it("refuses a map that still has gaps in it", () => {
@@ -278,7 +283,7 @@ describe("worldFromMap", () => {
 
   it("plays a gappy map once the gaps are filled", () => {
     const world = worldFromMap(fillEmpty(blank(2, 2), GRASS));
-    expect(world.isWater(0, 0)).toBe(false);
+    expect(world.isHazard(0, 0)).toBe(false);
   });
 });
 
@@ -303,15 +308,16 @@ describe("mapFromWorld", () => {
     }
   });
 
-  it("keeps the generated world's water impassable", () => {
-    // The generator flags water itself; a round trip has to rediscover it from
-    // the tile alone, so a mismatch here would drown the hero or dry up a lake.
+  it("keeps the generated world's water wet", () => {
+    // A map carries tiles, not verdicts, so the round trip has to rediscover
+    // what hurts from the tile alone — a mismatch dries up a lake or floods a field.
     const back = worldFromMap(mapFromWorld(world));
     let water = 0;
     for (let row = 0; row < world.rows; row++) {
       for (let col = 0; col < world.cols; col++) {
-        expect(back.isWater(col, row)).toBe(world.isWater(col, row));
-        if (world.isWater(col, row)) water++;
+        expect(back.isHazard(col, row)).toBe(world.isHazard(col, row));
+        expect(back.blocks(col, row)).toBe(world.blocks(col, row));
+        if (world.isHazard(col, row)) water++;
       }
     }
     expect(water).toBeGreaterThan(0); // or the check above proves nothing

@@ -6,8 +6,9 @@ export interface PaletteEntry {
 }
 
 // Curated brushes drawn from the sheet — the tiles kids will reach for most.
-// The four pools sit last, and every one of them is impassable in play
-// (`isLiquidTile`), so the labels have to say pool rather than crystal.
+// The four pools sit last, and none of them is ordinary footing: water and lava
+// cost a heart a second to wade, the other two cannot be crossed at all. So the
+// labels have to say pool rather than crystal.
 export const PALETTE: PaletteEntry[] = [
   { label: "Grass", tile: [1, 1] },
   { label: "Flowers", tile: [1, 8] },

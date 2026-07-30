@@ -127,17 +127,45 @@ describe("Hero.knockback", () => {
   });
 });
 
-describe("Hero water", () => {
-  it("cannot step onto a water cell", () => {
-    // Flat land, but every column from 6 on is water.
+describe("Hero and liquid", () => {
+  /** Flat land where every column from 6 on is the given kind of liquid. */
+  const shoreAt6 = (kind: "blocks" | "isHazard"): Parameters<Hero["update"]>[2] =>
+    ({
+      cols: 20,
+      rows: 20,
+      heightAt: () => 0,
+      blocks: kind === "blocks" ? (c: number) => c >= 6 : () => false,
+      isHazard: kind === "isHazard" ? (c: number) => c >= 6 : () => false,
+    }) as unknown as Parameters<Hero["update"]>[2];
+
+  const EAST = { axis: { dc: 1, dr: 0 }, jump: false };
+
+  it("cannot step into a pool that blocks", () => {
+    const world = shoreAt6("blocks");
+    const hero = new Hero(5, 5, world);
+    run(hero, world, 60, EAST);
+    expect(Math.round(hero.col)).toBe(5); // stopped at the shore
+  });
+
+  it("wades straight into water and lava", () => {
+    // They cost hearts, not passage — `hazard.ts` does the charging.
+    const world = shoreAt6("isHazard");
+    const hero = new Hero(5, 5, world);
+    run(hero, world, 60, EAST);
+    expect(hero.col).toBeGreaterThan(6);
+  });
+
+  it("is stopped by a wall even when the ground beyond it hurts", () => {
+    // A hazard behind a wall is still behind a wall.
     const world = {
       cols: 20,
       rows: 20,
       heightAt: () => 0,
-      isWater: (c: number) => c >= 6,
+      blocks: (c: number) => c === 6,
+      isHazard: (c: number) => c > 6,
     } as unknown as Parameters<Hero["update"]>[2];
     const hero = new Hero(5, 5, world);
-    run(hero, world, 60, { axis: { dc: 1, dr: 0 }, jump: false });
-    expect(Math.round(hero.col)).toBe(5); // stopped at the shore
+    run(hero, world, 60, EAST);
+    expect(Math.round(hero.col)).toBe(5);
   });
-})
+});
