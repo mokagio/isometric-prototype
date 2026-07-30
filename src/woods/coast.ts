@@ -157,18 +157,43 @@ export function lipCornerTile(col: number, row: number): Tile | null {
   return null;
 }
 
+// `fence.png`, cut as a strip: a post with rails running across, one with the
+// rail running down, and the two corner posts — rail east and rail west, each
+// with its shaft running south.
+const FENCE = {
+  across: { col: 0, row: 0 },
+  down: { col: 1, row: 0 },
+  cornerRailEast: { col: 2, row: 0 },
+  cornerRailWest: { col: 3, row: 0 },
+} as const;
+
+// The fence rings the island one cell inside the last of the land. On the south
+// that is the lip, the top of the drop; on the other three it leaves a verge of
+// grass between the rails and the water, which is how the pack's own scenes fence
+// a shore.
+const FENCE_RING = COAST_RINGS + CLIFF_RINGS;
+const FENCE_FIRST = FENCE_RING;
+const FENCE_LAST = FIELD - 1 - FENCE_RING;
+
 /**
- * The fence along the top of the drop, and which way round its tile goes. A run of
- * posts-and-rails, ended properly at each corner rather than trailing off.
- *
- * `FENCE` names cells of `fence.png`, cut as a strip: a mid post with rails both
- * ways, then an end post with a rail on one side only, mirrored for the other end.
+ * The fence, and whether its tile is stood on its head. A closed run right round
+ * the island: rails across the north and south, down the east and west, and a
+ * corner post where they turn.
  */
-export function fenceTile(col: number, row: number): { tile: Tile; mirror: boolean } | null {
-  if (!isLip(col, row)) return null;
-  if (col === LIP_FIRST) return { tile: { col: 1, row: 0 }, mirror: true };
-  if (col === LIP_LAST) return { tile: { col: 1, row: 0 }, mirror: false };
-  return { tile: { col: 0, row: 0 }, mirror: false };
+export function fenceTile(col: number, row: number): { tile: Tile; flipV: boolean } | null {
+  if (ringOf(col, row) !== FENCE_RING) return null;
+  const first = col === FENCE_FIRST;
+  const last = col === FENCE_LAST;
+  const top = row === FENCE_FIRST;
+  const bottom = row === FENCE_LAST;
+  // The corner posts are cut with their shaft running south, so the two southern
+  // corners are the same posts stood on their heads.
+  if (top && first) return { tile: FENCE.cornerRailEast, flipV: false };
+  if (top && last) return { tile: FENCE.cornerRailWest, flipV: false };
+  if (bottom && first) return { tile: FENCE.cornerRailEast, flipV: true };
+  if (bottom && last) return { tile: FENCE.cornerRailWest, flipV: true };
+  if (top || bottom) return { tile: FENCE.across, flipV: false };
+  return { tile: FENCE.down, flipV: false };
 }
 
 /** Which tile of the sea block a cell takes, so the mottle stays seamless. */

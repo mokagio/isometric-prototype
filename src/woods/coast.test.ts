@@ -238,21 +238,40 @@ describe("the fence and the lip's corners", () => {
   const INNER_FIRST = COAST_RINGS + CLIFF_RINGS;
   const INNER_LAST = FIELD - 1 - COAST_RINGS - CLIFF_RINGS;
 
-  it("runs a fence the length of the lip, and nowhere else", () => {
-    expect(fenceTile(MID, LIP_ROW)).not.toBeNull();
-    expect(fenceTile(MID, LIP_ROW - 1)).toBeNull();
-    expect(fenceTile(MID, MID)).toBeNull();
-    expect(fenceTile(INNER_FIRST, MID)).toBeNull(); // no fence on the side shores
+  it("rings the whole island, one cell inside the last of the land", () => {
+    expect(fenceTile(MID, LIP_ROW)).not.toBeNull(); // south, along the lip
+    expect(fenceTile(MID, INNER_FIRST)).not.toBeNull(); // north
+    expect(fenceTile(INNER_FIRST, MID)).not.toBeNull(); // west
+    expect(fenceTile(INNER_LAST, MID)).not.toBeNull(); // east
   });
 
-  it("ends the run properly at each corner, one of them mirrored", () => {
-    const west = fenceTile(INNER_FIRST, LIP_ROW)!;
-    const east = fenceTile(INNER_LAST, LIP_ROW)!;
-    const middle = fenceTile(MID, LIP_ROW)!;
-    expect(west.tile).toEqual(east.tile); // the same end post
-    expect(west.mirror).not.toBe(east.mirror); // facing opposite ways
-    expect(middle.tile).not.toEqual(west.tile); // and a different post between
-    expect(middle.mirror).toBe(false);
+  it("leaves the rest of the island unfenced", () => {
+    expect(fenceTile(MID, LIP_ROW - 1)).toBeNull();
+    expect(fenceTile(MID, MID)).toBeNull();
+    expect(fenceTile(0, MID)).toBeNull(); // out on the water's edge
+  });
+
+  it("lays the rails across the top and bottom, and down the sides", () => {
+    const north = fenceTile(MID, INNER_FIRST)!;
+    const south = fenceTile(MID, LIP_ROW)!;
+    const west = fenceTile(INNER_FIRST, MID)!;
+    expect(north.tile).toEqual(south.tile);
+    expect(west.tile).not.toEqual(north.tile);
+    expect(fenceTile(INNER_LAST, MID)!.tile).toEqual(west.tile);
+  });
+
+  it("turns each corner on a corner post, the south pair stood on their heads", () => {
+    const nw = fenceTile(INNER_FIRST, INNER_FIRST)!;
+    const ne = fenceTile(INNER_LAST, INNER_FIRST)!;
+    const sw = fenceTile(INNER_FIRST, LIP_ROW)!;
+    const se = fenceTile(INNER_LAST, LIP_ROW)!;
+    expect(nw.tile).not.toEqual(ne.tile); // rails run opposite ways
+    expect(sw.tile).toEqual(nw.tile); // same post below, upended
+    expect(se.tile).toEqual(ne.tile);
+    expect([nw.flipV, ne.flipV]).toEqual([false, false]);
+    expect([sw.flipV, se.flipV]).toEqual([true, true]);
+    // And a corner post is not the post used along a run.
+    expect(nw.tile).not.toEqual(fenceTile(MID, INNER_FIRST)!.tile);
   });
 
   it("curves the lip's dark edge at both ends of its run", () => {

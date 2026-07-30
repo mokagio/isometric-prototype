@@ -119,15 +119,15 @@ export function tileVariant(col: number, row: number): number {
  * put the figure on a wall.
  */
 export function fieldBounds(inset: number): Bounds {
-  const coast = COAST_RINGS * TILE;
+  // Inside the fence, which rings the island a cell in from the last of the land.
+  // Stopping short of it is what keeps the figure out of the rails, with no
+  // collision to write — and on the south it keeps them off the drop's face too.
+  const edge = (COAST_RINGS + CLIFF_RINGS + 1) * TILE;
   return {
-    minX: coast + inset,
-    maxX: FIELD_PX - coast - inset,
-    minY: coast + inset,
-    // Two cells further on the south: the drop's face, and the lip above it, which
-    // carries the fence. Stopping short of the fence is what keeps the figure from
-    // standing in it, with no collision to write.
-    maxY: FIELD_PX - (COAST_RINGS + CLIFF_RINGS + 1) * TILE - inset,
+    minX: edge + inset,
+    maxX: FIELD_PX - edge - inset,
+    minY: edge + inset,
+    maxY: FIELD_PX - edge - inset,
   };
 }
 

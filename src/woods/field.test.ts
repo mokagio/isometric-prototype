@@ -221,23 +221,26 @@ describe("visibleTiles", () => {
 
 describe("fieldBounds", () => {
   const INSET = 4;
+  // The fence rings the island a cell inside the last of the land, and the walker
+  // stops short of it.
+  const FENCE_EDGE = (COAST_RINGS + CLIFF_RINGS + 1) * TILE;
 
-  it("stops the walker at the grass, short of the water's edge", () => {
+  it("stops the walker inside the fence, short of the water's edge", () => {
     const bounds = fieldBounds(INSET);
     const east = { dc: 1, dr: -1 };
     let pos = MIDDLE;
     for (let i = 0; i < 200; i++) pos = walk(pos, east, 0.5, bounds);
-    expect(pos.x).toBe(FIELD_PX - COAST_RINGS * TILE - INSET);
+    expect(pos.x).toBe(FIELD_PX - FENCE_EDGE - INSET);
     expect(pos.x).toBeLessThan(FIELD_PX);
   });
 
-  it("stops short of the fence on the south shore, above the drop's face", () => {
+  it("stops the same distance in on every side, since the fence rings the island", () => {
     const bounds = fieldBounds(INSET);
     const south = { dc: 1, dr: 1 };
     let pos = MIDDLE;
     for (let i = 0; i < 200; i++) pos = walk(pos, south, 0.5, bounds);
-    expect(pos.y).toBe(FIELD_PX - (COAST_RINGS + CLIFF_RINGS + 1) * TILE - INSET);
-    // Which is further in than the other shores, so nobody stands on the wall.
-    expect(bounds.maxY).toBeLessThan(bounds.maxX);
+    expect(pos.y).toBe(FIELD_PX - FENCE_EDGE - INSET);
+    expect(bounds.maxY).toBe(bounds.maxX);
+    expect(bounds.minY).toBe(bounds.minX);
   });
 });
