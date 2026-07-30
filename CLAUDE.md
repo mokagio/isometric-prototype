@@ -49,6 +49,10 @@ Frame counts and fps *are* reliable in the pack's GameMaker metadata (`Sunnyside
 A character is layers composited in order — `base_*`, then a hair sheet, then `tools_*` for whatever it is holding — flattened at vendoring time, per `CREDITS.md`.
 The pack draws one facing, so left is `blitFrame`'s `flip` and walking up or down keeps the sprite front-on.
 
+`woods/field.ts` holds the ground: a finite `FIELD` square of `TILE` (16px) grass, painted from `grass.png` by a value hash so no map is stored, with dark green past its edge.
+World coordinates are **sprite pixels** — `walker.ts` and `field.ts` never see the zoom, and `screenAt` is the only conversion.
+The camera keeps the character mid-screen and is deliberately unclamped, so walking to the edge shows the void, as it does in Peaceful Plains.
+
 ## Maps
 
 Every map is `MAP_SIZE` (56) square, generated or hand-built, so the editor can open the world you are playing and the game can play a board you drew.

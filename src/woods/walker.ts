@@ -1,10 +1,11 @@
 import type { Axis } from "../input";
 
 // Whispering Woods is drawn straight down the screen, not on an isometric grid,
-// so the walker works in pixels. The keys and the stick both speak the grid axes
-// the iso game uses, and `screenAxis` is the one place that converts.
+// so the walker works in world pixels — sprite pixels, before the drawing zoom.
+// The keys and the stick both speak the grid axes the iso game uses, and
+// `screenAxis` is the one place that converts.
 
-export const SPEED = 90; // pixels a second, before the sprite zoom
+export const SPEED = 64; // world pixels a second — four Sunnyside tiles
 
 export type Facing = "left" | "right";
 

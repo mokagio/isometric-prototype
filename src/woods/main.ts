@@ -3,6 +3,7 @@ import { Loop } from "../loop";
 import { blitFrame, frameAt, SheetLoader } from "../sprites";
 import { createStick } from "../stick";
 import { Viewport } from "../viewport";
+import { cameraAt, FIELD_PX, fieldBounds, screenAt, TILE, tileVariant, visibleTiles } from "./field";
 import { facingFrom, walk, type Facing, type Pos } from "./walker";
 
 // Sunnyside sheet contract: horizontal strips of 96x64 frames, played at 12 fps,
@@ -21,13 +22,12 @@ const WALK_FRAMES = 8;
 const IDLE_FRAMES = 9;
 const SHADOW_CELL = 16;
 
-const FIGURE_H = 16; // the drawn figure, feet to hat
 const ZOOM = 4;
-const GRASS = "#4ba54f";
-// The feet are the position, so walking to the top edge needs the figure's own
-// height in hand or the head leaves the canvas. The other three only need enough
-// for its width.
-const EDGE = 24;
+// The grass base colour, darkened: past the edge of the field is still woodland,
+// just not anywhere you can walk.
+const VOID = "#28501f";
+// Half the figure's width, so it never stands half over the void.
+const EDGE_INSET = 6;
 
 const url = (name: string): string => `${import.meta.env.BASE_URL}sunnyside/${name}`;
 
@@ -36,16 +36,17 @@ function main(): void {
   const ctx = canvas.getContext("2d")!;
   const viewport = new Viewport(canvas);
 
-  const sheets = new SheetLoader(3);
+  const sheets = new SheetLoader(4);
   const walkSheet = sheets.load(url("walk.png"));
   const idleSheet = sheets.load(url("idle.png"));
   const shadowSheet = sheets.load(url("shadow.png"));
+  const grassSheet = sheets.load(url("grass.png"));
 
   const input = new Input();
   createStick(input);
 
-  let pos: Pos = { x: 0, y: 0 }; // placed on the first frame, once the canvas has a size
-  let placed = false;
+  const bounds = fieldBounds(EDGE_INSET);
+  let pos: Pos = { x: FIELD_PX / 2, y: FIELD_PX / 2 };
   let facing: Facing = "right";
   let walkT = 0; // reset on stopping, so every step starts from a standstill
   let idleT = 0; // never reset — the idle breath keeps going
@@ -53,16 +54,6 @@ function main(): void {
   const step = (dt: number): void => {
     viewport.fit();
     viewport.applyTransform(ctx);
-    const bounds = {
-      minX: EDGE,
-      maxX: viewport.width - EDGE,
-      minY: FIGURE_H * ZOOM,
-      maxY: viewport.height - EDGE,
-    };
-    if (!placed) {
-      pos = { x: viewport.width / 2, y: viewport.height / 2 };
-      placed = true;
-    }
 
     const axis = input.axis;
     const moving = axis.dc !== 0 || axis.dr !== 0;
@@ -72,11 +63,26 @@ function main(): void {
     walkT = moving ? walkT + dt : 0;
     idleT += dt;
 
-    ctx.fillStyle = GRASS;
+    const camera = cameraAt(pos, viewport.width, viewport.height, ZOOM);
+    ctx.fillStyle = VOID;
     ctx.fillRect(0, 0, viewport.width, viewport.height);
 
+    if (grassSheet.ok) {
+      const { minCol, maxCol, minRow, maxRow } = visibleTiles(camera, viewport.width, viewport.height, ZOOM);
+      const size = TILE * ZOOM;
+      ctx.imageSmoothingEnabled = false;
+      for (let row = minRow; row <= maxRow; row++) {
+        for (let col = minCol; col <= maxCol; col++) {
+          const at = screenAt({ x: col * TILE, y: row * TILE }, camera, ZOOM);
+          const frame = tileVariant(col, row);
+          ctx.drawImage(grassSheet.img, frame * TILE, 0, TILE, TILE, Math.round(at.x), Math.round(at.y), size, size);
+        }
+      }
+    }
+
+    const feet = screenAt(pos, camera, ZOOM);
     if (shadowSheet.ok) {
-      blitFrame(ctx, shadowSheet.img, pos.x, pos.y, {
+      blitFrame(ctx, shadowSheet.img, feet.x, feet.y, {
         cell: SHADOW_CELL,
         scale: ZOOM,
         anchorX: SHADOW_CELL / 2,
@@ -88,7 +94,7 @@ function main(): void {
     const sheet = moving ? walkSheet : idleSheet;
     const frames = moving ? WALK_FRAMES : IDLE_FRAMES;
     if (sheet.ok) {
-      blitFrame(ctx, sheet.img, pos.x, pos.y, {
+      blitFrame(ctx, sheet.img, feet.x, feet.y, {
         cell: CELL_W,
         cellH: CELL_H,
         scale: ZOOM,
