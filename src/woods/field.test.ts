@@ -5,16 +5,18 @@ import {
   FIELD_PX,
   fieldBounds,
   GRASS_VARIANTS,
+  MIDDLE,
   screenAt,
   TILE,
   tileVariant,
+  treeAt,
+  treePhase,
   visibleTiles,
 } from "./field";
 import { walk } from "./walker";
 
 const ZOOM = 4;
 const VIEW = { w: 800, h: 600 };
-const MIDDLE = { x: FIELD_PX / 2, y: FIELD_PX / 2 };
 
 describe("tileVariant", () => {
   it("paints a cell the same way every time", () => {
@@ -38,6 +40,68 @@ describe("tileVariant", () => {
     }
     for (const n of count) expect(n).toBeGreaterThan(0);
     expect(Math.max(...count)).toBe(count[0]);
+  });
+});
+
+describe("treeAt", () => {
+  const all = (): Array<[number, number]> => {
+    const found: Array<[number, number]> = [];
+    for (let row = 0; row < FIELD; row++) {
+      for (let col = 0; col < FIELD; col++) if (treeAt(col, row)) found.push([col, row]);
+    }
+    return found;
+  };
+
+  it("stands the same trees in the same places every time", () => {
+    expect(all()).toEqual(all());
+  });
+
+  it("scatters a wood you can still walk through", () => {
+    // Thin enough to leave gaps, thick enough to be a wood: a handful per screen.
+    const share = all().length / (FIELD * FIELD);
+    expect(share).toBeGreaterThan(0.02);
+    expect(share).toBeLessThan(0.1);
+  });
+
+  it("leaves the middle clear, so nobody starts inside a trunk", () => {
+    const mid = FIELD / 2;
+    for (let row = mid - 2; row <= mid + 2; row++) {
+      for (let col = mid - 2; col <= mid + 2; col++) expect(treeAt(col, row), `${col},${row}`).toBe(false);
+    }
+    expect(treeAt(MIDDLE.x / TILE, MIDDLE.y / TILE)).toBe(false);
+  });
+
+  it("plants nothing out in the void", () => {
+    expect(treeAt(-1, 5)).toBe(false);
+    expect(treeAt(5, -1)).toBe(false);
+    expect(treeAt(FIELD, 5)).toBe(false);
+    expect(treeAt(5, FIELD)).toBe(false);
+  });
+
+  it("gives each tree its own place in the sway", () => {
+    const phases = new Set(all().map(([col, row]) => treePhase(col, row).toFixed(3)));
+    expect(phases.size).toBeGreaterThan(10); // not one wood breathing in unison
+    for (const [col, row] of all()) {
+      expect(treePhase(col, row)).toBeGreaterThanOrEqual(0);
+      expect(treePhase(col, row)).toBeLessThan(1);
+    }
+  });
+});
+
+describe("visibleTiles padding", () => {
+  it("reaches beyond the screen for sprites taller than a tile", () => {
+    const camera = cameraAt(MIDDLE, VIEW.w, VIEW.h, ZOOM);
+    const tight = visibleTiles(camera, VIEW.w, VIEW.h, ZOOM);
+    const padded = visibleTiles(camera, VIEW.w, VIEW.h, ZOOM, 3);
+    expect(padded.minRow).toBe(tight.minRow - 3);
+    expect(padded.maxCol).toBe(tight.maxCol + 3);
+  });
+
+  it("still stops at the edge of the field", () => {
+    const camera = cameraAt({ x: 0, y: 0 }, VIEW.w, VIEW.h, ZOOM);
+    const padded = visibleTiles(camera, VIEW.w, VIEW.h, ZOOM, 3);
+    expect(padded.minCol).toBe(0);
+    expect(padded.minRow).toBe(0);
   });
 });
 

@@ -9,23 +9,49 @@ export const FIELD = 40; // tiles a side
 export const GRASS_VARIANTS = 4; // frames in `grass.png`: plain, then three sprinklings
 
 const SEED = 6421;
+const TREE_SEED = 91177;
 // Keeps the plain tile in the majority, so the sprinkled ones read as detail
 // rather than as a pattern.
 const PLAIN_SHARE = 0.72;
+
+// Scattered thinly: a tree sprite covers about two tiles each way, so a share
+// much past this closes into woodland with nowhere to walk.
+const TREE_SHARE = 0.06;
+// Tiles kept clear around the middle, so nobody starts inside a trunk.
+const CLEARING = 3;
 
 /** Field size in world pixels. */
 export const FIELD_PX = FIELD * TILE;
 
 // Value noise: the same cell always draws the same tile, with no array to store.
-function hash(x: number, y: number): number {
-  let h = (x * 374761393 + y * 668265263 + SEED * 2246822519) >>> 0;
+function hash(x: number, y: number, seed: number): number {
+  let h = (x * 374761393 + y * 668265263 + seed * 2246822519) >>> 0;
   h = (h ^ (h >>> 13)) * 1274126177;
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
+/** Where the character starts, and the middle of the field. */
+export const MIDDLE: Pos = { x: FIELD_PX / 2, y: FIELD_PX / 2 };
+
+/** Whether a tree stands on a cell. Deterministic, so the wood does not reshuffle. */
+export function treeAt(col: number, row: number): boolean {
+  if (col < 0 || row < 0 || col >= FIELD || row >= FIELD) return false;
+  const mid = FIELD / 2;
+  if (Math.abs(col - mid) <= CLEARING && Math.abs(row - mid) <= CLEARING) return false;
+  return hash(col, row, TREE_SEED) < TREE_SHARE;
+}
+
+/**
+ * How far through its sway a tree is, so a wood does not breathe in unison.
+ * Fractions of the cycle, to add to the animation clock.
+ */
+export function treePhase(col: number, row: number): number {
+  return hash(col, row, TREE_SEED + 1);
+}
+
 /** Which frame of `grass.png` a cell is painted with. */
 export function tileVariant(col: number, row: number): number {
-  const v = hash(col, row);
+  const v = hash(col, row, SEED);
   if (v < PLAIN_SHARE) return 0;
   const rest = (v - PLAIN_SHARE) / (1 - PLAIN_SHARE);
   return 1 + Math.min(GRASS_VARIANTS - 2, Math.floor(rest * (GRASS_VARIANTS - 1)));
@@ -60,11 +86,16 @@ export interface TileRange {
   maxRow: number;
 }
 
-/** The cells that fall on screen, clipped to the field — everything else is void. */
-export function visibleTiles(camera: Pos, viewW: number, viewH: number, zoom: number): TileRange {
+/**
+ * The cells that fall on screen, clipped to the field — everything else is void.
+ *
+ * `pad` widens the range by whole tiles, for sprites taller than their cell: a
+ * tree just off the top of the screen still hangs its crown into view.
+ */
+export function visibleTiles(camera: Pos, viewW: number, viewH: number, zoom: number, pad = 0): TileRange {
   const span = (from: number, size: number): [number, number] => [
-    Math.max(0, Math.floor(from / TILE)),
-    Math.min(FIELD - 1, Math.floor((from + size / zoom) / TILE)),
+    Math.max(0, Math.floor(from / TILE) - pad),
+    Math.min(FIELD - 1, Math.floor((from + size / zoom) / TILE) + pad),
   ];
   const [minCol, maxCol] = span(camera.x, viewW);
   const [minRow, maxRow] = span(camera.y, viewH);
