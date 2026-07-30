@@ -143,7 +143,7 @@ async function main(): Promise<void> {
       drawBox(ctx, hf.x, hf.y + SY, HERO_BOX, "#7cff5a");
       drawArea(ctx, hero.col, hero.row, 0, origin, "#7cff5a"); // the hero's footprint
       for (const m of monsters.list()) {
-        drawArea(ctx, m.col, m.row, AGGRO_HALF, origin, "#ffd24a"); // the lurk square
+        drawArea(ctx, m.home.col, m.home.row, AGGRO_HALF, origin, "#ffd24a"); // the lurk square, anchored at its post
         const mf = project(m.col, m.row, 0, origin);
         drawBox(ctx, mf.x, mf.y + SY, MONSTER_BOX, "#ff5a5a");
       }
