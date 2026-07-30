@@ -36,17 +36,17 @@ describe("generateWorld (flat — the default)", () => {
     expect(water).toBeGreaterThan(0);
   });
 
-  it("generates water the hero can wade, not walls", () => {
-    // Rivers and ponds are hazards: crossable at a heart a second. Nothing the
-    // generator lays down is impassable.
-    let hazard = 0;
+  it("generates rivers and ponds that stop the hero, and nothing that hurts", () => {
+    // Lava is the only hazard, and the generator never lays any: a random world
+    // can be crossed on foot or not at all, never at the cost of hearts.
+    let blocked = 0;
     for (let row = 0; row < world.rows; row++) {
       for (let col = 0; col < world.cols; col++) {
-        expect(world.blocks(col, row)).toBe(false);
-        if (world.isHazard(col, row)) hazard++;
+        expect(world.isHazard(col, row)).toBe(false);
+        if (world.blocks(col, row)) blocked++;
       }
     }
-    expect(hazard).toBeGreaterThan(0);
+    expect(blocked).toBeGreaterThan(0);
   });
 
   it("is deterministic for a given seed", () => {
@@ -191,15 +191,13 @@ describe("what a tile does underfoot", () => {
   const PURPLE: Tile = [2, 10];
   const GRASS_TILE: Tile = [1, 1];
 
-  it("lets the hero wade water and lava", () => {
-    for (const tile of [WATER, LAVA]) {
-      expect(isHazardTile(tile), `${tile}`).toBe(true);
-      expect(blocksTile(tile), `${tile}`).toBe(false);
-    }
+  it("lets the hero wade lava, and only lava", () => {
+    expect(isHazardTile(LAVA)).toBe(true);
+    expect(blocksTile(LAVA)).toBe(false);
   });
 
-  it("keeps the teal and purple pools as walls", () => {
-    for (const tile of [TEAL, PURPLE]) {
+  it("keeps water and the teal and purple pools as walls", () => {
+    for (const tile of [WATER, TEAL, PURPLE]) {
       expect(blocksTile(tile), `${tile}`).toBe(true);
       expect(isHazardTile(tile), `${tile}`).toBe(false);
     }

@@ -147,8 +147,8 @@ describe("Hero and liquid", () => {
     expect(Math.round(hero.col)).toBe(5); // stopped at the shore
   });
 
-  it("wades straight into water and lava", () => {
-    // They cost hearts, not passage — `hazard.ts` does the charging.
+  it("wades straight into lava", () => {
+    // It costs hearts, not passage — `hazard.ts` does the charging.
     const world = shoreAt6("isHazard");
     const hero = new Hero(5, 5, world);
     run(hero, world, 60, EAST);

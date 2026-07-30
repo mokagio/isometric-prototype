@@ -23,10 +23,10 @@ const LAVA: Tile = [3, 10];
 // lava. Anywhere one of them caps a column, generated or hand-placed, it is
 // liquid.
 const LIQUID_SHEET_ROW = 10;
-// Water and lava can be waded, at a heart a second (`hazard.ts`); the teal and
-// purple pools are walls. So a river is an escape route the hero can buy and the
-// monsters cannot follow, while a pool still shapes the map.
-const HAZARDS: Tile[] = [WATER, LAVA];
+// Lava is waded at a heart a second (`hazard.ts`); every other pool, water
+// included, is a wall. Water shapes the map, so it has to stop you: a river you
+// can pay to cross is a river that no longer divides anything.
+const HAZARDS: Tile[] = [LAVA];
 
 // One size for every map, generated or hand-built, so the editor can open the
 // world you are playing and the game can play a map you drew without either

@@ -47,8 +47,8 @@ export class Hero {
     const c = Math.round(col);
     const r = Math.round(row);
     if (c < 0 || r < 0 || c >= world.cols || r >= world.rows) return false;
-    // Hazards are deliberately absent here: water and lava can be waded into,
-    // and `hazard.ts` charges for the privilege.
+    // Hazards are deliberately absent here: lava can be waded into, and
+    // `hazard.ts` charges for the privilege.
     if (world.blocks?.(c, r)) return false;
     return world.heightAt(c, r) <= this.z + CLIMB;
   }

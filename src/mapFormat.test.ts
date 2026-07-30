@@ -273,8 +273,8 @@ describe("worldFromMap", () => {
 
   it("reads past the edge as the nearest edge cell, like a generated world", () => {
     const world = worldFromMap(filled(2, 2, (col) => ground(col === 0 ? GRASS : WATER)));
-    expect(world.isHazard(99, 0)).toBe(true);
-    expect(world.isHazard(-99, 0)).toBe(false);
+    expect(world.blocks(99, 0)).toBe(true);
+    expect(world.blocks(-99, 0)).toBe(false);
   });
 
   it("refuses a map that still has gaps in it", () => {
@@ -310,14 +310,15 @@ describe("mapFromWorld", () => {
 
   it("keeps the generated world's water wet", () => {
     // A map carries tiles, not verdicts, so the round trip has to rediscover
-    // what hurts from the tile alone — a mismatch dries up a lake or floods a field.
+    // what stops the hero from the tile alone — a mismatch dries up a lake or
+    // floods a field.
     const back = worldFromMap(mapFromWorld(world));
     let water = 0;
     for (let row = 0; row < world.rows; row++) {
       for (let col = 0; col < world.cols; col++) {
         expect(back.isHazard(col, row)).toBe(world.isHazard(col, row));
         expect(back.blocks(col, row)).toBe(world.blocks(col, row));
-        if (world.isHazard(col, row)) water++;
+        if (world.blocks(col, row)) water++;
       }
     }
     expect(water).toBeGreaterThan(0); // or the check above proves nothing

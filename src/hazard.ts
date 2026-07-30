@@ -1,9 +1,9 @@
 import type { Lives } from "./lives";
 import type { World } from "./world";
 
-// Water and lava are crossable, at a price. Standing in one spends a heart, and
-// the immunity window that stops a slime emptying the bar in ten frames paces
-// this to a heart a second — the same mercy applies however you are being hurt.
+// Lava is crossable, at a price. Standing in it spends a heart, and the immunity
+// window that stops a slime emptying the bar in ten frames paces this to a heart
+// a second — the same mercy applies however you are being hurt.
 
 interface Pos {
   col: number;

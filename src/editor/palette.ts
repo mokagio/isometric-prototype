@@ -6,8 +6,8 @@ export interface PaletteEntry {
 }
 
 // Curated brushes drawn from the sheet — the tiles kids will reach for most.
-// The four pools sit last, and none of them is ordinary footing: water and lava
-// cost a heart a second to wade, the other two cannot be crossed at all. So the
+// The four pools sit last, and none of them is ordinary footing: lava costs a
+// heart a second to wade, the other three cannot be crossed at all. So the
 // labels have to say pool rather than crystal.
 export const PALETTE: PaletteEntry[] = [
   { label: "Grass", tile: [1, 1] },

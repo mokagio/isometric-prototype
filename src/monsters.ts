@@ -86,8 +86,8 @@ export interface Monster {
 
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
 
-// Monsters keep out of every pool, walls and hazards alike. The hero can wade a
-// river at a heart a second; nothing follows them in, which is the point.
+// Monsters keep out of every pool, walls and hazards alike. The hero can wade
+// lava at a heart a second; nothing follows them in, which is the point.
 const barred = (world: World, col: number, row: number): boolean =>
   world.blocks?.(col, row) === true || world.isHazard?.(col, row) === true;
 

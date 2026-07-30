@@ -208,8 +208,8 @@ async function main(): Promise<void> {
         hero.knockback(hero.col - bumping.col, hero.row - bumping.row);
         hud.setLives(lives.lives);
       } else if (hazardToll(world, hero, lives)) {
-        // No shove: there is nothing to be thrown clear of, and being pushed out
-        // of a river would undo the choice to swim it.
+        // No shove: there is nothing to be thrown clear of, and being pushed back
+        // out would undo the choice to cross.
         hud.setLives(lives.lives);
       }
     } else {
