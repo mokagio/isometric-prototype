@@ -14,6 +14,7 @@ import {
   SEPARATION,
   SPEED,
   WANDER_ARRIVE,
+  WANDER_HALF,
   WANDER_PAUSE,
   WANDER_SPEED,
   WAVE_BREAK,
@@ -665,10 +666,14 @@ describe("MonsterField wandering", () => {
     expect(amble(20).furthest).toBeGreaterThan(WANDER_ARRIVE);
   });
 
-  it("keeps its wandering inside the square it guards", () => {
+  it("keeps its wandering close to its post", () => {
     const { mon } = amble(60);
-    expect(Math.abs(mon.col - mon.home.col)).toBeLessThanOrEqual(AGGRO_HALF);
-    expect(Math.abs(mon.row - mon.home.row)).toBeLessThanOrEqual(AGGRO_HALF);
+    expect(Math.abs(mon.col - mon.home.col)).toBeLessThanOrEqual(WANDER_HALF);
+    expect(Math.abs(mon.row - mon.home.row)).toBeLessThanOrEqual(WANDER_HALF);
+  });
+
+  it("strays less far than it can see, so it stays posted where it spawned", () => {
+    expect(WANDER_HALF).toBeLessThan(AGGRO_HALF);
   });
 
   it("ambles slower than it chases", () => {

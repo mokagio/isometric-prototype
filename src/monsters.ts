@@ -34,18 +34,21 @@ const FADE_TAIL = 0.3; // last fraction of the death that fades — the rest is 
 export const KNOCKBACK = 1.6; // cells a killed monster is thrown, over the fade
 export const SPAWN_MIN = 7;
 export const SPAWN_MAX = 12;
-// "lurk" mode: the monster guards a 5x5 square (this many cells each way),
+// "lurk" mode: the monster watches a 9x9 square (this many cells each way),
 // centred on where it spawned rather than on where it currently stands, so an
-// ambling monster cannot walk its own guard square across the map.
-export const AGGRO_HALF = 2;
+// ambling monster cannot walk its own watch square across the map.
+export const AGGRO_HALF = 4;
 // It wakes when the hero's footprint (one cell) *touches* that square, not once
 // the hero is fully inside it — the Minkowski sum of the square's edge (+0.5)
 // and the footprint's half-width (0.5). "hunt" mode ignores this.
 export const AGGRO_REACH = AGGRO_HALF + 0.5 + 0.5;
 
-// Idle wandering while it lurks: amble to a waypoint inside the guard square,
-// stand still for a beat, pick another. Displaced monsters wander home again,
-// since every waypoint is drawn from the square around `home`.
+// Idle wandering while it lurks: amble to a waypoint near the post, stand still
+// for a beat, pick another. Displaced monsters wander home again, since every
+// waypoint is drawn from the square around `home`.
+// Deliberately tighter than the watch square: a monster notices the hero from
+// further off than it strays, so it stays recognisably posted where it spawned.
+export const WANDER_HALF = 2; // cells each way it ambles from its post
 export const WANDER_SPEED = 0.9; // cells/sec — an amble, well under a chase
 export const WANDER_PAUSE = 1.6; // max seconds of stillness between legs
 export const WANDER_ARRIVE = 0.15; // cells: close enough to call the waypoint reached
@@ -179,12 +182,12 @@ export class MonsterField {
     }
   }
 
-  /** A fresh waypoint inside the guard square, and a beat of stillness before it sets off. */
+  /** A fresh waypoint near the post, and a beat of stillness before it sets off. */
   private restWaypoint(m: Monster, world: World): void {
     m.pause = Math.random() * WANDER_PAUSE;
     m.waypoint = {
-      col: clamp(m.home.col + (Math.random() * 2 - 1) * AGGRO_HALF, 1, world.cols - 2),
-      row: clamp(m.home.row + (Math.random() * 2 - 1) * AGGRO_HALF, 1, world.rows - 2),
+      col: clamp(m.home.col + (Math.random() * 2 - 1) * WANDER_HALF, 1, world.cols - 2),
+      row: clamp(m.home.row + (Math.random() * 2 - 1) * WANDER_HALF, 1, world.rows - 2),
     };
   }
 
