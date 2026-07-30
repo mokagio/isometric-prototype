@@ -1,3 +1,5 @@
+import { fullscreenActive, fullscreenLabel, fullscreenSupported, toggleFullscreen } from "./fullscreen";
+
 // Every entry is optional, and the menu shows only the ones a game hands it:
 // Whispering Woods has no worlds to generate or maps to load.
 export interface MenuActions {
@@ -80,7 +82,7 @@ export function createMenu(title: string, actions: MenuActions): void {
     button.textContent = open ? OPEN_ICON : CLOSED_ICON;
   };
 
-  const addItem = (label: string, onClick: () => void): void => {
+  const addItem = (label: string, onClick: () => void): HTMLButtonElement => {
     const item = document.createElement("button");
     item.className = "ww-menu-item";
     item.textContent = label;
@@ -89,6 +91,7 @@ export function createMenu(title: string, actions: MenuActions): void {
       setOpen(false);
     });
     panel.appendChild(item);
+    return item;
   };
   const buildSwitch = (on: boolean): { sw: HTMLElement; set: (on: boolean) => void } => {
     const sw = document.createElement("span");
@@ -154,6 +157,16 @@ export function createMenu(title: string, actions: MenuActions): void {
   if (actions.onEditor) addItem("World Editor", actions.onEditor);
   if (actions.onEnemyMode) addModeToggle(actions.onEnemyMode);
   if (actions.onDebug) addToggle("Debug boxes", actions.onDebug);
+  // Not a MenuActions entry: it asks nothing of the game, and any page with a
+  // menu wants it. Absent where the browser has no API to offer.
+  if (fullscreenSupported(document)) {
+    const item = addItem(fullscreenLabel(false), () => toggleFullscreen(document));
+    // Esc, the swipe, and the browser's own control all leave fullscreen
+    // without going through the item, so follow the document rather than a flag.
+    document.addEventListener("fullscreenchange", () => {
+      item.textContent = fullscreenLabel(fullscreenActive(document));
+    });
+  }
   if (actions.onCredits) addItem("Credits", actions.onCredits);
   // Last: leaving the game sits well clear of the thumb reaching for New World.
   if (actions.onAllGames) addItem("All Games", actions.onAllGames);

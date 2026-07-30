@@ -92,5 +92,6 @@ The injected `<link>` needs the hook to stay `order: "pre"`, or Vite's HTML pass
 
 Pages are `viewport-fit=cover`, so the layout runs under the notch and the home indicator, and the `--ww-inset-*` properties (never a flat `16px`) are what keep the chrome clear of them.
 What actually clears Safari's tab bar on an iPhone is Add to Home Screen, which the injected `apple-mobile-web-app-capable` enables.
+Fullscreen is a menu item that hides itself where the API is missing, which on an iPhone it is — `createMenu` adds it for every game rather than taking it as a `MenuActions` entry, since it asks the game for nothing.
 Class names are `ww-` prefixed, and the storage keys are `ww:` — from Whispering Woods, which is what this was called before it became a playground with more than one game in it.
 The list page is a title and one button per game, borrowing the menu button's shape, and its backdrop is the game's own grass tiles: `backdrop.ts` renders a water-free flat world through `renderer.ts` rather than shipping a second copy of the art.
