@@ -135,15 +135,58 @@ describe("OboroSkin frames", () => {
 });
 
 describe("OboroSkin facing", () => {
+  /** Draws `facing` on `skin` and reports whether the sprite came out mirrored. */
+  const mirroredFor = (skin: OboroSkin, facing: Facing): boolean => {
+    const { ctx, calls } = recordingCtx();
+    skin.draw(ctx, 0, 0, facing, "run", 0);
+    return calls[0]!.mirrored;
+  };
+
   it("mirrors the sprite only when heading screen-left", () => {
     const skin = ready();
-    const left = recordingCtx();
-    skin.draw(left.ctx, 0, 0, 1, "run", 0);
-    expect(left.calls[0]!.mirrored).toBe(true);
+    expect(mirroredFor(skin, 1)).toBe(true);
+    expect(mirroredFor(skin, 3)).toBe(false);
+  });
 
-    const right = recordingCtx();
-    skin.draw(right.ctx, 0, 0, 3, "run", 0);
-    expect(right.calls[0]!.mirrored).toBe(false);
+  it("faces as drawn before it has been anywhere", () => {
+    // An idle figure at spawn is handed a vertical facing and must look the same
+    // as it always has, rather than starting out mirrored.
+    expect(mirroredFor(ready(), 2)).toBe(false);
+  });
+
+  it("keeps heading the way it last went across while walking straight up or down", () => {
+    // The sheets have no up or down frames. Falling back to the art as drawn
+    // would flip a figure that was walking left the moment it turned upward.
+    const skin = ready();
+    expect(mirroredFor(skin, 1)).toBe(true);
+    expect(mirroredFor(skin, 0)).toBe(true);
+    expect(mirroredFor(skin, 2)).toBe(true);
+
+    expect(mirroredFor(skin, 3)).toBe(false);
+    expect(mirroredFor(skin, 0)).toBe(false);
+    expect(mirroredFor(skin, 2)).toBe(false);
+  });
+
+  it("turns the moment it heads across the screen again", () => {
+    const skin = ready();
+    mirroredFor(skin, 1);
+    mirroredFor(skin, 0);
+    expect(mirroredFor(skin, 3)).toBe(false);
+  });
+
+  it("remembers per figure, not for every figure at once", () => {
+    const one = ready();
+    const two = ready();
+    expect(mirroredFor(one, 1)).toBe(true);
+    expect(mirroredFor(two, 0)).toBe(false);
+  });
+
+  it("plays the death facing the way the figure was last headed", () => {
+    const skin = ready();
+    mirroredFor(skin, 1);
+    const { ctx, calls } = recordingCtx();
+    skin.drawDefeat(ctx, 0, 0, 2, 0); // defeated facing the camera
+    expect(calls[0]!.mirrored).toBe(true);
   });
 });
 

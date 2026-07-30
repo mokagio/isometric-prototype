@@ -7,6 +7,8 @@ import { blitFrame, frameAt, SheetLoader, type Sheet } from "./sprites";
 // right — so left/right is a horizontal flip and there is no up/down facing.
 export const CELL = 96;
 const SCALE = 3;
+const LEFT: Facing = 1;
+const RIGHT: Facing = 3;
 const ANCHOR_X = 48; // frame centre
 const ANCHOR_Y = 57; // feet baseline within the 96px frame
 
@@ -25,6 +27,11 @@ export class OboroSkin implements HeroSkin {
   private sheets: Record<HeroAction, Sheet>;
   private deathSheet: Sheet;
   private loader = new SheetLoader(4);
+  // The last way the figure headed across the screen, kept because the sheets
+  // have no up or down frames: walking straight up would otherwise fall back to
+  // the art as drawn and flip a figure that was heading left. Starts at RIGHT,
+  // which is the sheet unmirrored — what an idle figure has always shown.
+  private across: Facing = RIGHT;
 
   get ready(): boolean {
     return this.loader.ready;
@@ -37,13 +44,14 @@ export class OboroSkin implements HeroSkin {
   }
 
   private blit(ctx: CanvasRenderingContext2D, sheet: Sheet, frame: number, feetX: number, feetY: number, facing: Facing): void {
+    if (facing === LEFT || facing === RIGHT) this.across = facing;
     blitFrame(ctx, sheet.img, feetX, feetY, {
       cell: CELL,
       scale: SCALE,
       anchorX: ANCHOR_X,
       anchorY: ANCHOR_Y,
       frame,
-      flip: facing === 1, // heading screen-left
+      flip: this.across === LEFT,
     });
   }
 
