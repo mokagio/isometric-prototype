@@ -39,7 +39,8 @@ export function frameAt(t: number, fps: number, frames: number, loop: boolean): 
 }
 
 export interface Blit {
-  cell: number; // source cell is square: cell x cell, taken from row 0
+  cell: number; // source cell width, taken from row 0
+  cellH?: number; // cell height, when the frames are not square (default: cell)
   scale: number;
   anchorX: number; // the point inside the cell that lands on (feetX, feetY)
   anchorY: number;
@@ -56,6 +57,7 @@ export function blitFrame(
   feetY: number,
   b: Blit,
 ): void {
+  const cellH = b.cellH ?? b.cell;
   const dx = Math.round(feetX - b.anchorX * b.scale);
   const dy = Math.round(feetY - b.anchorY * b.scale);
   ctx.save();
@@ -66,6 +68,6 @@ export function blitFrame(
     ctx.scale(-1, 1);
     ctx.translate(-feetX, 0);
   }
-  ctx.drawImage(img, b.frame * b.cell, 0, b.cell, b.cell, dx, dy, b.cell * b.scale, b.cell * b.scale);
+  ctx.drawImage(img, b.frame * b.cell, 0, b.cell, cellH, dx, dy, b.cell * b.scale, cellH * b.scale);
   ctx.restore();
 }

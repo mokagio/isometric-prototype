@@ -1,8 +1,9 @@
 # Games Playground
 
 An isometric browser prototype: TypeScript, Vite, no framework, no runtime dependencies.
-Four pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), the game — Peaceful Plains — (`game.html`, entry `main.ts`), a world editor (`editor.html`), and credits (`credits.html`).
+Five pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), Peaceful Plains (`game.html`, entry `main.ts`), Whispering Woods (`woods.html`, entry `woods/main.ts`), a world editor (`editor.html`), and credits (`credits.html`).
 A new game is an entry in `games.ts` plus its own page and Rollup input.
+Only Peaceful Plains is isometric: Whispering Woods is drawn straight down the screen, and shares the input, sprite, loop, and viewport plumbing but none of `iso.ts`.
 
 ## Commands
 
@@ -40,6 +41,13 @@ Every new sheet loader needs a test covering the base prefix, as `monsters.test.
 The same trap catches anything else `public/` holds: the font in `index.html` is reached with a *relative* `url("fonts/…")`, and links between pages are relative for the same reason (`games.test.ts` pins it).
 
 Any new art or font goes in `CREDITS.md` and `credits.html`.
+
+**Sunnyside sheets** (Whispering Woods) are horizontal strips of 96x64 frames, feet-anchored like everything else here — but *not* where the pack says.
+Its metadata gives the origin as (48, 64), the bottom edge; the figure is 11x16 of that frame and stands at y=39, so anchoring on 64 floats it a sprite's height above its own shadow.
+Measure a new sheet instead of trusting it: `magick walk.png -crop 96x64+0+0 +repage -format %@ info:`.
+Frame counts and fps *are* reliable in the pack's GameMaker metadata (`Sunnyside_World_Gamemaker/sprites/<name>/<name>.yy`): walk is 8 frames, idle 9, both at 12 fps.
+A character is layers composited in order — `base_*`, then a hair sheet, then `tools_*` for whatever it is holding — flattened at vendoring time, per `CREDITS.md`.
+The pack draws one facing, so left is `blitFrame`'s `flip` and walking up or down keeps the sprite front-on.
 
 ## Maps
 

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Whispering Woods | Games Playground</title>
+    <style>
+      /* The stick rules below are a copy of the ones in `game.html`. Two pages
+         is not yet worth a shared stylesheet; a third would be. */
+      :root {
+        --ww-inset: 16px;
+        --ww-stick: 144px;
+      }
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #4ba54f;
+        -webkit-tap-highlight-color: transparent;
+      }
+      canvas {
+        display: block;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+
+      /* Sized border-box so the knob's travel (RADIUS in `stick.ts`) can be
+         checked against the well's half-width without unpacking the borders. */
+      .ww-stick {
+        position: fixed;
+        left: var(--ww-inset);
+        bottom: var(--ww-inset);
+        box-sizing: border-box;
+        width: var(--ww-stick);
+        height: var(--ww-stick);
+        display: grid;
+        place-items: center;
+        touch-action: none;
+        cursor: grab;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      /* The well is drawn on pseudo-elements, not on `.ww-stick` itself: a clip
+         on the element would crop the square knob where it overhangs the rim at
+         the diagonals. Both shapes are set in `stick.ts`. */
+      .ww-stick::before,
+      .ww-stick::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+      }
+      .ww-stick::before {
+        clip-path: var(--ww-stick-clip);
+        background: rgba(27, 43, 26, 0.5);
+      }
+      .ww-stick::after {
+        clip-path: var(--ww-stick-ring);
+        background: #6b4f34;
+      }
+      .ww-stick:active {
+        cursor: grabbing;
+      }
+      .ww-stick-knob {
+        /* The rim is `::after`, which paints after every real child, so without
+           the z-index it covers the knob wherever the two meet at full
+           deflection. `position: relative` alone does not beat a later sibling. */
+        position: relative;
+        z-index: 1;
+        box-sizing: border-box;
+        width: 54px;
+        height: 54px;
+        background: #3b2a1c;
+        border: 3px solid #6b4f34;
+        border-radius: 10px;
+        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="woods"></canvas>
+    <script type="module" src="/src/woods/main.ts"></script>
+  </body>
+</html>

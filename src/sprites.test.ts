@@ -104,6 +104,15 @@ describe("blitFrame", () => {
     expect(dy! + dh!).toBeGreaterThan(200); // feet sit inside the frame
   });
 
+  it("takes a short frame off a wide strip when cellH is set", () => {
+    // The Sunnyside sheets are 96x64, so the source rect cannot be square.
+    const { args } = drawWith({ cellH: 64, frame: 2 }, 300, 200);
+    const [sx, sy, sw, sh, , dy, dw, dh] = args;
+    expect([sx, sy, sw, sh]).toEqual([2 * 96, 0, 96, 64]);
+    expect([dw, dh]).toEqual([96 * 3, 64 * 3]);
+    expect(dy).toBe(200 - 57 * 3); // still hung off the anchor, not the cell height
+  });
+
   it("draws at nearest-neighbour", () => {
     expect(drawWith({}).smoothing).toBe(false);
   });
