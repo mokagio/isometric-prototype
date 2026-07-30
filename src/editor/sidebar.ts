@@ -136,7 +136,7 @@ export function buildSidebar(
 
   const hint = document.createElement("div");
   hint.className = "ed-hint";
-  hint.textContent = "Scroll to change height. Right-click erases.";
+  hint.textContent = "Scroll to change height. Right-click erases. Arrow keys pan the map.";
   root.appendChild(hint);
 
   return { syncHeight };

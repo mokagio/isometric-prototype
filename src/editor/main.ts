@@ -1,21 +1,35 @@
 import { loadTileset } from "../tileset";
 import { unproject } from "../iso";
+import { MAP_SIZE } from "../world";
 import tilesheetUrl from "../../isometric_fantasy_tiles.png";
 import { Board } from "./board";
 import { PALETTE } from "./palette";
 import { buildSidebar, clampHeight, type EditorState } from "./sidebar";
-import { boardOrigin, renderEditor, type Cell } from "./render";
+import { renderEditor, type Cell } from "./render";
+import { centreView, panView, viewOrigin, type PanDir } from "./view";
+import { createPanPad } from "./panPad";
 
-const BOARD_SIZE = 20;
+const PAN_KEYS: Record<string, PanDir> = {
+  arrowup: "up",
+  arrowdown: "down",
+  arrowleft: "left",
+  arrowright: "right",
+  w: "up",
+  s: "down",
+  a: "left",
+  d: "right",
+};
 
 async function main(): Promise<void> {
   const canvas = document.getElementById("board-canvas") as HTMLCanvasElement;
   const ctx = canvas.getContext("2d")!;
   const sidebarEl = document.getElementById("sidebar") as HTMLElement;
+  const editorEl = document.getElementById("editor") as HTMLElement;
   const tileset = await loadTileset(tilesheetUrl);
 
-  const board = new Board(BOARD_SIZE);
+  const board = new Board(MAP_SIZE);
   const state: EditorState = { brush: PALETTE[0]!.tile, mode: "place", height: 0 };
+  let view = centreView(board.size);
 
   let hover: Cell | null = null;
   let painting = false;
@@ -40,13 +54,18 @@ async function main(): Promise<void> {
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    renderEditor(ctx, tileset, board, boardOrigin(board, w, h), hover, state, w, h);
+    renderEditor(ctx, tileset, board, viewOrigin(view, w, h), hover, state, w, h);
   }
 
   const cellAt = (clientX: number, clientY: number): Cell => {
     const rect = canvas.getBoundingClientRect();
-    const origin = boardOrigin(board, canvas.clientWidth, canvas.clientHeight);
+    const origin = viewOrigin(view, canvas.clientWidth, canvas.clientHeight);
     return unproject(clientX - rect.left, clientY - rect.top, origin);
+  };
+
+  const pan = (dir: PanDir): void => {
+    view = panView(view, dir, board.size);
+    requestRender();
   };
 
   const applyAt = (cell: Cell, erase: boolean): void => {
@@ -93,6 +112,15 @@ async function main(): Promise<void> {
     },
     { passive: false },
   );
+
+  window.addEventListener("keydown", (e) => {
+    const dir = PAN_KEYS[e.key.toLowerCase()];
+    if (!dir) return;
+    e.preventDefault(); // arrows would otherwise scroll the page under the board
+    pan(dir);
+  });
+
+  createPanPad(editorEl, pan);
 
   window.addEventListener("resize", requestRender);
   draw();

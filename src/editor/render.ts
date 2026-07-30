@@ -8,10 +8,11 @@ export interface Cell {
   row: number;
 }
 
-/** Centres the board in the canvas area. */
-export function boardOrigin(board: Board, viewW: number, viewH: number): Origin {
-  return { x: viewW / 2, y: viewH / 2 - board.size * SY };
-}
+// A board is much wider than the canvas, so most of it is off screen on any
+// frame. Culling by the apex keeps the grid guide from stroking thousands of
+// diamonds nobody can see. The margin covers a tall column drawn from an apex
+// just past the edge.
+const MARGIN = DRAW * 2;
 
 function diamondPath(ctx: CanvasRenderingContext2D, col: number, row: number, o: Origin): void {
   const a = project(col, row, 0, o); // apex = top corner of the cell's diamond
@@ -50,11 +51,17 @@ export function renderEditor(
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, viewW, viewH);
 
+  const onScreen = (col: number, row: number): boolean => {
+    const a = project(col, row, 0, origin);
+    return a.x > -MARGIN && a.x < viewW + MARGIN && a.y > -MARGIN && a.y < viewH + MARGIN;
+  };
+
   // Grid guide: every cell's top diamond, faint.
   ctx.lineWidth = 1;
   ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
   for (let row = 0; row < board.size; row++) {
     for (let col = 0; col < board.size; col++) {
+      if (!onScreen(col, row)) continue;
       diamondPath(ctx, col, row, origin);
       ctx.stroke();
     }
@@ -62,7 +69,9 @@ export function renderEditor(
 
   // Placed columns, back-to-front (larger col+row is nearer, drawn later).
   const items: { col: number; row: number; height: number; surface: readonly [number, number] }[] = [];
-  board.forEach((col, row, column) => items.push({ col, row, ...column }));
+  board.forEach((col, row, column) => {
+    if (onScreen(col, row)) items.push({ col, row, ...column });
+  });
   items.sort((a, b) => a.col + a.row - (b.col + b.row));
   for (const it of items) {
     for (let z = 0; z <= it.height; z++) {
