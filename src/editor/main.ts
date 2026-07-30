@@ -1,6 +1,6 @@
 import { loadTileset } from "../tileset";
 import { unproject } from "../iso";
-import { generateWorld, MAP_SIZE, randomSeed } from "../world";
+import { generateWorld, GRASS, MAP_SIZE, randomSeed } from "../world";
 import tilesheetUrl from "../../isometric_fantasy_tiles.png";
 import { Board } from "./board";
 import { PALETTE } from "./palette";
@@ -9,7 +9,7 @@ import { renderEditor, type Cell } from "./render";
 import { centreView, panView, viewOrigin, type PanDir } from "./view";
 import { createPanPad } from "./panPad";
 import { boardToMap, loadMapIntoBoard, mapFilename } from "./mapIO";
-import { decodeMap, encodeMap, mapFromWorld } from "../mapFormat";
+import { decodeMap, encodeMap, mapFromWorld, readyToPlay } from "../mapFormat";
 import { downloadText, pickTextFile } from "./files";
 import { PLAY_STASHED_MAP_URL, recallWorldSeed, stashMap } from "../handoff";
 
@@ -84,7 +84,11 @@ async function main(): Promise<void> {
   };
 
   const playMap = (): void => {
-    if (!stashMap(encodeMap(boardToMap(board)))) {
+    // Asked here rather than in the game: you are stood over the board with a
+    // brush in hand, so "keep building" is a real answer.
+    const map = readyToPlay(boardToMap(board), confirm, GRASS);
+    if (map === null) return;
+    if (!stashMap(encodeMap(map))) {
       alert("This browser will not let the editor pass a map to the game. Save the map and open it in the game instead.");
       return;
     }

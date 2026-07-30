@@ -35,6 +35,21 @@ export function fillEmpty(map: MapData, surface: Tile): MapData {
   return { ...map, cells: map.cells.map((c) => c ?? { height: 0, surface }) };
 }
 
+const tiles = (n: number): string => `${n} ${n === 1 ? "tile" : "tiles"}`;
+
+export const unfinishedMapMessage = (empty: number): string =>
+  `This map still has ${tiles(empty)} with nothing on them.\n\nFill them with grass and play it?`;
+
+/**
+ * A map ready to be played, or `null` if the gaps in it should be built by hand
+ * first. `ask` is `confirm` in the browser; injected so this stays testable.
+ */
+export function readyToPlay(map: MapData, ask: (message: string) => boolean, fill: Tile): MapData | null {
+  const empty = countEmpty(map);
+  if (empty === 0) return map;
+  return ask(unfinishedMapMessage(empty)) ? fillEmpty(map, fill) : null;
+}
+
 export function encodeMap(map: MapData): string {
   const palette: Tile[] = [];
   const seen = new Map<string, number>();

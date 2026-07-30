@@ -10,6 +10,8 @@ import {
   MAX_SIDE,
   VERSION,
   mapFromWorld,
+  readyToPlay,
+  unfinishedMapMessage,
   worldFromMap,
   type MapCell,
   type MapData,
@@ -82,6 +84,50 @@ describe("map cells", () => {
     const map = blank(2, 2);
     fillEmpty(map, GRASS);
     expect(countEmpty(map)).toBe(4);
+  });
+});
+
+describe("readyToPlay", () => {
+  const never = (): boolean => {
+    throw new Error("should not have been asked");
+  };
+
+  it("plays a finished map without asking anything", () => {
+    const map = filled(3, 3, () => ground(GRASS));
+    expect(readyToPlay(map, never, GRASS)).toEqual(map);
+  });
+
+  it("fills the gaps once and plays, when that is what you want", () => {
+    const map = filled(2, 2, (col) => (col === 0 ? ground(STONE) : null));
+    const ready = readyToPlay(map, () => true, GRASS)!;
+    expect(isComplete(ready)).toBe(true);
+    expect(cellAt(ready, 0, 0)?.surface).toEqual(STONE); // what you built stands
+    expect(cellAt(ready, 1, 0)?.surface).toEqual(GRASS);
+  });
+
+  it("hands back nothing when you would rather keep building", () => {
+    const map = filled(2, 2, (col) => (col === 0 ? ground(STONE) : null));
+    expect(readyToPlay(map, () => false, GRASS)).toBeNull();
+  });
+
+  it("says how much is left to do", () => {
+    let asked = "";
+    readyToPlay(
+      filled(4, 4, (col) => (col === 0 ? ground(GRASS) : null)),
+      (message) => ((asked = message), false),
+      GRASS,
+    );
+    expect(asked).toContain("12 tiles");
+  });
+
+  it("counts one leftover tile as a tile, not tiles", () => {
+    expect(unfinishedMapMessage(1)).toContain("1 tile with");
+    expect(unfinishedMapMessage(2)).toContain("2 tiles with");
+  });
+
+  it("says what saying yes will do", () => {
+    // The offer is grass and nothing else, so the message has to name it.
+    expect(unfinishedMapMessage(3)).toMatch(/grass/i);
   });
 });
 
