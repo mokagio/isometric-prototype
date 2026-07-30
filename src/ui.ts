@@ -1,18 +1,20 @@
+// Every entry is optional, and the menu shows only the ones a game hands it:
+// Whispering Woods has no worlds to generate or maps to load.
 export interface MenuActions {
-  onNewWorld: () => void;
-  onEditor: () => void;
+  onNewWorld?: () => void;
+  onEditor?: () => void;
   /** Pick a saved map file and play it. */
-  onLoadMap: () => void;
+  onLoadMap?: () => void;
   /** Open the editor on the map being played. */
-  onEditMap: () => void;
+  onEditMap?: () => void;
   /** true = "lurk" (enemies wake only in their area); false = "hunt" (always chase). */
-  onEnemyMode: (lurk: boolean) => void;
+  onEnemyMode?: (lurk: boolean) => void;
   /** true = draw entity bounding boxes. */
-  onDebug: (on: boolean) => void;
+  onDebug?: (on: boolean) => void;
   /** Open the credits page. */
-  onCredits: () => void;
+  onCredits?: () => void;
   /** Leave the game for the list of games. */
-  onAllGames: () => void;
+  onAllGames?: () => void;
 }
 
 const LURK_KEY = "ww:lurk"; // remembered across reloads
@@ -51,8 +53,8 @@ function injectToggleStyle(): void {
   document.head.appendChild(style);
 }
 
-/** Top-right menu button and its drop panel. */
-export function createMenu(actions: MenuActions): void {
+/** Top-right menu button and its drop panel, titled after the game showing it. */
+export function createMenu(title: string, actions: MenuActions): void {
   const wrap = document.createElement("div");
   wrap.className = "ww-menu";
 
@@ -68,10 +70,10 @@ export function createMenu(actions: MenuActions): void {
   panel.className = "ww-menu-panel";
   panel.hidden = true;
 
-  const title = document.createElement("div");
-  title.className = "ww-menu-title";
-  title.textContent = "Peaceful Plains";
-  panel.appendChild(title);
+  const heading = document.createElement("div");
+  heading.className = "ww-menu-title";
+  heading.textContent = title;
+  panel.appendChild(heading);
 
   const setOpen = (open: boolean): void => {
     panel.hidden = !open;
@@ -102,7 +104,7 @@ export function createMenu(actions: MenuActions): void {
   };
 
   // Hunt/Lurk: a two-name toggle, remembered across reloads.
-  const addModeToggle = (): void => {
+  const addModeToggle = (onEnemyMode: (lurk: boolean) => void): void => {
     injectToggleStyle();
     const row = document.createElement("div");
     row.className = "ww-menu-item ww-mode-row";
@@ -117,13 +119,13 @@ export function createMenu(actions: MenuActions): void {
       lurk.classList.toggle("active", on);
     };
     reflect();
-    actions.onEnemyMode(on); // apply the remembered preference at startup
+    onEnemyMode(on); // apply the remembered preference at startup
 
     row.addEventListener("click", () => {
       on = !on;
       saveBool(LURK_KEY, on);
       reflect();
-      actions.onEnemyMode(on);
+      onEnemyMode(on);
     });
     row.append(hunt, sw, lurk);
     panel.appendChild(row);
@@ -146,15 +148,15 @@ export function createMenu(actions: MenuActions): void {
     panel.appendChild(row);
   };
 
-  addItem("New Random World", actions.onNewWorld);
-  addItem("Load Map…", actions.onLoadMap);
-  addItem("Edit Map", actions.onEditMap);
-  addItem("World Editor", actions.onEditor);
-  addModeToggle();
-  addToggle("Debug boxes", actions.onDebug);
-  addItem("Credits", actions.onCredits);
+  if (actions.onNewWorld) addItem("New Random World", actions.onNewWorld);
+  if (actions.onLoadMap) addItem("Load Map…", actions.onLoadMap);
+  if (actions.onEditMap) addItem("Edit Map", actions.onEditMap);
+  if (actions.onEditor) addItem("World Editor", actions.onEditor);
+  if (actions.onEnemyMode) addModeToggle(actions.onEnemyMode);
+  if (actions.onDebug) addToggle("Debug boxes", actions.onDebug);
+  if (actions.onCredits) addItem("Credits", actions.onCredits);
   // Last: leaving the game sits well clear of the thumb reaching for New World.
-  addItem("All Games", actions.onAllGames);
+  if (actions.onAllGames) addItem("All Games", actions.onAllGames);
 
   button.addEventListener("click", (e) => {
     e.stopPropagation();

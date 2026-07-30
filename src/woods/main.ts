@@ -1,7 +1,9 @@
+import { drawBox, type Box } from "../debug";
 import { Input } from "../input";
 import { Loop } from "../loop";
 import { blitFrame, frameAt, SheetLoader } from "../sprites";
 import { createStick } from "../stick";
+import { createMenu } from "../ui";
 import { Viewport } from "../viewport";
 import {
   blockedByTree,
@@ -13,6 +15,7 @@ import {
   tileVariant,
   treeAt,
   treePhase,
+  TRUNK,
   visibleTiles,
 } from "./field";
 import { facingFrom, walk, type Facing, type Pos } from "./walker";
@@ -28,6 +31,9 @@ const CELL_W = 96;
 const CELL_H = 64;
 const ANCHOR_X = 48;
 const ANCHOR_Y = 39;
+// The drawn figure within that frame, for the debug box.
+const FIGURE_W = 11;
+const FIGURE_H = 16;
 const FPS = 12;
 const WALK_FRAMES = 8;
 const IDLE_FRAMES = 9;
@@ -44,6 +50,21 @@ const TREE_FPS = 4;
 const TREE_PAD = 3;
 
 const ZOOM = 4;
+
+// Debug boxes, in screen pixels from the point each thing stands on: the figure
+// as it is drawn, and the strip of roots a trunk actually blocks.
+const FIGURE_BOX: Box = {
+  dx: (-FIGURE_W / 2) * ZOOM,
+  dy: -FIGURE_H * ZOOM,
+  w: FIGURE_W * ZOOM,
+  h: FIGURE_H * ZOOM,
+};
+const TRUNK_BOX: Box = {
+  dx: -TRUNK.halfW * ZOOM,
+  dy: -TRUNK.top * ZOOM,
+  w: 2 * TRUNK.halfW * ZOOM,
+  h: (TRUNK.top + TRUNK.bottom) * ZOOM,
+};
 // The grass base colour, darkened: past the edge of the field is still woodland,
 // just not anywhere you can walk.
 const VOID = "#28501f";
@@ -66,6 +87,16 @@ function main(): void {
 
   const input = new Input();
   createStick(input);
+
+  let debug = false;
+  createMenu("Whispering Woods", {
+    onDebug: (on) => {
+      debug = on;
+    },
+    onAllGames: () => {
+      location.href = "index.html";
+    },
+  });
 
   const bounds = fieldBounds(EDGE_INSET);
   let pos: Pos = { ...MIDDLE };
@@ -105,6 +136,7 @@ function main(): void {
     // Whatever stands lower on the field is drawn last, so a tree in front of
     // the character hides them and one behind does not.
     const standing: Array<{ y: number; draw: () => void }> = [];
+    const trunks: Array<{ x: number; y: number }> = []; // screen points, for the debug boxes
 
     if (treeSheet.ok) {
       const range = visibleTiles(camera, viewport.width, viewport.height, ZOOM, TREE_PAD);
@@ -115,6 +147,7 @@ function main(): void {
           const base = { x: col * TILE + TILE / 2, y: row * TILE + TILE / 2 };
           const at = screenAt(base, camera, ZOOM);
           const t = animT + treePhase(col, row) * (TREE_FRAMES / TREE_FPS);
+          trunks.push(at);
           standing.push({
             y: base.y,
             draw: () =>
@@ -162,6 +195,11 @@ function main(): void {
 
     standing.sort((a, b) => a.y - b.y);
     for (const s of standing) s.draw();
+
+    if (debug) {
+      for (const trunk of trunks) drawBox(ctx, trunk.x, trunk.y, TRUNK_BOX, "#ff5a5a");
+      drawBox(ctx, feet.x, feet.y, FIGURE_BOX, "#7cff5a");
+    }
   };
 
   new Loop(step).start();

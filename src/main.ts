@@ -255,7 +255,7 @@ async function main(): Promise<void> {
   viewport.fit();
   new Loop(step).start();
 
-  createMenu({
+  createMenu("Peaceful Plains", {
     onNewWorld: newRandomWorld,
     onLoadMap: () => void loadMap(),
     onEditMap: editMap,

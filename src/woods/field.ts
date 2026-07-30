@@ -25,12 +25,13 @@ const TREE_REACH = TREE_SPACING - 1;
 // Tiles kept clear around the middle, so nobody starts inside a trunk.
 const CLEARING = 3;
 
-// What a trunk blocks, measured off `tree.png` relative to the base it stands
-// on: its roots, not its crown. Walking behind a tree is fine, and the crown
-// hiding you as you pass is the point of a wood.
-const TRUNK_HALF_W = 8;
-const TRUNK_TOP = 5;
-const TRUNK_BOTTOM = 2;
+/**
+ * What a trunk blocks, in world pixels around the base it stands on: its roots,
+ * not its crown. Walking behind a tree is fine, and the crown hiding you as you
+ * pass is the point of a wood. Measured off `tree.png`, and drawn by the debug
+ * overlay so it can be checked against the art.
+ */
+export const TRUNK = { halfW: 8, top: 5, bottom: 2 };
 
 /** Field size in world pixels. */
 export const FIELD_PX = FIELD * TILE;
@@ -88,7 +89,7 @@ export function blockedByTree(feet: Pos): boolean {
       if (!treeAt(col, row)) continue;
       const base = { x: col * TILE + TILE / 2, y: row * TILE + TILE / 2 };
       const inTrunk =
-        Math.abs(feet.x - base.x) < TRUNK_HALF_W && feet.y > base.y - TRUNK_TOP && feet.y < base.y + TRUNK_BOTTOM;
+        Math.abs(feet.x - base.x) < TRUNK.halfW && feet.y > base.y - TRUNK.top && feet.y < base.y + TRUNK.bottom;
       if (inTrunk) return true;
     }
   }
