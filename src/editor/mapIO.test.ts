@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Board } from "./board";
-import { boardToMap, mapFilename } from "./mapIO";
+import { boardToMap, loadMapIntoBoard, mapFilename } from "./mapIO";
 import { cellAt, countEmpty, decodeMap, encodeMap, isComplete } from "../mapFormat";
 import type { Tile } from "../world";
 
@@ -46,6 +46,54 @@ describe("boardToMap", () => {
     board.place(3, 2, GRASS, 2);
     const map = boardToMap(board);
     expect(decodeMap(encodeMap(map))).toEqual(map);
+  });
+});
+
+describe("loadMapIntoBoard", () => {
+  const painted = (): Board => {
+    const board = new Board(6);
+    board.place(0, 0, GRASS, 0);
+    board.place(5, 5, STONE, 4);
+    board.place(3, 2, GRASS, 2);
+    return board;
+  };
+
+  it("puts a saved map back exactly as it was", () => {
+    const before = boardToMap(painted());
+    const board = new Board(6);
+    loadMapIntoBoard(board, before);
+    expect(boardToMap(board)).toEqual(before);
+  });
+
+  it("survives a full trip through a file", () => {
+    const before = boardToMap(painted());
+    const board = new Board(6);
+    loadMapIntoBoard(board, decodeMap(encodeMap(before)));
+    expect(boardToMap(board)).toEqual(before);
+  });
+
+  it("throws out whatever was on the board first", () => {
+    const board = painted();
+    loadMapIntoBoard(board, boardToMap(new Board(6)));
+    expect(countEmpty(boardToMap(board))).toBe(36);
+  });
+
+  it("leaves a map's gaps as gaps rather than filling them in", () => {
+    const board = new Board(6);
+    loadMapIntoBoard(board, boardToMap(painted()));
+    expect(board.at(1, 1)).toBeUndefined();
+  });
+
+  it("refuses a map of the wrong size instead of cropping it", () => {
+    const board = new Board(6);
+    expect(() => loadMapIntoBoard(board, boardToMap(new Board(8)))).toThrow(/8x8.*6x6/);
+  });
+
+  it("leaves the board alone when it refuses a map", () => {
+    const board = painted();
+    const before = boardToMap(board);
+    expect(() => loadMapIntoBoard(board, boardToMap(new Board(8)))).toThrow();
+    expect(boardToMap(board)).toEqual(before);
   });
 });
 

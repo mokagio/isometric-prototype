@@ -8,9 +8,9 @@ import { buildSidebar, clampHeight, type EditorState } from "./sidebar";
 import { renderEditor, type Cell } from "./render";
 import { centreView, panView, viewOrigin, type PanDir } from "./view";
 import { createPanPad } from "./panPad";
-import { boardToMap, mapFilename } from "./mapIO";
-import { encodeMap } from "../mapFormat";
-import { downloadText } from "./files";
+import { boardToMap, loadMapIntoBoard, mapFilename } from "./mapIO";
+import { decodeMap, encodeMap } from "../mapFormat";
+import { downloadText, pickTextFile } from "./files";
 
 const PAN_KEYS: Record<string, PanDir> = {
   arrowup: "up",
@@ -50,7 +50,23 @@ async function main(): Promise<void> {
 
   const saveMap = (): void => downloadText(mapFilename(new Date()), encodeMap(boardToMap(board)));
 
-  const sidebar = buildSidebar(sidebarEl, tileset, state, requestRender, { onSave: saveMap });
+  const openMap = async (): Promise<void> => {
+    const text = await pickTextFile();
+    if (text === null) return;
+    try {
+      loadMapIntoBoard(board, decodeMap(text));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "That map could not be opened.");
+      return;
+    }
+    view = centreView(board.size);
+    requestRender();
+  };
+
+  const sidebar = buildSidebar(sidebarEl, tileset, state, requestRender, {
+    onSave: saveMap,
+    onOpen: () => void openMap(),
+  });
 
   function draw(): void {
     const dpr = window.devicePixelRatio || 1;

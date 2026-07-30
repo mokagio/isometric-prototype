@@ -41,6 +41,10 @@ export class Board {
     this.cells.delete(this.key(col, row));
   }
 
+  clear(): void {
+    this.cells.clear();
+  }
+
   forEach(fn: (col: number, row: number, column: Column) => void): void {
     for (const [key, column] of this.cells) {
       fn(key % this.size, Math.floor(key / this.size), column);

@@ -19,6 +19,8 @@ export interface SidebarHandle {
 export interface MapActions {
   /** Download the board as a map file. */
   onSave: () => void;
+  /** Pick a map file and load it onto the board. */
+  onOpen: () => void;
 }
 
 export function clampHeight(h: number): number {
@@ -152,6 +154,7 @@ export function buildSidebar(
     mapButtons.appendChild(b);
   };
   button("Save map", actions.onSave);
+  button("Open map…", actions.onOpen);
   root.appendChild(mapButtons);
 
   const hint = document.createElement("div");
