@@ -10,7 +10,7 @@ import { centreView, panView, viewOrigin, type PanDir } from "./view";
 import { createPanPad } from "./panPad";
 import { boardToMap, loadMapIntoBoard, mapFilename } from "./mapIO";
 import { decodeMap, encodeMap, mapFromWorld, readyToPlay } from "../mapFormat";
-import { downloadText, pickTextFile } from "./files";
+import { downloadText, pickTextFile } from "../files";
 import { PLAY_STASHED_MAP_URL, recallWorldSeed, stashMap } from "../handoff";
 
 const PAN_KEYS: Record<string, PanDir> = {

@@ -10,7 +10,8 @@ const MAP_KEY = "ww:map";
 const MAP_PARAM = "map";
 const MAP_PARAM_VALUE = "local";
 
-export const PLAY_STASHED_MAP_URL = `index.html?${MAP_PARAM}=${MAP_PARAM_VALUE}`;
+export const PLAY_STASHED_MAP_QUERY = `?${MAP_PARAM}=${MAP_PARAM_VALUE}`;
+export const PLAY_STASHED_MAP_URL = `index.html${PLAY_STASHED_MAP_QUERY}`;
 
 export const wantsStashedMap = (search: string): boolean =>
   new URLSearchParams(search).get(MAP_PARAM) === MAP_PARAM_VALUE;

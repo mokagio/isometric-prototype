@@ -1,7 +1,14 @@
 import { loadTileset } from "./tileset";
 import { generateWorld, findSpawn, GRASS, MAP_SIZE, randomSeed, type World } from "./world";
-import { recallMap, rememberWorldSeed, wantsStashedMap } from "./handoff";
-import { decodeMap, fillEmpty, isComplete, worldFromMap } from "./mapFormat";
+import {
+  PLAY_STASHED_MAP_QUERY,
+  recallMap,
+  rememberWorldSeed,
+  stashMap,
+  wantsStashedMap,
+} from "./handoff";
+import { decodeMap, encodeMap, fillEmpty, isComplete, readyToPlay, worldFromMap, type MapData } from "./mapFormat";
+import { pickTextFile } from "./files";
 import { render, type Entity } from "./renderer";
 import { project, SY, type Origin } from "./iso";
 import { Camera } from "./camera";
@@ -83,6 +90,24 @@ async function main(): Promise<void> {
   /** Try again: back onto the same ground you died on, hand-built map included. */
   function restart(): void {
     resetTo(stashedWorld() ?? newWorld());
+  }
+
+  /** Play a map from a file: stashed and marked in the URL, so it survives a reload. */
+  async function openMap(): Promise<void> {
+    const text = await pickTextFile();
+    if (text === null) return;
+    let map: MapData;
+    try {
+      map = decodeMap(text);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "That map could not be played.");
+      return;
+    }
+    const ready = readyToPlay(map, confirm, GRASS);
+    if (ready === null) return;
+    stashMap(encodeMap(ready));
+    history.replaceState(null, "", PLAY_STASHED_MAP_QUERY);
+    resetTo(worldFromMap(ready));
   }
 
   function newRandomWorld(): void {
@@ -188,6 +213,7 @@ async function main(): Promise<void> {
 
   createMenu({
     onNewWorld: newRandomWorld,
+    onOpenMap: () => void openMap(),
     onEditor: () => {
       location.href = "editor.html";
     },
