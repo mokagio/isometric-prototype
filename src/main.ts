@@ -1,5 +1,5 @@
 import { loadTileset } from "./tileset";
-import { generateWorld, findSpawn } from "./world";
+import { generateWorld, findSpawn, MAP_SIZE } from "./world";
 import { render, type Entity } from "./renderer";
 import { project, SY, type Origin } from "./iso";
 import { Camera } from "./camera";
@@ -19,8 +19,6 @@ import { Swing } from "./swing";
 import { drawArea, drawBox, HERO_BOX, MONSTER_BOX } from "./debug";
 import tilesheetUrl from "../isometric_fantasy_tiles.png";
 
-const WORLD = 80; // fixed roamable map; the camera follows the hero across it
-
 const randomSeed = (): number => Math.floor(Math.random() * 1_000_000);
 
 async function main(): Promise<void> {
@@ -29,7 +27,7 @@ async function main(): Promise<void> {
   const tileset = await loadTileset(tilesheetUrl);
   const input = new Input(window);
 
-  let world = generateWorld(WORLD, WORLD, randomSeed());
+  let world = generateWorld(MAP_SIZE, MAP_SIZE, randomSeed());
   let spawn = findSpawn(world);
   let hero = new Hero(spawn.col, spawn.row, world);
   // Height tracks the ground under the hero, not the hero's own z, so a jump
@@ -49,7 +47,7 @@ async function main(): Promise<void> {
   };
 
   function restart(): void {
-    world = generateWorld(WORLD, WORLD, randomSeed());
+    world = generateWorld(MAP_SIZE, MAP_SIZE, randomSeed());
     spawn = findSpawn(world);
     hero = new Hero(spawn.col, spawn.row, world);
     camera.snap(hero.z);

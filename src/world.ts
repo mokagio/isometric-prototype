@@ -23,6 +23,12 @@ const WATER: Tile = [0, 10]; // the bright blue water cube
 // liquid: impassable to the hero and monsters.
 const LIQUID_SHEET_ROW = 10;
 
+// One size for every map, generated or hand-built, so the editor can open the
+// world you are playing and the game can play a map you drew without either
+// side resizing anything. Big enough to roam, small enough to pan across the
+// editor in a handful of presses.
+export const MAP_SIZE = 56;
+
 export const GROUND_HEIGHT = 0; // single flat level for the whole world
 const WATER_THRESHOLD = 0.22; // lower noise → water; keeps ponds small and scattered
 const NOISE_FREQ = 0.11; // higher → smaller, more broken-up water features
