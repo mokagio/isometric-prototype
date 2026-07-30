@@ -6,6 +6,21 @@ import { createStick } from "../stick";
 import { createMenu } from "../ui";
 import { Viewport } from "../viewport";
 import { createActionButton } from "./actionButton";
+import {
+  cellAt,
+  FOAM_SECONDS,
+  frameOf,
+  isCliffFace,
+  isLip,
+  ringOf,
+  seaTile,
+  shoreHasBank,
+  shoreTile,
+  SPARKLE_FRAMES,
+  SPARKLE_SECONDS,
+  sparkleAt,
+  type Tile as CoastTile,
+} from "./coast";
 import { createLogCounter } from "./logCounter";
 import { Logs } from "./logs";
 import {
@@ -79,20 +94,25 @@ const TRUNK_BOX: Box = {
   w: 2 * TRUNK.halfW * ZOOM,
   h: (TRUNK.top + TRUNK.bottom) * ZOOM,
 };
-// The grass base colour, darkened: past the edge of the field is still woodland,
-// just not anywhere you can walk.
-const VOID = "#28501f";
+// Under the sea tiles, for the frame before they load and any sliver of a
+// rounding gap: the pack's own deep water blue.
+const DEEP_SEA = "#0099db";
+// The bank's face out of `cliff.png`: its second row is the body of the wall, in
+// three variants that are picked by column so the striations do not repeat.
+const CLIFF_FACE_ROW = 1;
+const CLIFF_FACE_COLS = 3;
 // Half the figure's width, so it never stands half over the void.
 const EDGE_INSET = 6;
 
 const url = (name: string): string => `${import.meta.env.BASE_URL}sunnyside/${name}`;
+
 
 function main(): void {
   const canvas = document.getElementById("woods") as HTMLCanvasElement;
   const ctx = canvas.getContext("2d")!;
   const viewport = new Viewport(canvas);
 
-  const sheets = new SheetLoader(8);
+  const sheets = new SheetLoader(14);
   const walkSheet = sheets.load(url("walk.png"));
   const idleSheet = sheets.load(url("idle.png"));
   const axeSheet = sheets.load(url("axe.png"));
@@ -101,6 +121,12 @@ function main(): void {
   const treeSheet = sheets.load(url("tree.png"));
   const stumpSheet = sheets.load(url("stump.png"));
   const logSheet = sheets.load(url("log.png"));
+  const seaSheet = sheets.load(url("sea.png"));
+  const sparkleSheet = sheets.load(url("seaSparkle.png"));
+  const shoreSheet = sheets.load(url("shore.png"));
+  const shore2Sheet = sheets.load(url("shore2.png"));
+  const cliffSheet = sheets.load(url("cliff.png"));
+  const lipSheet = sheets.load(url("lip.png"));
 
   const input = new Input();
   createStick(input);
@@ -124,6 +150,59 @@ function main(): void {
       location.href = "index.html";
     },
   });
+
+  /** One 16px tile of a sheet, blown up to the drawing zoom. */
+  const drawTile = (img: CanvasImageSource, src: CoastTile, at: Pos): void => {
+    const size = TILE * ZOOM;
+    ctx.drawImage(
+      img,
+      src.col * TILE,
+      src.row * TILE,
+      TILE,
+      TILE,
+      Math.round(at.x),
+      Math.round(at.y),
+      size,
+      size,
+    );
+  };
+
+  /** Sea, then the island on top of it: grass, the bank's face, and the surf. */
+  const drawGround = (camera: Pos): void => {
+    // Deliberately unclamped: the sea carries on past the field, which is the
+    // whole point of an island.
+    const minCol = Math.floor(camera.x / TILE);
+    const minRow = Math.floor(camera.y / TILE);
+    const maxCol = Math.floor((camera.x + viewport.width / ZOOM) / TILE);
+    const maxRow = Math.floor((camera.y + viewport.height / ZOOM) / TILE);
+    const surf = frameOf(animT, FOAM_SECONDS, 2) === 0 ? shoreSheet : shore2Sheet;
+
+    for (let row = minRow; row <= maxRow; row++) {
+      for (let col = minCol; col <= maxCol; col++) {
+        const at = screenAt(cellAt(col, row), camera, ZOOM);
+        if (seaSheet.ok) drawTile(seaSheet.img, seaTile(col, row), at);
+        const sparkle = sparkleSheet.ok ? sparkleAt(col, row) : null;
+        if (sparkle) {
+          const t = animT + sparkle.phase * SPARKLE_SECONDS * SPARKLE_FRAMES;
+          drawTile(sparkleSheet.img, { col: frameOf(t, SPARKLE_SECONDS, SPARKLE_FRAMES), row: 0 }, at);
+        }
+        if (ringOf(col, row) < 0) continue; // out at sea
+
+        // The lip and the bank tiles are their own ground; everywhere else on the
+        // island starts as grass.
+        const ownGround = (isLip(col, row) && lipSheet.ok) || shoreHasBank(col, row);
+        if (grassSheet.ok && !ownGround) drawTile(grassSheet.img, { col: tileVariant(col, row), row: 0 }, at);
+        if (isLip(col, row) && lipSheet.ok) drawTile(lipSheet.img, { col: 0, row: 0 }, at);
+        // The face is a wall, so it is drawn over the grass rather than instead of
+        // it: its own tiles are cut away at the top where the lip shows through.
+        if (isCliffFace(col, row) && cliffSheet.ok) {
+          drawTile(cliffSheet.img, { col: col % CLIFF_FACE_COLS, row: CLIFF_FACE_ROW }, at);
+        }
+        const shore = shoreTile(col, row);
+        if (shore && surf.ok) drawTile(surf.img, shore, at);
+      }
+    }
+  };
 
   const bounds = fieldBounds(EDGE_INSET);
   let pos: Pos = { ...MIDDLE };
@@ -166,21 +245,10 @@ function main(): void {
     action.setEnabled(wood.inReach(pos) !== null);
 
     const camera = cameraAt(pos, viewport.width, viewport.height, ZOOM);
-    ctx.fillStyle = VOID;
+    ctx.fillStyle = DEEP_SEA;
     ctx.fillRect(0, 0, viewport.width, viewport.height);
-
-    if (grassSheet.ok) {
-      const { minCol, maxCol, minRow, maxRow } = visibleTiles(camera, viewport.width, viewport.height, ZOOM);
-      const size = TILE * ZOOM;
-      ctx.imageSmoothingEnabled = false;
-      for (let row = minRow; row <= maxRow; row++) {
-        for (let col = minCol; col <= maxCol; col++) {
-          const at = screenAt({ x: col * TILE, y: row * TILE }, camera, ZOOM);
-          const frame = tileVariant(col, row);
-          ctx.drawImage(grassSheet.img, frame * TILE, 0, TILE, TILE, Math.round(at.x), Math.round(at.y), size, size);
-        }
-      }
-    }
+    ctx.imageSmoothingEnabled = false;
+    drawGround(camera);
 
     // Whatever stands lower on the field is drawn last, so a tree in front of
     // the character hides them and one behind does not.

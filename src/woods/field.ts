@@ -25,9 +25,13 @@ const TREE_SPACING = 3;
 const TREE_REACH = TREE_SPACING - 1;
 // Tiles kept clear around the middle, so nobody starts inside a trunk.
 const CLEARING = 3;
-// Tiles kept clear along the edge, so the logs a tree drops cannot land in the
-// void where nobody could ever pick them up.
-const EDGE = Math.ceil(LOG_CLEARANCE / TILE);
+/** Cells of the field given over to the island's edge — `coast.ts` draws them. */
+export const COAST_RINGS = 1; // the water's edge itself
+export const CLIFF_RINGS = 1; // the bank's face above it, on the south shore only
+// Tiles kept clear along the edge: enough that the logs a tree drops cannot land
+// in the sea where nobody could pick them up, and enough to keep the wood back off
+// the coast, lip included.
+const EDGE = Math.max(COAST_RINGS + CLIFF_RINGS + 1, Math.ceil(LOG_CLEARANCE / TILE));
 
 /**
  * What a trunk blocks, in world pixels around the base it stands on: its roots,
@@ -109,11 +113,19 @@ export function tileVariant(col: number, row: number): number {
 }
 
 /**
- * Where the walker may stand, `inset` world pixels in from the edge so the figure
- * is not left standing half over the void.
+ * Where the walker may stand: the island's grass, `inset` world pixels in from
+ * where the coast begins. The south shore keeps back a cell further, since there
+ * the drop's face is drawn between the grass and the water — walking onto it would
+ * put the figure on a wall.
  */
 export function fieldBounds(inset: number): Bounds {
-  return { minX: inset, maxX: FIELD_PX - inset, minY: inset, maxY: FIELD_PX - inset };
+  const coast = COAST_RINGS * TILE;
+  return {
+    minX: coast + inset,
+    maxX: FIELD_PX - coast - inset,
+    minY: coast + inset,
+    maxY: FIELD_PX - (COAST_RINGS + CLIFF_RINGS) * TILE - inset,
+  };
 }
 
 /**

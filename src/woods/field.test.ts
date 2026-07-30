@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   blockedByTree,
+  CLIFF_RINGS,
+  COAST_RINGS,
   cameraAt,
   FIELD,
   FIELD_PX,
@@ -218,12 +220,24 @@ describe("visibleTiles", () => {
 });
 
 describe("fieldBounds", () => {
-  it("stops the walker inside the field, not at the void", () => {
-    const bounds = fieldBounds(4);
+  const INSET = 4;
+
+  it("stops the walker at the grass, short of the water's edge", () => {
+    const bounds = fieldBounds(INSET);
     const east = { dc: 1, dr: -1 };
     let pos = MIDDLE;
     for (let i = 0; i < 200; i++) pos = walk(pos, east, 0.5, bounds);
-    expect(pos.x).toBe(FIELD_PX - 4);
+    expect(pos.x).toBe(FIELD_PX - COAST_RINGS * TILE - INSET);
     expect(pos.x).toBeLessThan(FIELD_PX);
+  });
+
+  it("keeps a cell further back on the south shore, where the drop's face is drawn", () => {
+    const bounds = fieldBounds(INSET);
+    const south = { dc: 1, dr: 1 };
+    let pos = MIDDLE;
+    for (let i = 0; i < 200; i++) pos = walk(pos, south, 0.5, bounds);
+    expect(pos.y).toBe(FIELD_PX - (COAST_RINGS + CLIFF_RINGS) * TILE - INSET);
+    // Which is further in than the other shores, so nobody stands on the wall.
+    expect(bounds.maxY).toBeLessThan(bounds.maxX);
   });
 });
