@@ -96,14 +96,6 @@ export function blockedByTree(feet: Pos): boolean {
   return false;
 }
 
-/**
- * How far through its sway a tree is, so a wood does not breathe in unison.
- * Fractions of the cycle, to add to the animation clock.
- */
-export function treePhase(col: number, row: number): number {
-  return hash(col, row, TREE_SEED + 1);
-}
-
 /** Which frame of `grass.png` a cell is painted with. */
 export function tileVariant(col: number, row: number): number {
   const v = hash(col, row, SEED);

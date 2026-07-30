@@ -56,6 +56,10 @@ Trees come out of the same hash, thinned by a local-maximum rule — a cell keep
 Standing things draw in order of how far down the field they are, so passing behind a crown hides you — deliberately, with no ghost of the kind `occlusion.ts` draws in the other game.
 Trunks are solid: `blockedByTree` guards the roots only, and `walk` tries each axis separately so walking into one at an angle slides round it.
 
+`woods/wood.ts` holds everything the wood remembers between frames, since the field itself is a pure function of its seed: how many blows each tree has taken, which are shuddering, and `inReach` for the tree the action button would swing at.
+Trees stand still until hit — the pack's 4-frame sway plays once, fast, as a shudder.
+`Chop` is the swing clock: frame 6 of the axe strip carries the impact star, so that is the frame the blow lands on, and after `CHOPS_TO_FELL` the tree draws as `stump.png` instead.
+
 ## Maps
 
 Every map is `MAP_SIZE` (56) square, generated or hand-built, so the editor can open the world you are playing and the game can play a board you drew.

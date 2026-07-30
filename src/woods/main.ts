@@ -5,6 +5,7 @@ import { blitFrame, frameAt, SheetLoader } from "../sprites";
 import { createStick } from "../stick";
 import { createMenu } from "../ui";
 import { Viewport } from "../viewport";
+import { createActionButton } from "./actionButton";
 import {
   blockedByTree,
   cameraAt,
@@ -14,11 +15,11 @@ import {
   TILE,
   tileVariant,
   treeAt,
-  treePhase,
   TRUNK,
   visibleTiles,
 } from "./field";
 import { facingFrom, walk, type Facing, type Pos } from "./walker";
+import { Chop, CHOP_FRAMES, Wood } from "./wood";
 
 // Sunnyside sheet contract: horizontal strips of 96x64 frames, played at 12 fps,
 // drawn in one facing only — so left is right mirrored.
@@ -39,15 +40,22 @@ const WALK_FRAMES = 8;
 const IDLE_FRAMES = 9;
 const SHADOW_CELL = 16;
 
-// The pack's tree: a 4-frame sway, standing on the middle of its bottom edge.
+// The pack's tree: a 4-frame strip, standing on the middle of its bottom edge.
+// The strip is a sway, but it only ever plays as a shudder when the tree is hit
+// (`Wood.frame`) — a whole wood swaying on its own is a distraction.
 const TREE_W = 32;
 const TREE_H = 34;
 const TREE_ANCHOR_X = 16;
 const TREE_ANCHOR_Y = 32;
-const TREE_FRAMES = 4;
-const TREE_FPS = 4;
 // A tree hangs two tiles above its base, so one just off screen still shows.
 const TREE_PAD = 3;
+
+// What is left after three chops: the bottom of the same sprite, cropped at
+// vendoring time, so the roots stay exactly where the tree's were.
+const STUMP_W = 32;
+const STUMP_H = 11;
+const STUMP_ANCHOR_X = 16;
+const STUMP_ANCHOR_Y = 9;
 
 const ZOOM = 4;
 
@@ -78,15 +86,24 @@ function main(): void {
   const ctx = canvas.getContext("2d")!;
   const viewport = new Viewport(canvas);
 
-  const sheets = new SheetLoader(5);
+  const sheets = new SheetLoader(7);
   const walkSheet = sheets.load(url("walk.png"));
   const idleSheet = sheets.load(url("idle.png"));
+  const axeSheet = sheets.load(url("axe.png"));
   const shadowSheet = sheets.load(url("shadow.png"));
   const grassSheet = sheets.load(url("grass.png"));
   const treeSheet = sheets.load(url("tree.png"));
+  const stumpSheet = sheets.load(url("stump.png"));
 
   const input = new Input();
   createStick(input);
+
+  const wood = new Wood();
+  const chop = new Chop();
+  const action = createActionButton(() => {
+    const target = wood.inReach(pos);
+    if (target) chop.start(target);
+  });
 
   let debug = false;
   createMenu("Whispering Woods", {
@@ -108,13 +125,24 @@ function main(): void {
     viewport.fit();
     viewport.applyTransform(ctx);
 
-    const axis = input.axis;
+    // Mid-swing the character is planted: an axe animation that slides along the
+    // ground reads as a bug.
+    const swinging = chop.active;
+    const axis = swinging ? { dc: 0, dr: 0 } : input.axis;
     const moving = axis.dc !== 0 || axis.dr !== 0;
     const next = walk(pos, axis, dt, bounds, blockedByTree);
-    facing = facingFrom(next.x - pos.x, facing);
+    if (!swinging) facing = facingFrom(next.x - pos.x, facing);
     pos = next;
     walkT = moving ? walkT + dt : 0;
     animT += dt;
+
+    if (chop.target) {
+      // Face the tree being chopped, whichever way it was reached from.
+      facing = chop.target.col * TILE + TILE / 2 < pos.x ? "left" : "right";
+    }
+    if (chop.update(dt) && chop.target) wood.hit(chop.target.col, chop.target.row);
+    wood.update(dt);
+    action.setEnabled(wood.inReach(pos) !== null);
 
     const camera = cameraAt(pos, viewport.width, viewport.height, ZOOM);
     ctx.fillStyle = VOID;
@@ -138,7 +166,7 @@ function main(): void {
     const standing: Array<{ y: number; draw: () => void }> = [];
     const trunks: Array<{ x: number; y: number }> = []; // screen points, for the debug boxes
 
-    if (treeSheet.ok) {
+    if (treeSheet.ok && stumpSheet.ok) {
       const range = visibleTiles(camera, viewport.width, viewport.height, ZOOM, TREE_PAD);
       for (let row = range.minRow; row <= range.maxRow; row++) {
         for (let col = range.minCol; col <= range.maxCol; col++) {
@@ -146,18 +174,19 @@ function main(): void {
           // Standing on the middle of its cell, not the corner.
           const base = { x: col * TILE + TILE / 2, y: row * TILE + TILE / 2 };
           const at = screenAt(base, camera, ZOOM);
-          const t = animT + treePhase(col, row) * (TREE_FRAMES / TREE_FPS);
+          const felled = wood.isStump(col, row);
+          const frame = wood.frame(col, row);
           trunks.push(at);
           standing.push({
             y: base.y,
             draw: () =>
-              blitFrame(ctx, treeSheet.img, at.x, at.y, {
-                cell: TREE_W,
-                cellH: TREE_H,
+              blitFrame(ctx, felled ? stumpSheet.img : treeSheet.img, at.x, at.y, {
+                cell: felled ? STUMP_W : TREE_W,
+                cellH: felled ? STUMP_H : TREE_H,
                 scale: ZOOM,
-                anchorX: TREE_ANCHOR_X,
-                anchorY: TREE_ANCHOR_Y,
-                frame: frameAt(t, TREE_FPS, TREE_FRAMES, true),
+                anchorX: felled ? STUMP_ANCHOR_X : TREE_ANCHOR_X,
+                anchorY: felled ? STUMP_ANCHOR_Y : TREE_ANCHOR_Y,
+                frame: felled ? 0 : frame,
               }),
           });
         }
@@ -165,8 +194,8 @@ function main(): void {
     }
 
     const feet = screenAt(pos, camera, ZOOM);
-    const sheet = moving ? walkSheet : idleSheet;
-    const frames = moving ? WALK_FRAMES : IDLE_FRAMES;
+    const sheet = swinging ? axeSheet : moving ? walkSheet : idleSheet;
+    const frames = swinging ? CHOP_FRAMES : moving ? WALK_FRAMES : IDLE_FRAMES;
     standing.push({
       y: pos.y,
       draw: () => {
@@ -186,7 +215,7 @@ function main(): void {
             scale: ZOOM,
             anchorX: ANCHOR_X,
             anchorY: ANCHOR_Y,
-            frame: frameAt(moving ? walkT : animT, FPS, frames, true),
+            frame: swinging ? chop.frame() : frameAt(moving ? walkT : animT, FPS, frames, true),
             flip: facing === "left",
           });
         }

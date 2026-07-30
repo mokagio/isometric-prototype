@@ -103,6 +103,22 @@
         }
       }
 
+      /* Under the right thumb, mirroring the stick. Sitting where the middle of
+         Peaceful Plains' two-button pad would be, so the reach is the same. */
+      .ww-action {
+        position: fixed;
+        right: calc(var(--ww-inset) + (var(--ww-stick) - var(--ww-btn)) / 2);
+        bottom: calc(var(--ww-inset) + (var(--ww-stick) - var(--ww-btn)) / 2);
+        font-size: 26px;
+        line-height: 1;
+      }
+      .ww-action:disabled {
+        opacity: 0.4;
+        cursor: default;
+        /* The button's own :active travel would otherwise fire on a dead press. */
+        pointer-events: none;
+      }
+
       /* Sized border-box so the knob's travel (RADIUS in `stick.ts`) can be
          checked against the well's half-width without unpacking the borders. */
       .ww-stick {

@@ -11,7 +11,6 @@ import {
   TILE,
   tileVariant,
   treeAt,
-  treePhase,
   visibleTiles,
 } from "./field";
 import { walk, type Pos } from "./walker";
@@ -92,14 +91,6 @@ describe("treeAt", () => {
     expect(treeAt(5, FIELD)).toBe(false);
   });
 
-  it("gives each tree its own place in the sway", () => {
-    const phases = new Set(all().map(([col, row]) => treePhase(col, row).toFixed(3)));
-    expect(phases.size).toBeGreaterThan(10); // not one wood breathing in unison
-    for (const [col, row] of all()) {
-      expect(treePhase(col, row)).toBeGreaterThanOrEqual(0);
-      expect(treePhase(col, row)).toBeLessThan(1);
-    }
-  });
 });
 
 /** The first tree with clear ground around it, to stand a figure against. */
