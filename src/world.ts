@@ -18,6 +18,10 @@ const FLOWERS: Tile[] = [
 ];
 const DIRT: Tile = [0, 1]; // cliff-face body cube
 const WATER: Tile = [0, 10]; // the bright blue water cube
+// Sheet row 10 is one cracked-pool cube in four hues — water, teal, purple,
+// lava. Anywhere one of them caps a column, generated or hand-placed, it is
+// liquid: impassable to the hero and monsters.
+const LIQUID_SHEET_ROW = 10;
 
 export const GROUND_HEIGHT = 0; // single flat level for the whole world
 const WATER_THRESHOLD = 0.22; // lower noise → water; keeps ponds small and scattered
@@ -57,6 +61,25 @@ export interface World {
   heightAt(col: number, row: number): number;
   /** Whether a cell is water — impassable to the hero and monsters. */
   isWater(col: number, row: number): boolean;
+}
+
+export const isLiquidTile = (tile: Tile): boolean => tile[1] === LIQUID_SHEET_ROW;
+
+/** Wraps a grid of cells as a `World`, reading out of bounds as the nearest edge cell. */
+export function makeWorld(cells: Cell[][]): World {
+  const rows = cells.length;
+  const cols = cells[0]?.length ?? 0;
+  const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
+  const at = (col: number, row: number): Cell => cells[clamp(row, 0, rows - 1)]![clamp(col, 0, cols - 1)]!;
+  return {
+    cols,
+    rows,
+    cells,
+    body: DIRT,
+    cell: at,
+    heightAt: (col, row) => at(col, row).height,
+    isWater: (col, row) => at(col, row).isWater,
+  };
 }
 
 // Deterministic hash → [0, 1) at integer lattice points.
@@ -144,17 +167,7 @@ export function generateWorld(cols: number, rows: number, seed = 1337, options: 
     }
     cells.push(line);
   }
-
-  const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
-  return {
-    cols,
-    rows,
-    cells,
-    body: DIRT,
-    cell: (col, row) => cells[clamp(row, 0, rows - 1)]![clamp(col, 0, cols - 1)]!,
-    heightAt: (col, row) => cells[clamp(row, 0, rows - 1)]![clamp(col, 0, cols - 1)]!.height,
-    isWater: (col, row) => cells[clamp(row, 0, rows - 1)]![clamp(col, 0, cols - 1)]!.isWater,
-  };
+  return makeWorld(cells);
 }
 
 /**
