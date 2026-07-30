@@ -1,31 +1,20 @@
 import { drawBox, drawCircle, type Box } from "../debug";
+import { EDIT_STASHED_ISLAND_URL, recallIsland, wantsStashedMap } from "../handoff";
 import { Input } from "../input";
 import { Loop } from "../loop";
 import { blitFrame, frameAt, SheetLoader } from "../sprites";
+import { drawGroundCell, drawProp, type SheetBook } from "../sunnyside/draw";
+import { groundById, propById } from "../sunnyside/manifest";
+import { SHEETS, sheetUrl, type SheetId } from "../sunnyside/sheets";
 import { createStick } from "../stick";
 import { createMenu } from "../ui";
 import { Viewport } from "../viewport";
 import { createActionButton } from "./actionButton";
-import {
-  cellAt,
-  FOAM_SECONDS,
-  frameOf,
-  isCliffFace,
-  isLip,
-  ringOf,
-  seaTile,
-  chamferTile,
-  fenceTile,
-  isWater,
-  lipCornerTile,
-  shoreTile,
-  SPARKLE_FRAMES,
-  SPARKLE_SECONDS,
-  sparkleAt,
-  type Tile as CoastTile,
-} from "./coast";
+import { cellAt, fenceTile } from "./coast";
 import { createLogCounter } from "./logCounter";
 import { Logs } from "./logs";
+import { DEEP_SEA, drawCoastTile, drawIslandGround, type CoastSheets } from "./ground";
+import { blockedOn, decodeIsland, drawOrder, playedGroundAt, type Island } from "./island";
 import {
   blockedByTree,
   cameraAt,
@@ -97,25 +86,42 @@ const TRUNK_BOX: Box = {
   w: 2 * TRUNK.halfW * ZOOM,
   h: (TRUNK.top + TRUNK.bottom) * ZOOM,
 };
-// Under the sea tiles, for the frame before they load and any sliver of a
-// rounding gap: the pack's own deep water blue.
-const DEEP_SEA = "#0099db";
-// The bank's face out of `cliff.png`: its second row is the body of the wall, in
-// three variants that are picked by column so the striations do not repeat.
-const CLIFF_FACE_ROW = 1;
-const CLIFF_FACE_COLS = 3;
 // Half the figure's width, so it never stands half over the void.
 const EDGE_INSET = 6;
+// The library's own tree, which is the one this game knows how to chop.
+const TREE_PROP = "tree";
 
 const url = (name: string): string => `${import.meta.env.BASE_URL}sunnyside/${name}`;
 
+/**
+ * The island the editor handed over, or null to grow a wood instead. Asked for
+ * by the query, not by whether a stash happens to be lying around, so a reload
+ * keeps you on the island and the plain game stays the plain game.
+ */
+function openStashedIsland(): Island | null {
+  if (!wantsStashedMap(location.search)) return null;
+  const text = recallIsland();
+  if (text === null) return null;
+  try {
+    return decodeIsland(text);
+  } catch (e) {
+    alert(e instanceof Error ? e.message : "That island could not be opened.");
+    return null;
+  }
+}
 
 function main(): void {
   const canvas = document.getElementById("woods") as HTMLCanvasElement;
   const ctx = canvas.getContext("2d")!;
   const viewport = new Viewport(canvas);
 
-  const sheets = new SheetLoader(16);
+  // Arrived from the editor: play what was built instead of the grown wood.
+  const island = openStashedIsland();
+  // The library is only worth fetching for a built island; the grown wood draws
+  // itself out of the handful of strips below.
+  const libraryIds = island ? (Object.keys(SHEETS) as SheetId[]) : [];
+
+  const sheets = new SheetLoader(16 + libraryIds.length);
   const walkSheet = sheets.load(url("walk.png"));
   const idleSheet = sheets.load(url("idle.png"));
   const axeSheet = sheets.load(url("axe.png"));
@@ -124,19 +130,33 @@ function main(): void {
   const treeSheet = sheets.load(url("tree.png"));
   const stumpSheet = sheets.load(url("stump.png"));
   const logSheet = sheets.load(url("log.png"));
-  const seaSheet = sheets.load(url("sea.png"));
-  const sparkleSheet = sheets.load(url("seaSparkle.png"));
-  const shoreSheet = sheets.load(url("shore.png"));
-  const shore2Sheet = sheets.load(url("shore2.png"));
-  const cliffSheet = sheets.load(url("cliff.png"));
-  const lipSheet = sheets.load(url("lip.png"));
-  const lipCornerSheet = sheets.load(url("cliffTop.png"));
-  const fenceSheet = sheets.load(url("fence.png"));
+  const coast: CoastSheets = {
+    sea: sheets.load(url("sea.png")),
+    sparkle: sheets.load(url("seaSparkle.png")),
+    shore: sheets.load(url("shore.png")),
+    shore2: sheets.load(url("shore2.png")),
+    cliff: sheets.load(url("cliff.png")),
+    lip: sheets.load(url("lip.png")),
+    lipCorner: sheets.load(url("cliffTop.png")),
+    fence: sheets.load(url("fence.png")),
+  };
+  const book: SheetBook = {};
+  for (const id of libraryIds) book[id] = sheets.load(sheetUrl(id));
 
   const input = new Input();
   createStick(input);
 
-  const wood = new Wood();
+  // A built island's trees are wherever someone stood them up; a grown one's are
+  // a function of the field. Everything downstream only asks "is there a tree
+  // here", so the two are the same shape.
+  const plantedTrees = new Set<string>();
+  if (island) {
+    for (const placed of island.props) if (placed.id === TREE_PROP) plantedTrees.add(`${placed.col},${placed.row}`);
+  }
+  const hasTree = island ? (col: number, row: number): boolean => plantedTrees.has(`${col},${row}`) : treeAt;
+  const blocked = island ? blockedOn(island) : blockedByTree;
+
+  const wood = new Wood(hasTree);
   const chop = new Chop();
   const swingAxe = (): void => {
     const target = wood.inReach(pos);
@@ -151,69 +171,25 @@ function main(): void {
     onDebug: (on) => {
       debug = on;
     },
+    onEditor: () => {
+      // With an island in hand the editor opens it; without one it starts blank,
+      // which is what "build an island" should do from the grown wood.
+      location.href = island ? EDIT_STASHED_ISLAND_URL : "woodsEditor.html";
+    },
     onAllGames: () => {
       location.href = "index.html";
     },
   });
 
-  /** One 16px tile of a sheet, blown up to the drawing zoom. */
-  const drawTile = (img: CanvasImageSource, src: CoastTile, at: Pos, mirror = false): void => {
-    const size = TILE * ZOOM;
-    const x = Math.round(at.x);
-    const y = Math.round(at.y);
-    if (!mirror) {
-      ctx.drawImage(img, src.col * TILE, src.row * TILE, TILE, TILE, x, y, size, size);
+  /** What the island's ground is painted with, cell by cell. */
+  const paintLand = (col: number, row: number, at: Pos): void => {
+    if (island) {
+      const brush = groundById(playedGroundAt(island, col, row));
+      if (!brush) return;
+      drawGroundCell(ctx, book, brush, col, row, at.x, at.y, ZOOM);
       return;
     }
-    ctx.save();
-    ctx.translate(x + size, y);
-    ctx.scale(-1, 1);
-    ctx.drawImage(img, src.col * TILE, src.row * TILE, TILE, TILE, 0, 0, size, size);
-    ctx.restore();
-  };
-
-  /** Sea, then the island on top of it: grass, the bank's face, and the surf. */
-  const drawGround = (camera: Pos): void => {
-    // Deliberately unclamped: the sea carries on past the field, which is the
-    // whole point of an island.
-    const minCol = Math.floor(camera.x / TILE);
-    const minRow = Math.floor(camera.y / TILE);
-    const maxCol = Math.floor((camera.x + viewport.width / ZOOM) / TILE);
-    const maxRow = Math.floor((camera.y + viewport.height / ZOOM) / TILE);
-    const surf = frameOf(animT, FOAM_SECONDS, 2) === 0 ? shoreSheet : shore2Sheet;
-
-    for (let row = minRow; row <= maxRow; row++) {
-      for (let col = minCol; col <= maxCol; col++) {
-        const at = screenAt(cellAt(col, row), camera, ZOOM);
-        if (seaSheet.ok) drawTile(seaSheet.img, seaTile(col, row), at);
-        const sparkle = sparkleSheet.ok ? sparkleAt(col, row) : null;
-        if (sparkle) {
-          const t = animT + sparkle.phase * SPARKLE_SECONDS * SPARKLE_FRAMES;
-          drawTile(sparkleSheet.img, { col: frameOf(t, SPARKLE_SECONDS, SPARKLE_FRAMES), row: 0 }, at);
-        }
-        if (ringOf(col, row) < 0) continue; // out at sea
-
-        // Grass everywhere on the island but the lip and the corner chamfers,
-        // which are their own ground. Never on the coast ring: that is water, and
-        // the shore tiles go over it.
-        const chamfer = shoreSheet.ok ? chamferTile(col, row) : null;
-        const ownGround = isWater(col, row) || chamfer !== null || (isLip(col, row) && lipSheet.ok);
-        if (grassSheet.ok && !ownGround) drawTile(grassSheet.img, { col: tileVariant(col, row), row: 0 }, at);
-        if (chamfer && surf.ok) drawTile(surf.img, chamfer, at);
-        if (isLip(col, row)) {
-          const corner = lipCornerSheet.ok ? lipCornerTile(col, row) : null;
-          if (corner) drawTile(lipCornerSheet.img, corner, at);
-          else if (lipSheet.ok) drawTile(lipSheet.img, { col: 0, row: 0 }, at);
-        }
-        // The face is a wall, so it is drawn over the grass rather than instead of
-        // it: its own tiles are cut away at the top where the lip shows through.
-        if (isCliffFace(col, row) && cliffSheet.ok) {
-          drawTile(cliffSheet.img, { col: col % CLIFF_FACE_COLS, row: CLIFF_FACE_ROW }, at);
-        }
-        const shore = shoreTile(col, row);
-        if (shore && surf.ok) drawTile(surf.img, shore, at);
-      }
-    }
+    if (grassSheet.ok) drawCoastTile(ctx, grassSheet.img, { col: tileVariant(col, row), row: 0 }, at, ZOOM);
   };
 
   const bounds = fieldBounds(EDGE_INSET);
@@ -237,7 +213,7 @@ function main(): void {
     const swinging = chop.active;
     const axis = swinging ? { dc: 0, dr: 0 } : input.axis;
     const moving = axis.dc !== 0 || axis.dr !== 0;
-    const next = walk(pos, axis, dt, bounds, blockedByTree);
+    const next = walk(pos, axis, dt, bounds, blocked);
     if (!swinging) facing = facingFrom(next.x - pos.x, facing);
     pos = next;
     walkT = moving ? walkT + dt : 0;
@@ -260,15 +236,16 @@ function main(): void {
     ctx.fillStyle = DEEP_SEA;
     ctx.fillRect(0, 0, viewport.width, viewport.height);
     ctx.imageSmoothingEnabled = false;
-    drawGround(camera);
+    const view = { camera, zoom: ZOOM, width: viewport.width, height: viewport.height, animT };
+    drawIslandGround(ctx, coast, view, paintLand);
 
     // Whatever stands lower on the field is drawn last, so a tree in front of
     // the character hides them and one behind does not.
     const standing: Array<{ y: number; draw: () => void }> = [];
 
-    // The fence along the top of the drop. It stands on the ground like anything
-    // else, so it joins the depth order and the character passes behind it.
-    if (fenceSheet.ok) {
+    // The fence ringing the island. It stands on the ground like anything else, so
+    // it joins the depth order and the character passes behind it.
+    if (coast.fence.ok) {
       const range = visibleTiles(camera, viewport.width, viewport.height, ZOOM, 1);
       for (let row = range.minRow; row <= range.maxRow; row++) {
         for (let col = range.minCol; col <= range.maxCol; col++) {
@@ -277,7 +254,7 @@ function main(): void {
           const at = screenAt(cellAt(col, row), camera, ZOOM);
           standing.push({
             y: row * TILE + TILE,
-            draw: () => drawTile(fenceSheet.img, fence.tile, at, fence.mirror),
+            draw: () => drawCoastTile(ctx, coast.fence.img, fence.tile, at, ZOOM, fence.flipV),
           });
         }
       }
@@ -288,7 +265,7 @@ function main(): void {
       const range = visibleTiles(camera, viewport.width, viewport.height, ZOOM, TREE_PAD);
       for (let row = range.minRow; row <= range.maxRow; row++) {
         for (let col = range.minCol; col <= range.maxCol; col++) {
-          if (!treeAt(col, row)) continue;
+          if (!hasTree(col, row)) continue;
           // Standing on the middle of its cell, not the corner.
           const base = { x: col * TILE + TILE / 2, y: row * TILE + TILE / 2 };
           const at = screenAt(base, camera, ZOOM);
@@ -308,6 +285,21 @@ function main(): void {
               }),
           });
         }
+      }
+    }
+
+    // Everything else someone stood on a built island. Trees are left to the
+    // path above: they are the ones with an axe swinging at them.
+    if (island) {
+      for (const placed of drawOrder(island)) {
+        if (placed.id === TREE_PROP) continue;
+        const prop = propById(placed.id);
+        if (!prop) continue;
+        const at = screenAt(cellAt(placed.col, placed.row), camera, ZOOM);
+        standing.push({
+          y: placed.row * TILE + TILE / 2,
+          draw: () => drawProp(ctx, book, prop, at.x, at.y, ZOOM, animT),
+        });
       }
     }
 

@@ -39,6 +39,13 @@ export class Wood {
   private chops = new Map<string, number>();
   private shaking = new Map<string, number>(); // seconds into the shudder
 
+  /**
+   * Where the trees are. The generated wood is a pure function of the field, but
+   * a built island's trees are wherever someone stood them up, so the wood is
+   * told rather than working it out.
+   */
+  constructor(private readonly hasTree: (col: number, row: number) => boolean = treeAt) {}
+
   /** Chopped through: what is left is a trunk in the ground. */
   isStump(col: number, row: number): boolean {
     return (this.chops.get(key(col, row)) ?? 0) >= CHOPS_TO_FELL;
@@ -62,7 +69,7 @@ export class Wood {
       for (let dc = -REACH_CELLS; dc <= REACH_CELLS; dc++) {
         const col = col0 + dc;
         const row = row0 + dr;
-        if (!treeAt(col, row) || this.isStump(col, row)) continue;
+        if (!this.hasTree(col, row) || this.isStump(col, row)) continue;
         const dx = feet.x - (col * TILE + TILE / 2);
         const dy = feet.y - (row * TILE + TILE / 2);
         const away = Math.hypot(dx, dy);
