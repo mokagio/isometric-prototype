@@ -8,6 +8,9 @@ import { buildSidebar, clampHeight, type EditorState } from "./sidebar";
 import { renderEditor, type Cell } from "./render";
 import { centreView, panView, viewOrigin, type PanDir } from "./view";
 import { createPanPad } from "./panPad";
+import { boardToMap, mapFilename } from "./mapIO";
+import { encodeMap } from "../mapFormat";
+import { downloadText } from "./files";
 
 const PAN_KEYS: Record<string, PanDir> = {
   arrowup: "up",
@@ -45,7 +48,9 @@ async function main(): Promise<void> {
     });
   };
 
-  const sidebar = buildSidebar(sidebarEl, tileset, state, requestRender);
+  const saveMap = (): void => downloadText(mapFilename(new Date()), encodeMap(boardToMap(board)));
+
+  const sidebar = buildSidebar(sidebarEl, tileset, state, requestRender, { onSave: saveMap });
 
   function draw(): void {
     const dpr = window.devicePixelRatio || 1;

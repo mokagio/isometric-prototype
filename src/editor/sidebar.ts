@@ -16,6 +16,11 @@ export interface SidebarHandle {
   syncHeight(): void;
 }
 
+export interface MapActions {
+  /** Download the board as a map file. */
+  onSave: () => void;
+}
+
 export function clampHeight(h: number): number {
   return Math.max(0, Math.min(MAX_BUILD_HEIGHT, h));
 }
@@ -37,6 +42,7 @@ export function buildSidebar(
   tileset: Tileset,
   state: EditorState,
   onChange: () => void,
+  actions: MapActions,
 ): SidebarHandle {
   root.innerHTML = "";
 
@@ -133,6 +139,20 @@ export function buildSidebar(
   hc.append(down, readout, up);
   root.appendChild(hc);
   syncHeight();
+
+  // Map -------------------------------------------------------------------
+  heading("Map");
+  const mapButtons = document.createElement("div");
+  mapButtons.className = "ed-map";
+  const button = (label: string, onClick: () => void): void => {
+    const b = document.createElement("button");
+    b.className = "ed-action";
+    b.textContent = label;
+    b.addEventListener("click", onClick);
+    mapButtons.appendChild(b);
+  };
+  button("Save map", actions.onSave);
+  root.appendChild(mapButtons);
 
   const hint = document.createElement("div");
   hint.className = "ed-hint";
