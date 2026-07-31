@@ -1,6 +1,9 @@
 import { downloadText, pickTextFile } from "../../files";
 import { PLAY_DRAWN_OUTLINE_URL, recallOutline, stashOutline } from "../../handoff";
+import { History } from "../../history";
 import { Loop } from "../../loop";
+import { createPainter } from "../../painter";
+import { createPanPad, type PanDir } from "../../panPad";
 import { SheetLoader, type Sheet } from "../../sprites";
 import { createMenu } from "../../ui";
 import { COAST_TILES, SEA_CODE, type CoastTile } from "../coastTiles";
@@ -30,9 +33,7 @@ import {
   zoomLadder,
   ZOOM_STEPS,
   type View,
-  type Way,
 } from "./camera";
-import { History } from "./history";
 import { buildPalette, type PaletteSheets } from "./palette";
 
 // Drawing the island's shape, tile by tile. The coastline the game grows for
@@ -58,11 +59,11 @@ const SHEET_FILES = {
   grassUnder: "grass.png",
 } as const;
 
-const ARROW_KEYS: Record<string, Way | undefined> = {
-  ArrowUp: "north",
-  ArrowDown: "south",
-  ArrowLeft: "west",
-  ArrowRight: "east",
+const ARROW_KEYS: Record<string, PanDir | undefined> = {
+  ArrowUp: "up",
+  ArrowDown: "down",
+  ArrowLeft: "left",
+  ArrowRight: "right",
 };
 
 const GRID_LINE = "rgba(255, 255, 255, 0.16)";
@@ -84,13 +85,16 @@ function main(): void {
   let outline: Outline = openStashed() ?? grownOutline();
   let brush: CoastTile = COAST_TILES[0]!;
   let erasing = false;
-  let painting: string | null = null; // the code the drag is laying down
   let panning: Pos | null = null; // where the middle button last was
   let grid = true;
   let hover: Cell | null = null;
   let animT = 0;
   let swatchesDrawn = false;
-  const history = new History(outline);
+  // A drawing is a flat array of characters, so a snapshot is a slice.
+  const history = new History<Outline>(outline, {
+    clone: (state) => state.slice(),
+    same: (a, b) => a.length === b.length && a.every((code, i) => code === b[i]),
+  });
 
   const palette = buildPalette(
     document.getElementById("sidebar") as HTMLElement,
@@ -100,13 +104,10 @@ function main(): void {
         brush = tile;
         erasing = false;
       },
-      onErase: () => {
-        erasing = true;
-      },
+      onErasing: setErasing,
       onUndo: () => goTo(history.undo()),
       onRedo: () => goTo(history.redo()),
       onZoom: (by) => zoomBy(by),
-      onPan: (way) => panTo(way),
       onGrid: (on) => {
         grid = on;
       },
@@ -119,6 +120,11 @@ function main(): void {
   );
   const syncHistory = (): void => palette.syncHistory(history.canUndo, history.canRedo);
   syncHistory();
+
+  function setErasing(on: boolean): void {
+    erasing = on;
+    palette.syncErasing(on, brush);
+  }
 
   /** Go to a state undo or redo handed back. Null means there was nowhere to go. */
   function goTo(to: Outline | null): void {
@@ -173,7 +179,7 @@ function main(): void {
     const h = canvas.clientHeight;
     view = { ...view, origin: clampOrigin(view.origin, view.zoom, w, h) };
     palette.syncZoom(view.zoom > ladder[0]!, view.zoom < ladder[ladder.length - 1]!);
-    palette.syncPan(roomToPan(view, w, h));
+    pad.setRoom(roomToPan(view, w, h));
   };
   function fit(w: number, h: number): void {
     ladder = zoomLadder(w, h);
@@ -190,48 +196,45 @@ function main(): void {
     settle();
   }
 
-  function panTo(way: Way): void {
-    view = pan(view, way, canvas.clientWidth, canvas.clientHeight);
+  function panTo(dir: PanDir): void {
+    view = pan(view, dir, canvas.clientWidth, canvas.clientHeight);
     settle();
   }
 
   const pointOf = (e: MouseEvent): Pos => ({ x: e.offsetX, y: e.offsetY });
 
-  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+  createPainter<Cell>(canvas, {
+    cellAt: (x, y) => cellAt({ x, y }, view),
+    rubbing: () => erasing,
+    apply: (cell, rubbing) => draw(outline, cell.col, cell.row, rubbing ? SEA_CODE : brush.code),
+    onHover: (cell) => {
+      hover = cell;
+    },
+    onStroke: () => {
+      // A whole drag is one step back, however many cells it crossed.
+      if (history.record(outline)) syncHistory();
+    },
+  });
+
+  // The middle button drags the island about, which the painter leaves alone.
   canvas.addEventListener("pointerdown", (e) => {
-    // The middle button drags the island about, as it does everywhere else.
-    if (e.button === 1) {
-      panning = pointOf(e);
-      canvas.setPointerCapture(e.pointerId);
-      return;
-    }
-    // The right button clears back to open water, whichever brush is in hand.
-    painting = e.button === 2 || erasing ? SEA_CODE : brush.code;
-    const cell = cellAt(pointOf(e), view);
-    draw(outline, cell.col, cell.row, painting);
+    if (e.button !== 1) return;
+    panning = pointOf(e);
     canvas.setPointerCapture(e.pointerId);
   });
   canvas.addEventListener("pointermove", (e) => {
+    if (!panning) return;
     const point = pointOf(e);
-    if (panning) {
-      view = {
-        ...view,
-        origin: { x: view.origin.x + point.x - panning.x, y: view.origin.y + point.y - panning.y },
-      };
-      panning = point;
-      settle();
-      return;
-    }
-    hover = cellAt(point, view);
-    if (painting !== null) draw(outline, hover.col, hover.row, painting);
+    view = {
+      ...view,
+      origin: { x: view.origin.x + point.x - panning.x, y: view.origin.y + point.y - panning.y },
+    };
+    panning = point;
+    settle();
   });
   for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
     canvas.addEventListener(type, () => {
       panning = null;
-      if (painting === null) return;
-      painting = null;
-      // A whole drag is one step back, however many cells it crossed.
-      if (history.record(outline)) syncHistory();
     });
   }
   canvas.addEventListener(
@@ -251,13 +254,11 @@ function main(): void {
     }
     if (e.key === "+" || e.key === "=") return zoomBy(1);
     if (e.key === "-" || e.key === "_") return zoomBy(-1);
-    const way = ARROW_KEYS[e.key];
-    if (!way) return;
+    if (e.key === "e" || e.key === "E") return setErasing(!erasing);
+    const dir = ARROW_KEYS[e.key];
+    if (!dir) return;
     e.preventDefault(); // or the page scrolls instead of the island moving
-    panTo(way);
-  });
-  canvas.addEventListener("pointerleave", () => {
-    hover = null;
+    panTo(dir);
   });
 
   createMenu("Island Outline", {
@@ -265,6 +266,8 @@ function main(): void {
       location.href = "index.html";
     },
   });
+
+  const pad = createPanPad(document.getElementById("editor") as HTMLElement, panTo);
 
   const step = (dt: number): void => {
     animT += dt;

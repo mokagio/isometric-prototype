@@ -81,7 +81,7 @@ export function renderEditor(
 
   // Hover: a footprint outline, plus (in place mode) a ghost of the brush.
   if (hover && board.inBounds(hover.col, hover.row)) {
-    if (state.mode === "place") {
+    if (!state.erasing) {
       diamondPath(ctx, hover.col, hover.row, origin);
       ctx.strokeStyle = "rgba(255, 244, 193, 0.9)";
       ctx.lineWidth = 2;

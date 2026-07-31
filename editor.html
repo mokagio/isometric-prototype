@@ -33,35 +33,6 @@
         font-size: 22px;
         color: #f4e4c1;
       }
-
-      /* Pan pad: a compass of arrows over the bottom-right of the board. */
-      .ed-pan {
-        position: absolute;
-        right: var(--ww-inset-right);
-        bottom: var(--ww-inset-bottom);
-        display: grid;
-        grid-template-areas: ". up ." "left . right" ". down .";
-        gap: 4px;
-        opacity: 0.75;
-      }
-      .ed-pan:hover { opacity: 1; }
-      .ed-pan-btn {
-        width: 44px;
-        height: 44px;
-        font-size: 15px;
-        color: #f4e4c1;
-        background: rgba(59, 42, 28, 0.85);
-        border: 2px solid #6b4f34;
-        border-radius: 10px;
-        cursor: pointer;
-        touch-action: none;
-      }
-      .ed-pan-btn:hover { border-color: #9a7345; }
-      .ed-pan-btn:active { background: #56a03a; color: #10240c; }
-      .ed-pan-up { grid-area: up; }
-      .ed-pan-left { grid-area: left; }
-      .ed-pan-right { grid-area: right; }
-      .ed-pan-down { grid-area: down; }
     </style>
   </head>
   <body>

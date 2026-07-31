@@ -98,21 +98,21 @@ describe("pan", () => {
   const w = 400;
   const view = { zoom: 2, origin: { x: -300, y: -300 } };
 
-  it("moves a step towards the way it is asked for", () => {
+  it("moves a step the way it is asked for", () => {
     const step = PAN_TILES * TILE * 2;
-    expect(pan(view, "west", w, w).origin.x).toBe(-300 + step);
-    expect(pan(view, "east", w, w).origin.x).toBe(-300 - step);
-    expect(pan(view, "north", w, w).origin.y).toBe(-300 + step);
-    expect(pan(view, "south", w, w).origin.y).toBe(-300 - step);
+    expect(pan(view, "left", w, w).origin.x).toBe(-300 + step);
+    expect(pan(view, "right", w, w).origin.x).toBe(-300 - step);
+    expect(pan(view, "up", w, w).origin.y).toBe(-300 + step);
+    expect(pan(view, "down", w, w).origin.y).toBe(-300 - step);
   });
 
   it("stops at the island's edge rather than sailing past it", () => {
     const near = { zoom: 2, origin: { x: -10, y: -10 } };
-    expect(pan(near, "west", w, w).origin.x).toBe(0);
+    expect(pan(near, "left", w, w).origin.x).toBe(0);
   });
 
   it("leaves the zoom where it was", () => {
-    expect(pan(view, "east", w, w).zoom).toBe(view.zoom);
+    expect(pan(view, "right", w, w).zoom).toBe(view.zoom);
   });
 });
 
@@ -120,19 +120,30 @@ describe("roomToPan", () => {
   it("has nowhere to go when the whole island is on screen", () => {
     const w = FIELD_PX + 200;
     const view = { zoom: 1, origin: clampOrigin({ x: 0, y: 0 }, 1, w, w) };
-    expect(roomToPan(view, w, w)).toEqual({ west: false, east: false, north: false, south: false });
+    expect(roomToPan(view, w, w)).toEqual({ left: false, right: false, up: false, down: false });
   });
 
   it("points the way the island carries on", () => {
-    // Parked at the top-left corner: everything is off to the east and south.
+    // Parked at the top-left corner: everything is off to the right and below.
     const view = { zoom: 2, origin: { x: 0, y: 0 } };
-    expect(roomToPan(view, 400, 400)).toEqual({ west: false, east: true, north: false, south: true });
+    expect(roomToPan(view, 400, 400)).toEqual({ left: false, right: true, up: false, down: true });
   });
 
   it("turns round at the far corner", () => {
     const span = FIELD_PX * 2;
     const view = { zoom: 2, origin: { x: 400 - span, y: 400 - span } };
-    expect(roomToPan(view, 400, 400)).toEqual({ west: true, east: false, north: true, south: false });
+    expect(roomToPan(view, 400, 400)).toEqual({ left: true, right: false, up: true, down: false });
+  });
+
+  it("agrees with the pan it is describing", () => {
+    const w = 400;
+    for (const dir of ["up", "down", "left", "right"] as const) {
+      for (const origin of [{ x: 0, y: 0 }, { x: -300, y: -300 }, { x: 400 - FIELD_PX * 2, y: 400 - FIELD_PX * 2 }]) {
+        const view = { zoom: 2, origin };
+        const moved = JSON.stringify(pan(view, dir, w, w).origin) !== JSON.stringify(origin);
+        expect(roomToPan(view, w, w)[dir], `${dir} from ${origin.x},${origin.y}`).toBe(moved);
+      }
+    }
   });
 });
 

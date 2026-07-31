@@ -1,5 +1,6 @@
-import { FIELD_PX, TILE } from "../field";
+import type { PanDir, PanRoom } from "../../panPad";
 import type { Cell } from "../editor/view";
+import { FIELD_PX, TILE } from "../field";
 import type { Pos } from "../walker";
 
 // Where the outline editor is looking. The island editor never needs this — it
@@ -65,19 +66,19 @@ export function clampOrigin(origin: Pos, zoom: number, w: number, h: number): Po
 /** Tiles an arrow moves the view, whatever the zoom. Far enough to get somewhere. */
 export const PAN_TILES = 6;
 
-export type Way = "west" | "east" | "north" | "south";
-
-const WAYS: Record<Way, Pos> = {
-  west: { x: 1, y: 0 },
-  east: { x: -1, y: 0 },
-  north: { x: 0, y: 1 },
-  south: { x: 0, y: -1 },
+// Screen directions, as the pan pad's arrows are: looking up means dragging the
+// island down, so the origin goes the other way from the name.
+const STEPS: Record<PanDir, Pos> = {
+  up: { x: 0, y: 1 },
+  down: { x: 0, y: -1 },
+  left: { x: 1, y: 0 },
+  right: { x: -1, y: 0 },
 };
 
-/** Move the view a step towards `way`. Named for where it goes on the island. */
-export function pan(view: View, way: Way, w: number, h: number): View {
+/** Move the view a step that way, stopping at the island's edge. */
+export function pan(view: View, dir: PanDir, w: number, h: number): View {
   const step = PAN_TILES * TILE * view.zoom;
-  const { x, y } = WAYS[way];
+  const { x, y } = STEPS[dir];
   const origin = { x: view.origin.x + x * step, y: view.origin.y + y * step };
   return { zoom: view.zoom, origin: clampOrigin(origin, view.zoom, w, h) };
 }
@@ -86,17 +87,17 @@ export function pan(view: View, way: Way, w: number, h: number): View {
  * Which ways there is any island left to go — what greys the arrows out. A view
  * showing the whole thing has nowhere to go at all.
  */
-export function roomToPan(view: View, w: number, h: number): Record<Way, boolean> {
+export function roomToPan(view: View, w: number, h: number): PanRoom {
   const span = FIELD_PX * view.zoom;
   const { x, y } = view.origin;
   // A hair's tolerance: the origin is rounded when an axis is centred, so an
   // exact comparison would leave an arrow lit with nothing behind it.
   const slack = 0.5;
   return {
-    west: x < -slack,
-    east: x + span > w + slack,
-    north: y < -slack,
-    south: y + span > h + slack,
+    left: x < -slack,
+    right: x + span > w + slack,
+    up: y < -slack,
+    down: y + span > h + slack,
   };
 }
 

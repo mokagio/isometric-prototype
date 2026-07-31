@@ -1,14 +1,17 @@
+import { actionColumn, backLinks, hint, swatchGrid, tabRow, toolRow } from "../../editorUi";
 import type { Sheet } from "../../sprites";
 import { COAST_GROUPS, coastTilesIn, type CoastGroupId, type CoastTile } from "../coastTiles";
 import { TILE } from "../field";
 import type { CoastSheets, OutlineSheets } from "../ground";
-import type { Way } from "./camera";
 
 // The coast tiles down the side of the screen, a tab to a group. Every swatch is
 // cut from the sheet it will be drawn from, so what you pick is the thing itself
 // rather than a picture of it.
 
 const SWATCH = 44;
+
+/** Everything the coast is drawn from, plus the grass a swatch shows under a tile. */
+export type PaletteSheets = CoastSheets & OutlineSheets & { grassUnder?: Sheet };
 
 /** The strip a swatch is cut from. Either frame of the surf will do standing still. */
 const sheetOf = (sheets: PaletteSheets, tile: CoastTile): Sheet | undefined =>
@@ -46,11 +49,10 @@ function swatch(sheets: PaletteSheets, tile: CoastTile): HTMLCanvasElement {
 
 export interface PaletteActions {
   onPick: (tile: CoastTile) => void;
-  onErase: () => void;
+  onErasing: (on: boolean) => void;
   onUndo: () => void;
   onRedo: () => void;
   onZoom: (by: 1 | -1) => void;
-  onPan: (way: Way) => void;
   onGrid: (on: boolean) => void;
   onSave: () => void;
   onOpen: () => void;
@@ -61,16 +63,13 @@ export interface PaletteActions {
 export interface PaletteHandle {
   /** Draw the swatches again, once the sheets they are cut from have loaded. */
   refresh(): void;
+  /** Show the rubber as picked up, or put back down. */
+  syncErasing(erasing: boolean, brush: CoastTile): void;
   /** Grey out whichever of undo and redo has nowhere to go. */
   syncHistory(canUndo: boolean, canRedo: boolean): void;
   /** The same, for the two ends of the zoom. */
   syncZoom(canOut: boolean, canIn: boolean): void;
-  /** And for the arrows, each of which greys out at its own edge. */
-  syncPan(room: Record<Way, boolean>): void;
 }
-
-/** Everything the coast is drawn from, plus the grass a swatch shows under a tile. */
-export type PaletteSheets = CoastSheets & OutlineSheets & { grassUnder?: Sheet };
 
 export function buildPalette(
   root: HTMLElement,
@@ -79,180 +78,73 @@ export function buildPalette(
   startWith: CoastTile,
 ): PaletteHandle {
   root.innerHTML = "";
-
-  const links = document.createElement("div");
-  links.className = "ed-links";
-  for (const [href, text] of [
+  backLinks(root, [
     ["woods.html", "← Woods"],
     ["woodsEditor.html", "Island editor →"],
-  ]) {
-    const a = document.createElement("a");
-    a.className = "ed-back";
-    a.href = href!;
-    a.textContent = text!;
-    links.appendChild(a);
-  }
-  root.appendChild(links);
+  ]);
 
-  const tabs = document.createElement("div");
-  tabs.className = "ed-tabs";
-  root.appendChild(tabs);
+  // Tabs first, since they sit above the grid, and nothing is shown until the
+  // grid below them exists to show it in.
+  const tabs = tabRow<CoastGroupId>(root, COAST_GROUPS, (id) => tiles.show(coastTilesIn(id)));
+  const tiles = swatchGrid<CoastTile>(root, {
+    key: (tile) => tile.code,
+    label: (tile) => `${tile.label}  (${tile.code})`,
+    face: (tile) => swatch(sheets, tile),
+    onPick: (tile) => actions.onPick(tile),
+  });
+  tabs.show(COAST_GROUPS[0]!.id);
+  tiles.select(startWith.code);
 
-  const grid = document.createElement("div");
-  grid.className = "ed-palette";
-  root.appendChild(grid);
-
-  const swatches = new Map<string, HTMLButtonElement>();
-  let picked = startWith.code;
+  const steps = toolRow(root, [
+    { id: "undo", label: "↶ Undo", onClick: actions.onUndo },
+    { id: "redo", label: "↷ Redo", onClick: actions.onRedo },
+  ]);
+  const zooms = toolRow(root, [
+    { id: "out", label: "− Out", onClick: () => actions.onZoom(-1) },
+    { id: "in", label: "+ In", onClick: () => actions.onZoom(1) },
+  ]);
   let erasing = false;
-  let showing: CoastGroupId = COAST_GROUPS[0]!.id;
+  let gridOn = true;
+  const tools = toolRow(root, [
+    { id: "rubber", label: "Rubber", onClick: () => actions.onErasing(!erasing) },
+    {
+      id: "grid",
+      label: "Grid",
+      active: true,
+      onClick: () => {
+        gridOn = !gridOn;
+        tools.setActive("grid", gridOn);
+        actions.onGrid(gridOn);
+      },
+    },
+  ]);
 
-  const eraseBtn = document.createElement("button");
-  const markPicked = (): void => {
-    for (const [code, el] of swatches) el.classList.toggle("selected", !erasing && code === picked);
-    eraseBtn.classList.toggle("active", erasing);
-  };
+  actionColumn(root, [
+    { label: "▶ Try it out", onClick: actions.onPlay, go: true },
+    { label: "Save outline", onClick: actions.onSave },
+    { label: "Open outline…", onClick: actions.onOpen },
+    { label: "Start again", onClick: actions.onReset },
+  ]);
 
-  const showGroup = (id: CoastGroupId): void => {
-    showing = id;
-    grid.innerHTML = "";
-    swatches.clear();
-    for (const tile of coastTilesIn(id)) {
-      const b = document.createElement("button");
-      b.className = "ed-swatch";
-      b.title = `${tile.label}  (${tile.code})`;
-      b.appendChild(swatch(sheets, tile));
-      b.addEventListener("click", () => {
-        picked = tile.code;
-        erasing = false;
-        actions.onPick(tile);
-        markPicked();
-      });
-      swatches.set(tile.code, b);
-      grid.appendChild(b);
-    }
-    markPicked();
-  };
-
-  const tabEls = new Map<CoastGroupId, HTMLButtonElement>();
-  for (const group of COAST_GROUPS) {
-    const b = document.createElement("button");
-    b.className = "ed-tab";
-    b.textContent = group.label;
-    b.addEventListener("click", () => {
-      for (const [id, el] of tabEls) el.classList.toggle("active", id === group.id);
-      showGroup(group.id);
-    });
-    tabEls.set(group.id, b);
-    tabs.appendChild(b);
-  }
-
-  const steps = document.createElement("div");
-  steps.className = "ed-tools";
-  const undoBtn = document.createElement("button");
-  undoBtn.className = "ed-tool";
-  undoBtn.textContent = "↶ Undo";
-  undoBtn.addEventListener("click", () => actions.onUndo());
-  const redoBtn = document.createElement("button");
-  redoBtn.className = "ed-tool";
-  redoBtn.textContent = "↷ Redo";
-  redoBtn.addEventListener("click", () => actions.onRedo());
-  steps.append(undoBtn, redoBtn);
-  root.appendChild(steps);
-
-  const zooms = document.createElement("div");
-  zooms.className = "ed-tools";
-  const outBtn = document.createElement("button");
-  outBtn.className = "ed-tool";
-  outBtn.textContent = "− Out";
-  outBtn.addEventListener("click", () => actions.onZoom(-1));
-  const inBtn = document.createElement("button");
-  inBtn.className = "ed-tool";
-  inBtn.textContent = "+ In";
-  inBtn.addEventListener("click", () => actions.onZoom(1));
-  zooms.append(outBtn, inBtn);
-  root.appendChild(zooms);
-
-  // A pad rather than a row: which way an arrow goes should be its position,
-  // not something to read off it.
-  const pad = document.createElement("div");
-  pad.className = "ed-pad";
-  const arrows = {} as Record<Way, HTMLButtonElement>;
-  const LAYOUT: (Way | null)[] = [null, "north", null, "west", null, "east", null, "south", null];
-  const GLYPH: Record<Way, string> = { north: "↑", south: "↓", west: "←", east: "→" };
-  for (const way of LAYOUT) {
-    const cell = document.createElement("button");
-    cell.className = "ed-tool";
-    if (!way) {
-      cell.className = "ed-pad-gap";
-      cell.disabled = true;
-      pad.appendChild(cell);
-      continue;
-    }
-    cell.textContent = GLYPH[way];
-    cell.title = `Look ${way}`;
-    cell.addEventListener("click", () => actions.onPan(way));
-    arrows[way] = cell;
-    pad.appendChild(cell);
-  }
-  root.appendChild(pad);
-
-  const tools = document.createElement("div");
-  tools.className = "ed-tools";
-  eraseBtn.className = "ed-tool";
-  eraseBtn.textContent = "Rubber";
-  eraseBtn.addEventListener("click", () => {
-    erasing = true;
-    actions.onErase();
-    markPicked();
-  });
-  const gridBtn = document.createElement("button");
-  gridBtn.className = "ed-tool active";
-  gridBtn.textContent = "Grid";
-  gridBtn.addEventListener("click", () => {
-    const on = !gridBtn.classList.contains("active");
-    gridBtn.classList.toggle("active", on);
-    actions.onGrid(on);
-  });
-  tools.append(eraseBtn, gridBtn);
-  root.appendChild(tools);
-
-  const buttons = document.createElement("div");
-  buttons.className = "ed-map";
-  const button = (label: string, onClick: () => void, className = "ed-action"): void => {
-    const b = document.createElement("button");
-    b.className = className;
-    b.textContent = label;
-    b.addEventListener("click", onClick);
-    buttons.appendChild(b);
-  };
-  button("▶ Try it out", actions.onPlay, "ed-action ed-action-go");
-  button("Save outline", actions.onSave);
-  button("Open outline…", actions.onOpen);
-  button("Start over", actions.onReset);
-  root.appendChild(buttons);
-
-  const hint = document.createElement("div");
-  hint.className = "ed-hint";
-  hint.textContent =
-    "Pick a tile, then paint it. The rubber and the right button both clear back to open water. Scroll or the arrow keys to get about. Only the band outside the fence is yours — inside it is where the game is played.";
-  root.appendChild(hint);
-
-  tabEls.get(showing)?.classList.add("active");
-  showGroup(showing);
+  hint(
+    root,
+    "Pick a tile, then paint it. The rubber and the right button both clear back to open water. Scroll to zoom, the arrows to get about. Only the band outside the fence is yours — inside it is where the game is played.",
+  );
 
   return {
-    refresh: () => showGroup(showing),
-    syncHistory(canUndo: boolean, canRedo: boolean): void {
-      undoBtn.disabled = !canUndo;
-      redoBtn.disabled = !canRedo;
+    refresh: () => tiles.refresh(),
+    syncErasing(on, brush) {
+      erasing = on;
+      tools.setActive("rubber", on);
+      tiles.select(on ? null : brush.code);
     },
-    syncZoom(canOut: boolean, canIn: boolean): void {
-      outBtn.disabled = !canOut;
-      inBtn.disabled = !canIn;
+    syncHistory(canUndo, canRedo) {
+      steps.setEnabled("undo", canUndo);
+      steps.setEnabled("redo", canRedo);
     },
-    syncPan(room: Record<Way, boolean>): void {
-      for (const [way, button] of Object.entries(arrows)) button.disabled = !room[way as Way];
+    syncZoom(canOut, canIn) {
+      zooms.setEnabled("out", canOut);
+      zooms.setEnabled("in", canIn);
     },
   };
 }

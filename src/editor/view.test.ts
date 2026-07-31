@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { centreView, clampView, panView, PAN_STEP, viewOrigin, type PanDir } from "./view";
+import type { PanDir } from "../panPad";
+import { centreView, clampView, panRoom, panView, PAN_STEP, viewOrigin } from "./view";
 import { unproject } from "../iso";
 
 const SIZE = 56;
@@ -93,5 +94,26 @@ describe("editor view", () => {
     const from = { col: 20, row: 20 };
     const seen = new Set(dirs.map((d) => JSON.stringify(panView(from, d, SIZE))));
     expect(seen.size).toBe(4);
+  });
+});
+
+describe("panRoom", () => {
+  it("has somewhere to go every way from the middle", () => {
+    expect(panRoom(centreView(SIZE), SIZE)).toEqual({ up: true, down: true, left: true, right: true });
+  });
+
+  it("says so where the board runs out", () => {
+    // The north corner of the diamond: up is both axes at once, and both are at 0.
+    expect(panRoom({ col: 0, row: 0 }, SIZE).up).toBe(false);
+    expect(panRoom({ col: SIZE - 1, row: SIZE - 1 }, SIZE).down).toBe(false);
+  });
+
+  it("agrees with the pan it is describing", () => {
+    for (const dir of ["up", "down", "left", "right"] as PanDir[]) {
+      for (const view of [{ col: 0, row: 0 }, { col: 20, row: 3 }, { col: SIZE - 1, row: SIZE - 1 }]) {
+        const moved = JSON.stringify(panView(view, dir, SIZE)) !== JSON.stringify(view);
+        expect(panRoom(view, SIZE)[dir], `${dir} from ${view.col},${view.row}`).toBe(moved);
+      }
+    }
   });
 });

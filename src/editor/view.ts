@@ -1,4 +1,5 @@
 import { SX, SY, type Origin } from "../iso";
+import type { PanDir, PanRoom } from "../panPad";
 
 // A board wider than the canvas needs a view: the cell held at the centre of the
 // screen. Panning moves that cell; the origin is derived from it.
@@ -9,8 +10,6 @@ export interface View {
   col: number;
   row: number;
 }
-
-export type PanDir = "up" | "down" | "left" | "right";
 
 // Screen directions, not grid ones: on an iso grid, straight up the screen is a
 // step along both axes at once.
@@ -33,6 +32,20 @@ export const centreView = (size: number): View => clampView({ col: (size - 1) / 
 
 export const panView = (view: View, dir: PanDir, size: number, step = PAN_STEP): View =>
   clampView({ col: view.col + STEPS[dir].col * step, row: view.row + STEPS[dir].row * step }, size);
+
+/**
+ * Which ways there is any board left to go — what greys an arrow out. A pan that
+ * lands you back where you were had nowhere to go, which `clampView` already
+ * decides, so this asks it rather than repeating the arithmetic.
+ */
+export function panRoom(view: View, size: number): PanRoom {
+  const room: PanRoom = {};
+  for (const dir of ["up", "down", "left", "right"] as PanDir[]) {
+    const to = panView(view, dir, size);
+    room[dir] = to.col !== view.col || to.row !== view.row;
+  }
+  return room;
+}
 
 /** Screen origin that parks `view` at the centre of a `viewW` x `viewH` canvas. */
 export const viewOrigin = (view: View, viewW: number, viewH: number): Origin => ({

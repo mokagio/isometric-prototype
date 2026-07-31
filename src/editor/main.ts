@@ -6,10 +6,12 @@ import { Board } from "./board";
 import { PALETTE } from "./palette";
 import { buildSidebar, clampHeight, type EditorState } from "./sidebar";
 import { renderEditor, type Cell } from "./render";
-import { centreView, panView, viewOrigin, type PanDir } from "./view";
-import { createPanPad } from "./panPad";
+import { centreView, panRoom, panView, viewOrigin } from "./view";
+import { createPanPad, type PanDir } from "../panPad";
+import { History, jsonSteps } from "../history";
+import { createPainter } from "../painter";
 import { boardToMap, loadMapIntoBoard, mapFilename } from "./mapIO";
-import { decodeMap, encodeMap, mapFromWorld, readyToPlay } from "../mapFormat";
+import { decodeMap, encodeMap, mapFromWorld, readyToPlay, type MapData } from "../mapFormat";
 import { downloadText, pickTextFile } from "../files";
 import { PLAY_STASHED_MAP_URL, recallMap, recallWorldSeed, stashMap, wantsStashedMap } from "../handoff";
 
@@ -32,12 +34,15 @@ async function main(): Promise<void> {
   const tileset = await loadTileset(tilesheetUrl);
 
   const board = new Board(MAP_SIZE);
-  const state: EditorState = { brush: PALETTE[0]!.tile, mode: "place", height: 0 };
+  const state: EditorState = { brush: PALETTE[0]!.tile, erasing: false, height: 0 };
   let view = centreView(board.size);
 
   let hover: Cell | null = null;
-  let painting = false;
-  let paintErase = false;
+
+  // The board is a class, so the snapshot is the map file it would write — which
+  // `mapIO` already knows how to make and to load back.
+  const history = new History(boardToMap(board), jsonSteps<MapData>());
+  const syncHistory = (): void => sidebar.syncHistory(history.canUndo, history.canRedo);
 
   let pending = false;
   const requestRender = (): void => {
@@ -55,8 +60,18 @@ async function main(): Promise<void> {
   const mayReplaceBoard = (): boolean =>
     board.placed === 0 || confirm("This replaces what you have built. Save it first if you want to keep it.");
 
+  // A board that arrived whole — opened, or loaded from the game. The past goes
+  // with it: undoing across someone else's map is not a step anybody meant.
   const showBoard = (): void => {
     view = centreView(board.size);
+    history.reset(boardToMap(board));
+    syncHistory();
+    requestRender();
+  };
+
+  const goTo = (map: MapData | null): void => {
+    if (map) loadMapIntoBoard(board, map);
+    syncHistory();
     requestRender();
   };
 
@@ -95,12 +110,22 @@ async function main(): Promise<void> {
     location.href = PLAY_STASHED_MAP_URL;
   };
 
+  const setErasing = (on: boolean): void => {
+    state.erasing = on;
+    sidebar.syncErasing();
+    requestRender();
+  };
+
   const sidebar = buildSidebar(sidebarEl, tileset, state, requestRender, {
     onSave: saveMap,
     onOpen: () => void openMap(),
     onLoadGameWorld: loadGameWorld,
     onPlay: playMap,
+    onUndo: () => goTo(history.undo()),
+    onRedo: () => goTo(history.redo()),
+    onErasing: setErasing,
   });
+  syncHistory();
 
   function draw(): void {
     const dpr = window.devicePixelRatio || 1;
@@ -112,50 +137,29 @@ async function main(): Promise<void> {
     renderEditor(ctx, tileset, board, viewOrigin(view, w, h), hover, state, w, h);
   }
 
-  const cellAt = (clientX: number, clientY: number): Cell => {
-    const rect = canvas.getBoundingClientRect();
-    const origin = viewOrigin(view, canvas.clientWidth, canvas.clientHeight);
-    return unproject(clientX - rect.left, clientY - rect.top, origin);
-  };
-
   const pan = (dir: PanDir): void => {
     view = panView(view, dir, board.size);
+    pad.setRoom(panRoom(view, board.size));
     requestRender();
   };
 
-  const applyAt = (cell: Cell, erase: boolean): void => {
-    if (!board.inBounds(cell.col, cell.row)) return;
-    if (erase) board.erase(cell.col, cell.row);
-    else board.place(cell.col, cell.row, state.brush, state.height);
-  };
-
-  canvas.addEventListener("mousemove", (e) => {
-    hover = cellAt(e.clientX, e.clientY);
-    if (painting) applyAt(hover, paintErase);
-    requestRender();
+  createPainter<Cell>(canvas, {
+    cellAt: (x, y) => unproject(x, y, viewOrigin(view, canvas.clientWidth, canvas.clientHeight)),
+    rubbing: () => state.erasing,
+    apply: (cell, rubbing) => {
+      if (!board.inBounds(cell.col, cell.row)) return;
+      if (rubbing) board.erase(cell.col, cell.row);
+      else board.place(cell.col, cell.row, state.brush, state.height);
+      requestRender();
+    },
+    onHover: (cell) => {
+      hover = cell;
+      requestRender();
+    },
+    onStroke: () => {
+      if (history.record(boardToMap(board))) syncHistory();
+    },
   });
-
-  canvas.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    const cell = cellAt(e.clientX, e.clientY);
-    hover = cell;
-    paintErase = e.button === 2 || state.mode === "erase";
-    painting = true;
-    applyAt(cell, paintErase);
-    requestRender();
-  });
-
-  const stop = (): void => {
-    painting = false;
-  };
-  window.addEventListener("mouseup", stop);
-  canvas.addEventListener("mouseleave", () => {
-    hover = null;
-    stop();
-    requestRender();
-  });
-
-  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
   canvas.addEventListener(
     "wheel",
@@ -169,13 +173,20 @@ async function main(): Promise<void> {
   );
 
   window.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      goTo(e.shiftKey ? history.redo() : history.undo());
+      return;
+    }
+    if (e.key === "e" || e.key === "E") return setErasing(!state.erasing);
     const dir = PAN_KEYS[e.key.toLowerCase()];
     if (!dir) return;
     e.preventDefault(); // arrows would otherwise scroll the page under the board
     pan(dir);
   });
 
-  createPanPad(editorEl, pan);
+  const pad = createPanPad(editorEl, pan);
+  pad.setRoom(panRoom(view, board.size));
 
   // Arrived from the game's Edit Map: open what was being played. An empty board
   // is a fine fallback, so a stash that will not read is worth a word and no more.
@@ -186,6 +197,8 @@ async function main(): Promise<void> {
     } catch (e) {
       alert(e instanceof Error ? e.message : "That map could not be opened.");
     }
+    history.reset(boardToMap(board));
+    syncHistory();
   }
 
   window.addEventListener("resize", requestRender);

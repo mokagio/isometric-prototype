@@ -1,19 +1,23 @@
+import { actionColumn, backLinks, heading, hint, swatchGrid, toolRow, type ToolRow } from "../editorUi";
 import { TILE, type Tileset } from "../tileset";
 import type { Tile } from "../world";
 import { MAX_BUILD_HEIGHT } from "./board";
-import { PALETTE } from "./palette";
-
-export type Mode = "place" | "erase";
+import { PALETTE, type PaletteEntry } from "./palette";
 
 export interface EditorState {
   brush: Tile;
-  mode: Mode;
+  /** The rubber is in hand, so a press rubs out rather than places. */
+  erasing: boolean;
   height: number;
 }
 
 export interface SidebarHandle {
   /** Refresh the height readout after the wheel changes it from the canvas. */
   syncHeight(): void;
+  /** Show the rubber as picked up, or put back down. */
+  syncErasing(): void;
+  /** Grey out whichever of undo and redo has nowhere to go. */
+  syncHistory(canUndo: boolean, canRedo: boolean): void;
 }
 
 export interface MapActions {
@@ -25,6 +29,10 @@ export interface MapActions {
   onLoadGameWorld: () => void;
   /** Hand the board to the game and go and play it. */
   onPlay: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  /** Put the rubber down or pick it up. */
+  onErasing: (on: boolean) => void;
 }
 
 export function clampHeight(h: number): number {
@@ -51,74 +59,40 @@ export function buildSidebar(
   actions: MapActions,
 ): SidebarHandle {
   root.innerHTML = "";
+  backLinks(root, [["game.html", "← World"]]);
 
-  const back = document.createElement("a");
-  back.className = "ed-back";
-  back.href = "game.html";
-  back.textContent = "← World";
-  root.appendChild(back);
+  heading(root, "Tiles");
+  const tiles = swatchGrid<PaletteEntry>(
+    root,
+    {
+      key: (entry) => entry.label,
+      label: (entry) => entry.label,
+      face: (entry) => swatch(tileset, entry.tile),
+      onPick: (entry) => {
+        state.brush = entry.tile;
+        state.erasing = false; // picking a tile implies you want to place it
+        tools.setActive("rubber", false);
+        onChange();
+      },
+    },
+    PALETTE,
+  );
+  tiles.select(PALETTE[0]!.label);
 
-  const heading = (text: string): void => {
-    const h = document.createElement("div");
-    h.className = "ed-heading";
-    h.textContent = text;
-    root.appendChild(h);
-  };
+  heading(root, "Tool");
+  const steps = toolRow(root, [
+    { id: "undo", label: "↶ Undo", onClick: actions.onUndo },
+    { id: "redo", label: "↷ Redo", onClick: actions.onRedo },
+  ]);
+  const tools: ToolRow = toolRow(root, [
+    {
+      id: "rubber",
+      label: "Rubber",
+      onClick: () => actions.onErasing(!state.erasing),
+    },
+  ]);
 
-  // Palette --------------------------------------------------------------
-  heading("Tiles");
-  const grid = document.createElement("div");
-  grid.className = "ed-palette";
-  const swatchEls: HTMLButtonElement[] = [];
-  PALETTE.forEach((entry, i) => {
-    const b = document.createElement("button");
-    b.className = "ed-swatch";
-    b.title = entry.label;
-    b.appendChild(swatch(tileset, entry.tile));
-    b.addEventListener("click", () => {
-      state.brush = entry.tile;
-      state.mode = "place"; // picking a tile implies you want to place it
-      swatchEls.forEach((el) => el.classList.remove("selected"));
-      b.classList.add("selected");
-      syncMode();
-      onChange();
-    });
-    if (i === 0) b.classList.add("selected");
-    swatchEls.push(b);
-    grid.appendChild(b);
-  });
-  root.appendChild(grid);
-
-  // Mode -----------------------------------------------------------------
-  heading("Tool");
-  const tools = document.createElement("div");
-  tools.className = "ed-tools";
-  const placeBtn = document.createElement("button");
-  placeBtn.className = "ed-tool";
-  placeBtn.textContent = "Place";
-  const eraseBtn = document.createElement("button");
-  eraseBtn.className = "ed-tool";
-  eraseBtn.textContent = "Erase";
-  const syncMode = (): void => {
-    placeBtn.classList.toggle("active", state.mode === "place");
-    eraseBtn.classList.toggle("active", state.mode === "erase");
-  };
-  placeBtn.addEventListener("click", () => {
-    state.mode = "place";
-    syncMode();
-    onChange();
-  });
-  eraseBtn.addEventListener("click", () => {
-    state.mode = "erase";
-    syncMode();
-    onChange();
-  });
-  tools.append(placeBtn, eraseBtn);
-  root.appendChild(tools);
-  syncMode();
-
-  // Height ---------------------------------------------------------------
-  heading("Height");
+  heading(root, "Height");
   const hc = document.createElement("div");
   hc.className = "ed-height";
   const down = document.createElement("button");
@@ -146,27 +120,31 @@ export function buildSidebar(
   root.appendChild(hc);
   syncHeight();
 
-  // Map -------------------------------------------------------------------
-  heading("Map");
-  const mapButtons = document.createElement("div");
-  mapButtons.className = "ed-map";
-  const button = (label: string, onClick: () => void, className = "ed-action"): void => {
-    const b = document.createElement("button");
-    b.className = className;
-    b.textContent = label;
-    b.addEventListener("click", onClick);
-    mapButtons.appendChild(b);
+  heading(root, "Map");
+  actionColumn(root, [
+    { label: "▶ Play this map", onClick: actions.onPlay, go: true },
+    { label: "Save map", onClick: actions.onSave },
+    { label: "Open map…", onClick: actions.onOpen },
+    { label: "Load game world", onClick: actions.onLoadGameWorld },
+  ]);
+
+  hint(root, "Scroll to change height. The rubber and the right button both rub out. Arrow keys pan the map.");
+
+  const syncErasing = (): void => {
+    tools.setActive("rubber", state.erasing);
+    tiles.select(state.erasing ? null : entryFor(state.brush)?.label ?? null);
   };
-  button("▶ Play this map", actions.onPlay, "ed-action ed-action-go");
-  button("Save map", actions.onSave);
-  button("Open map…", actions.onOpen);
-  button("Load game world", actions.onLoadGameWorld);
-  root.appendChild(mapButtons);
+  syncErasing();
 
-  const hint = document.createElement("div");
-  hint.className = "ed-hint";
-  hint.textContent = "Scroll to change height. Right-click erases. Arrow keys pan the map.";
-  root.appendChild(hint);
-
-  return { syncHeight };
+  return {
+    syncHeight,
+    syncErasing,
+    syncHistory(canUndo, canRedo) {
+      steps.setEnabled("undo", canUndo);
+      steps.setEnabled("redo", canRedo);
+    },
+  };
 }
+
+const entryFor = (tile: Tile): PaletteEntry | undefined =>
+  PALETTE.find((entry) => entry.tile[0] === tile[0] && entry.tile[1] === tile[1]);
