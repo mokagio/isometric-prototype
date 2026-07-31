@@ -1,5 +1,5 @@
 import { blitFrame, frameAt, type Sheet } from "../sprites";
-import { variantAt, type Ground, type Prop, type TileRef } from "./library";
+import { isProp, variantAt, type Asset, type Ground, type Prop, type TileRef } from "./library";
 import { SHEETS, type SheetId } from "./sheets";
 
 // Painting library assets onto a canvas. The editor and the game both come
@@ -101,4 +101,41 @@ export function drawProp(
   for (const tile of art.tiles) {
     drawSheetTile(ctx, book, art.sheet, tile, left + tile.dx * cellW * scale, top + tile.dy * cellH * scale, scale);
   }
+}
+
+/**
+ * How wide and tall a thing draws on its own, in sheet pixels — what a swatch
+ * has to make room for. A sprite is its whole frame, whatever footprint the
+ * thing claims on the ground.
+ */
+export function swatchExtent(asset: Asset): { w: number; h: number } {
+  if (!isProp(asset)) return { w: GRID, h: GRID };
+  if (asset.art.kind === "sprite") {
+    const { cellW, cellH } = SHEETS[asset.art.sheet];
+    return { w: cellW, h: cellH };
+  }
+  if (asset.art.kind === "tileStrip") return { w: GRID, h: GRID };
+  return { w: asset.w * GRID, h: asset.h * GRID };
+}
+
+/**
+ * Draw a thing on its own, with its top-left at `(x, y)` — for a swatch, where
+ * there is no island underneath and nothing to stand on. Props draw from the
+ * cell they stand on, so this offsets by that cell for them.
+ */
+export function drawAsset(
+  ctx: CanvasRenderingContext2D,
+  book: SheetBook,
+  asset: Asset,
+  x: number,
+  y: number,
+  scale: number,
+  t = 0,
+): void {
+  if (!isProp(asset)) {
+    const tile = groundTile(asset, 0, 0);
+    if (tile) drawSheetTile(ctx, book, asset.sheet, tile, x, y, scale);
+    return;
+  }
+  drawProp(ctx, book, asset, x + asset.base.dx * GRID * scale, y + asset.base.dy * GRID * scale, scale, t);
 }

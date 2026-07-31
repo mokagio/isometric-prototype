@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Library | Games Playground</title>
+    <style>
+      body {
+        min-height: 100%;
+        margin: 0;
+        background: #2c2016;
+        color: #f4e4c1;
+        font-family: Georgia, "Times New Roman", serif;
+      }
+
+      .lib-bar {
+        position: sticky;
+        top: 0;
+        /* The same layer the menu sits on, and earlier in the document, so the
+           menu stays clear of the bar rather than under it. */
+        z-index: 1;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 10px 18px;
+        padding: var(--ww-inset-top) calc(var(--ww-inset-right) + 64px) 14px var(--ww-inset-left);
+        background: #2c2016;
+        border-bottom: 3px solid #6b4f34;
+      }
+      .lib-bar h1 {
+        margin: 0;
+        font-family: var(--ww-pixel);
+        font-size: 15px;
+        line-height: 1.4;
+        color: #f4e4c1;
+      }
+      .lib-tally { color: #8a6f52; font-size: 14px; font-variant-numeric: tabular-nums; }
+      .lib-search {
+        margin-left: auto;
+        min-width: 180px;
+        padding: 8px 11px;
+        font: inherit;
+        font-size: 15px;
+        color: #f4e4c1;
+        background: #3b2a1c;
+        border: 2px solid #6b4f34;
+        border-radius: 8px;
+      }
+      .lib-search::placeholder { color: #8a6f52; }
+      .lib-search:focus-visible { outline: 3px solid #7cc24a; outline-offset: 1px; border-color: #7cc24a; }
+
+      main { padding: 0 var(--ww-inset-right) calc(var(--ww-inset-bottom) + 40px) var(--ww-inset-left); }
+      section[hidden] { display: none; }
+
+      .lib-head { display: flex; align-items: center; gap: 12px; margin: 30px 0 12px; }
+      .lib-head h2 {
+        margin: 0;
+        font-family: var(--ww-pixel);
+        font-size: 11px;
+        color: #c9a86a;
+      }
+      .lib-rule { flex: 1; height: 2px; background: #6b4f34; }
+      .lib-count { color: #8a6f52; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+      .lib-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+        gap: 10px;
+      }
+      .lib-card {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        margin: 0;
+        padding: 7px 7px 9px;
+        background: #3b2a1c;
+        border: 2px solid #6b4f34;
+        border-radius: 10px;
+      }
+      .lib-card[hidden] { display: none; }
+      .lib-cell {
+        position: relative;
+        display: grid;
+        place-items: center;
+        height: 84px;
+        border-radius: 6px;
+        /* A checker behind the art, so what is transparent reads as transparent
+           rather than as part of the thing. */
+        background: repeating-conic-gradient(#46351f 0 25%, #34261a 0 50%) 0 0 / 14px 14px;
+        overflow: hidden;
+      }
+      .lib-cell canvas { max-width: 100%; height: auto; image-rendering: pixelated; }
+      .lib-size {
+        position: absolute;
+        right: 3px;
+        bottom: 2px;
+        padding: 1px 4px;
+        border-radius: 4px;
+        background: rgba(27, 43, 26, 0.8);
+        color: #c9a86a;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+      figcaption { display: flex; flex-direction: column; gap: 2px; text-align: center; }
+      .lib-label { font-size: 13px; line-height: 1.25; text-wrap: balance; }
+      figcaption code { font-size: 10.5px; color: #8a6f52; word-break: break-all; }
+    </style>
+  </head>
+  <body>
+    <div class="lib-bar">
+      <h1>Library</h1>
+      <span class="lib-tally" id="tally"></span>
+      <input class="lib-search" id="search" type="search" placeholder="Find a thing…" aria-label="Find a thing" />
+    </div>
+    <main id="catalog"></main>
+    <script type="module" src="/src/sunnyside/catalogPage.ts"></script>
+  </body>
+</html>

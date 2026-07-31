@@ -241,6 +241,14 @@ canvas {
   color: #f4e4c1;
   user-select: none;
 }
+/* Stacked, since the sidebar is too narrow to hold two of these side by side. */
+.ed-links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.ed-links .ed-back { margin-bottom: 0; }
 .ed-back {
   display: inline-block;
   margin-bottom: 12px;

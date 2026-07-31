@@ -1,24 +1,12 @@
-import { drawProp, drawSheetTile, type SheetBook } from "../../sunnyside/draw";
-import { isProp, type Asset, type CategoryId } from "../../sunnyside/library";
+import { drawAsset, swatchExtent, type SheetBook } from "../../sunnyside/draw";
+import type { Asset, CategoryId } from "../../sunnyside/library";
 import { BRUSHES, CATEGORIES, PROPS } from "../../sunnyside/manifest";
-import { SHEETS } from "../../sunnyside/sheets";
 
 // The library, down the side of the screen: a row of category buttons and a grid
 // of what is in the one you picked. Everything is drawn from the same sheets the
 // island is, so a swatch is the thing itself rather than a picture of it.
 
 const SWATCH = 48;
-
-/** How wide and tall a thing draws, in sheet pixels. */
-function extent(asset: Asset): { w: number; h: number } {
-  if (!isProp(asset)) return { w: 16, h: 16 };
-  if (asset.art.kind === "sprite") {
-    const { cellW, cellH } = SHEETS[asset.art.sheet];
-    return { w: cellW, h: cellH };
-  }
-  if (asset.art.kind === "tileStrip") return { w: 16, h: 16 };
-  return { w: asset.w * 16, h: asset.h * 16 };
-}
 
 /** A small canvas with the asset drawn on it, sized to fit. */
 function swatch(book: SheetBook, asset: Asset): HTMLCanvasElement {
@@ -28,17 +16,9 @@ function swatch(book: SheetBook, asset: Asset): HTMLCanvasElement {
   const g = c.getContext("2d");
   if (!g) return c;
   g.imageSmoothingEnabled = false;
-  const size = extent(asset);
+  const size = swatchExtent(asset);
   const scale = Math.max(1, Math.min(SWATCH / size.w, SWATCH / size.h));
-  const x = (SWATCH - size.w * scale) / 2;
-  const y = (SWATCH - size.h * scale) / 2;
-  if (!isProp(asset)) {
-    const tile = asset.variants[0];
-    if (tile) drawSheetTile(g, book, asset.sheet, tile, x, y, scale);
-    return c;
-  }
-  // Props draw from the cell they stand on, so the swatch offsets by that cell.
-  drawProp(g, book, asset, x + asset.base.dx * 16 * scale, y + asset.base.dy * 16 * scale, scale, 0);
+  drawAsset(g, book, asset, (SWATCH - size.w * scale) / 2, (SWATCH - size.h * scale) / 2, scale);
   return c;
 }
 
@@ -67,11 +47,18 @@ export function buildPalette(
 ): PaletteHandle {
   root.innerHTML = "";
 
-  const back = document.createElement("a");
-  back.className = "ed-back";
-  back.href = "woods.html";
-  back.textContent = "← Woods";
-  root.appendChild(back);
+  const links = document.createElement("div");
+  links.className = "ed-links";
+  const link = (href: string, text: string): void => {
+    const a = document.createElement("a");
+    a.className = "ed-back";
+    a.href = href;
+    a.textContent = text;
+    links.appendChild(a);
+  };
+  link("woods.html", "← Woods");
+  link("library.html", "All the things →");
+  root.appendChild(links);
 
   const tabs = document.createElement("div");
   tabs.className = "ed-tabs";

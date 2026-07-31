@@ -1,7 +1,7 @@
 # Games Playground
 
 An isometric browser prototype: TypeScript, Vite, no framework, no runtime dependencies.
-Six pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), Peaceful Plains (`game.html`, entry `main.ts`), Whispering Woods (`woods.html`, entry `woods/main.ts`), a world editor for it (`editor.html`), an island editor for the Woods (`woodsEditor.html`, entry `woods/editor/main.ts`), and credits (`credits.html`).
+Seven pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), Peaceful Plains (`game.html`, entry `main.ts`), Whispering Woods (`woods.html`, entry `woods/main.ts`), a world editor for it (`editor.html`), an island editor for the Woods (`woodsEditor.html`, entry `woods/editor/main.ts`), the asset library (`library.html`, entry `sunnyside/catalogPage.ts`), and credits (`credits.html`).
 A new game is an entry in `games.ts` plus its own page and Rollup input.
 Only Peaceful Plains is isometric: Whispering Woods is drawn straight down the screen, and shares the input, sprite, loop, and viewport plumbing but none of `iso.ts`.
 
@@ -67,6 +67,7 @@ The felling blow bursts three logs out of the stump (`woods/logs.ts`): the only 
 `src/sunnyside/` names the pack's art — around 210 ground brushes and props — as a manifest over the sheets vendored whole in `public/sunnyside/`, so nothing is re-cut and a wrong tile is a number to change.
 `ASSETS.md` is the whole story: what an asset is, how to add one, what the pack's own GameMaker project tells you (and the two things it says that are wrong), and why autotiled paths are deferred.
 `draw.ts` is the one painter; the island editor and Whispering Woods both go through it, so a cell someone paints is the cell they later walk on.
+`library.html` shows the lot, drawn by that same painter off the same manifest — which makes it the answer to "does everything in there actually draw" as well as somewhere to go looking. It is reached from the editor's sidebar, and `catalog.ts` holds the grouping and the search so both can be tested without a document.
 
 ## Islands
 
