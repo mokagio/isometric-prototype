@@ -3,6 +3,7 @@ import { Hero } from "./hero";
 import { Lives } from "./lives";
 import { CONTACT, MELEE, MonsterField, SPAWN_MAX, SPAWN_MIN, SPEED } from "./monsters";
 import { ATTACK_DURATION, ATTACK_HIT_AT, Swing } from "./swing";
+import { HP, LASH_REACH, Treant } from "./treant";
 import type { World } from "./world";
 
 // Same `new Image()` stub the monster tests use: the node environment has none.
@@ -116,5 +117,57 @@ describe("fighting off an incoming monster", () => {
     // Otherwise the kill resolves a further ATTACK_DURATION - ATTACK_HIT_AT late,
     // eating most of the margin the reach above buys.
     expect(ATTACK_HIT_AT).toBeLessThan(ATTACK_DURATION);
+  });
+});
+
+/**
+ * The same hero, swing and lives against the boss, wired the way `main.ts` wires
+ * them, with the player holding the attack button and closing back to `away` cells
+ * whenever the lash shoves them off it. Returns the hearts it cost and what the
+ * boss had left.
+ */
+function bossFight(away: number): { cost: number; hp: number } {
+  const hero = new Hero(ORIGIN, ORIGIN + away, FLAT);
+  const lives = new Lives();
+  const swing = new Swing();
+  const boss = new Treant();
+  const at = { col: ORIGIN, row: ORIGIN };
+
+  const before = lives.lives;
+  for (let t = 0; t < 30 && boss.alive; t += DT) {
+    swing.start();
+    // Walk back in when knocked off the mark, and hold there once on it.
+    const gap = Math.hypot(hero.col - at.col, hero.row - at.row) - away;
+    const closing = gap > 0.05 ? { axis: { dc: 0, dr: -1 }, jump: false } : STILL;
+    hero.update(DT, closing, FLAT);
+
+    const fromBoss = Math.hypot(hero.col - at.col, hero.row - at.row);
+    if (swing.update(DT) && boss.alive && fromBoss <= MELEE) boss.hit();
+    if (boss.update(DT) && fromBoss <= LASH_REACH && lives.hit()) {
+      hero.knockback(hero.col - at.col, hero.row - at.row);
+    }
+  }
+  return { cost: before - lives.lives, hp: boss.hp };
+}
+
+describe("standing up to the boss", () => {
+  it("falls to the hero's own sword, at the hero's own reach", () => {
+    expect(bossFight(MELEE - 0.1).hp).toBe(0);
+  });
+
+  it("costs hearts to stand inside the lash while doing it", () => {
+    // The trade the fight is made of: close enough to swing is close enough to
+    // be caught, so the hero has to step out between roars.
+    expect(bossFight(MELEE - 0.1).cost).toBeGreaterThan(0);
+  });
+
+  it("cannot be worn down from outside the blade", () => {
+    expect(bossFight(MELEE + 0.5).hp).toBe(HP);
+  });
+
+  it("keeps the lash reaching past the blade, so there is no free swing", () => {
+    // If the hero could hit it from outside its reach the fight would be a
+    // formality — stand at MELEE and hold the button.
+    expect(LASH_REACH).toBeGreaterThan(MELEE);
   });
 });
