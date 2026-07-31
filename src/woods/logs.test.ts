@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MAX_DT } from "../loop";
-import { LOG_REACH, Logs, LOGS_PER_TREE, PICKUP_RANGE } from "./logs";
+import { BOSS_LOG_REACH, LOG_REACH, Logs, LOGS_PER_TREE, PICKUP_RANGE } from "./logs";
 
 const DT = 1 / 60;
 const STUMP = { x: 200, y: 200 };
@@ -39,6 +39,27 @@ describe("Logs.spawn", () => {
         expect(Math.hypot(log.x - STUMP.x, log.y - STUMP.y), `dt ${dt}`).toBeLessThanOrEqual(LOG_REACH);
         expect(log.y).toBeGreaterThanOrEqual(STUMP.y); // never behind the stump
       }
+    }
+  });
+
+  it("throws a bigger burst wider, and still in front of the stump", () => {
+    const logs = new Logs();
+    logs.spawn(STUMP, 9);
+    expect(logs.list().length).toBe(9);
+    settle(logs);
+    const away = logs.list().map((l) => Math.hypot(l.x - STUMP.x, l.y - STUMP.y));
+    for (const log of logs.list()) expect(log.y).toBeGreaterThanOrEqual(STUMP.y);
+    expect(Math.max(...away)).toBeLessThanOrEqual(BOSS_LOG_REACH);
+    // Spread over the ground, not lined up on one arc at one distance.
+    expect(Math.max(...away) - Math.min(...away)).toBeGreaterThan(LOG_REACH / 2);
+  });
+
+  it("leaves a tree's own three logs where they were", () => {
+    const logs = new Logs();
+    logs.spawn(STUMP);
+    settle(logs);
+    for (const log of logs.list()) {
+      expect(Math.hypot(log.x - STUMP.x, log.y - STUMP.y)).toBeLessThanOrEqual(LOG_REACH);
     }
   });
 

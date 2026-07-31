@@ -18,12 +18,19 @@ export const DRAG = 0.6; // sideways speed kept per bounce, so they stop rolling
 export const PICKUP_RANGE = 10;
 
 /**
- * The furthest from the stump a log ever comes to rest. Two hops of the burst
- * above carry it 16.4 world pixels at worst — measured across frame steps up to
- * the loop's `MAX_DT` clamp, since a coarser step overshoots each landing —
+ * The furthest from the stump a *tree's* log ever comes to rest. Two hops of the
+ * burst above carry it 16.4 world pixels at worst — measured across frame steps
+ * up to the loop's `MAX_DT` clamp, since a coarser step overshoots each landing —
  * and the tests hold it to this.
  */
 export const LOG_REACH = 18;
+
+/**
+ * The same for a burst bigger than a tree's, which is thrown along `RUNGS` and so
+ * carries further. It buys no edge clearance: the only thing that throws one is
+ * the boss, which stands mid-field.
+ */
+export const BOSS_LOG_REACH = 32;
 
 // Half the sprite, so a log lying at full reach still has none of itself over
 // the edge of the field.
@@ -40,6 +47,26 @@ const SPREAD: ReadonlyArray<Pos> = [
   { x: 0.9, y: 0.45 },
 ];
 
+// Thrown at one speed, a burst lands on a single arc, which reads as a fence
+// rather than a scatter. Stepping through these rungs puts each log down at its
+// own distance. A tree's three are left alone: they scatter fine as they are.
+const RUNGS = [1.55, 0.7, 1.2, 0.95, 1.75];
+
+/**
+ * A heading along the arc `SPREAD` sets out, `t` running 0 to 1 across it. A
+ * three-log burst lands back on `SPREAD` exactly; a bigger one fans between its
+ * points rather than throwing several logs down the same three lines, which would
+ * pile them on three spots.
+ */
+function spreadAt(t: number): Pos {
+  const along = t * (SPREAD.length - 1);
+  const i = Math.min(SPREAD.length - 2, Math.floor(along));
+  const f = along - i;
+  const a = SPREAD[i]!;
+  const b = SPREAD[i + 1]!;
+  return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+}
+
 export interface Log {
   x: number;
   y: number;
@@ -54,16 +81,17 @@ export class Logs {
   private logs: Log[] = [];
   collected = 0;
 
-  /** Burst `LOGS_PER_TREE` logs out of a stump. */
-  spawn(at: Pos): void {
-    for (let i = 0; i < LOGS_PER_TREE; i++) {
-      const dir = SPREAD[i % SPREAD.length]!;
+  /** Burst logs out of a stump — a tree's worth, or more from something bigger. */
+  spawn(at: Pos, count = LOGS_PER_TREE): void {
+    for (let i = 0; i < count; i++) {
+      const dir = spreadAt(count === 1 ? 0.5 : i / (count - 1));
+      const out = BURST_OUT * (count > LOGS_PER_TREE ? RUNGS[i % RUNGS.length]! : 1);
       this.logs.push({
         x: at.x,
         y: at.y,
         z: 0,
-        vx: dir.x * BURST_OUT,
-        vy: dir.y * BURST_OUT,
+        vx: dir.x * out,
+        vy: dir.y * out,
         vz: BURST_UP,
         resting: false,
       });
