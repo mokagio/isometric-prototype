@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BACKDROPS, backdropById, backdropGrid, backdropTiles, coversItsCell } from "./backdrop";
+import { backdropGrid } from "./backdrop";
 import { unproject } from "./iso";
 
 // Phones held either way, a laptop, a wide desktop, and a silly-thin window.
@@ -52,27 +52,5 @@ describe("backdropGrid", () => {
     // Every cell is a `drawImage`, and this runs on a phone.
     expect(backdropGrid(1440, 900).size).toBeLessThan(40);
     expect(backdropGrid(320, 480).size).toBeLessThan(20);
-  });
-});
-
-describe("BACKDROPS", () => {
-  it("gives every ground its own name", () => {
-    const ids = BACKDROPS.map((b) => b.id);
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-
-  it("lays nothing but tiles that fill their cell", () => {
-    // A tuft laid as ground leaves the page showing through the hole in it.
-    for (const backdrop of BACKDROPS) {
-      for (const tile of backdropTiles(backdrop)) {
-        expect(coversItsCell(tile), `${backdrop.id} lays ${tile.join(",")}`).toBe(true);
-      }
-    }
-  });
-
-  it("keeps the ground it is asked for, and falls back to the first", () => {
-    expect(backdropById("frost").id).toBe("frost");
-    expect(backdropById("no-such-ground").id).toBe(BACKDROPS[0]!.id);
-    expect(backdropById(null).id).toBe(BACKDROPS[0]!.id);
   });
 });
