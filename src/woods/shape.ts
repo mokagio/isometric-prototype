@@ -45,37 +45,18 @@ export function shoreDepth(side: Side, along: number): number {
 }
 
 /**
- * The generated wander: what the island looks like when nobody has drawn one.
+ * Whether a cell is part of the island.
  *
  * Each side pushes in independently, so the corners are where two wanders meet —
  * which is what gives the island its headlands.
  */
-export function grownLand(col: number, row: number): boolean {
+export function isLand(col: number, row: number): boolean {
   if (col < 0 || row < 0 || col >= FIELD || row >= FIELD) return false;
   if (row < shoreDepth("north", col)) return false;
   if (row > FIELD - 1 - shoreDepth("south", col)) return false;
   if (col < shoreDepth("west", row)) return false;
   if (col > FIELD - 1 - shoreDepth("east", row)) return false;
   return true;
-}
-
-// The outline in play, when someone has drawn one. Everything that draws the
-// coast asks `isLand`, so setting this is all it takes for a hand-drawn island to
-// replace the grown one — in the game, in either editor, everywhere.
-let drawn: readonly boolean[] | null = null;
-
-/** Hand over a drawn outline, or `null` to go back to the grown one. */
-export function setOutline(outline: readonly boolean[] | null): void {
-  drawn = outline && outline.length === FIELD * FIELD ? outline : null;
-}
-
-/** Whether an outline has been drawn over the grown one. */
-export const hasOutline = (): boolean => drawn !== null;
-
-/** Whether a cell is part of the island — drawn if one was, grown if not. */
-export function isLand(col: number, row: number): boolean {
-  if (col < 0 || row < 0 || col >= FIELD || row >= FIELD) return false;
-  return drawn ? drawn[row * FIELD + col] === true : grownLand(col, row);
 }
 
 /** Land on each side of a cell — everything the shore tiles are chosen from. */
