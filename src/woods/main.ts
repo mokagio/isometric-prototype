@@ -30,6 +30,8 @@ import {
 import { decodeOutline, setDrawnOutline } from "./outline";
 import { facingFrom, walk, type Facing, type Pos } from "./walker";
 import { AXE_REACH, Chop, CHOP_FRAMES, Wood } from "./wood";
+import { BOSS_CELL, BOSS_LOGS, BOSS_SCALE, BOSS_TRUNK, bossBase, BossTree } from "./bossTree";
+import { TreantArt } from "../treant";
 
 // Sunnyside sheet contract: horizontal strips of 96x64 frames, played at 12 fps,
 // drawn in one facing only — so left is right mirrored.
@@ -86,6 +88,12 @@ const TRUNK_BOX: Box = {
   dy: -TRUNK.top * ZOOM,
   w: 2 * TRUNK.halfW * ZOOM,
   h: (TRUNK.top + TRUNK.bottom) * ZOOM,
+};
+const BOSS_BOX: Box = {
+  dx: -BOSS_TRUNK.halfW * ZOOM,
+  dy: -BOSS_TRUNK.top * ZOOM,
+  w: 2 * BOSS_TRUNK.halfW * ZOOM,
+  h: (BOSS_TRUNK.top + BOSS_TRUNK.bottom) * ZOOM,
 };
 // Half the figure's width, so it never stands half over the void.
 const EDGE_INSET = 6;
@@ -176,12 +184,19 @@ function main(): void {
     for (const placed of island.props) if (placed.id === TREE_PROP) plantedTrees.add(`${placed.col},${placed.row}`);
   }
   const hasTree = island ? (col: number, row: number): boolean => plantedTrees.has(`${col},${row}`) : treeAt;
-  const blocked = island ? blockedOn(island) : blockedByTree;
+  const groundBlocked = island ? blockedOn(island) : blockedByTree;
 
   const wood = new Wood(hasTree);
+  const boss = new BossTree();
+  const bossArt = new TreantArt();
+  const blocked = (feet: Pos): boolean => groundBlocked(feet) || boss.blocks(feet);
   const chop = new Chop();
+  const isBoss = (cell: { col: number; row: number }): boolean =>
+    cell.col === BOSS_CELL.col && cell.row === BOSS_CELL.row;
+  // The boss wins a tie: standing where its roots do, an ordinary trunk is not
+  // what you meant to swing at.
   const swingAxe = (): void => {
-    const target = wood.inReach(pos);
+    const target = boss.inReach(pos) ? BOSS_CELL : wood.inReach(pos);
     if (target) chop.start(target);
   };
   const action = createActionButton(swingAxe);
@@ -250,12 +265,18 @@ function main(): void {
     }
     if (chop.update(dt) && chop.target) {
       const { col, row } = chop.target;
-      // The blow that fells it bursts its logs out of the stump.
-      if (wood.hit(col, row)) logs.spawn({ x: col * TILE + TILE / 2, y: row * TILE + TILE / 2 });
+      // The blow that fells it bursts its logs out of the stump — an armful from
+      // the boss, where an ordinary tree gives three.
+      if (isBoss(chop.target)) {
+        if (boss.hit()) logs.spawn(bossBase(), BOSS_LOGS);
+      } else if (wood.hit(col, row)) {
+        logs.spawn({ x: col * TILE + TILE / 2, y: row * TILE + TILE / 2 });
+      }
     }
     wood.update(dt);
+    boss.update(dt);
     if (logs.update(dt, pos) > 0) counter.set(logs.collected);
-    action.setEnabled(wood.inReach(pos) !== null);
+    action.setEnabled(boss.inReach(pos) || wood.inReach(pos) !== null);
 
     const camera = cameraAt(pos, viewport.width, viewport.height, ZOOM);
     ctx.fillStyle = DEEP_SEA;
@@ -311,6 +332,15 @@ function main(): void {
           });
         }
       }
+    }
+
+    // The boss stands among them, in the depth order like anything else, so you
+    // can walk behind it. It stays on the field once felled: a slumped, unlit
+    // stump is the trophy.
+    if (bossArt.ready) {
+      const base = bossBase();
+      const at = screenAt(base, camera, ZOOM);
+      standing.push({ y: base.y, draw: () => bossArt.draw(ctx, boss.treant, at.x, at.y, BOSS_SCALE) });
     }
 
     // Everything else someone stood on a built island. Trees are left to the
@@ -379,6 +409,8 @@ function main(): void {
 
     if (debug) {
       for (const trunk of trunks) drawBox(ctx, trunk.x, trunk.y, TRUNK_BOX, "#ff5a5a");
+      const bossAt = screenAt(bossBase(), camera, ZOOM);
+      drawBox(ctx, bossAt.x, bossAt.y, BOSS_BOX, "#ff8a3a");
       // How far the axe carries: a trunk's base inside this ring is choppable.
       drawCircle(ctx, feet.x, feet.y, AXE_REACH * ZOOM, "#ffd24a");
       drawBox(ctx, feet.x, feet.y, FIGURE_BOX, "#7cff5a");
