@@ -13,6 +13,8 @@ export interface MenuActions {
   onEnemyMode?: (lurk: boolean) => void;
   /** true = draw entity bounding boxes. */
   onDebug?: (on: boolean) => void;
+  /** Draw the island's own shape, rather than what stands on it. */
+  onOutline?: () => void;
   /** Leave the game for the list of games. */
   onAllGames?: () => void;
 }
@@ -153,6 +155,7 @@ export function createMenu(title: string, actions: MenuActions): void {
   if (actions.onLoadMap) addItem("Load Map…", actions.onLoadMap);
   if (actions.onEditMap) addItem("Edit Map", actions.onEditMap);
   if (actions.onEditor) addItem("World Editor", actions.onEditor);
+  if (actions.onOutline) addItem("Island Outline", actions.onOutline);
   if (actions.onEnemyMode) addModeToggle(actions.onEnemyMode);
   if (actions.onDebug) addToggle("Debug boxes", actions.onDebug);
   // Not a MenuActions entry: it asks nothing of the game, and any page with a

@@ -1,5 +1,5 @@
 import { drawBox, drawCircle, type Box } from "../debug";
-import { EDIT_STASHED_ISLAND_URL, recallIsland, wantsStashedMap } from "../handoff";
+import { EDIT_STASHED_ISLAND_URL, OUTLINE_URL, recallIsland, recallOutline, wantsStashedMap } from "../handoff";
 import { Input } from "../input";
 import { Loop } from "../loop";
 import { blitFrame, frameAt, SheetLoader } from "../sprites";
@@ -27,6 +27,8 @@ import {
   TRUNK,
   visibleTiles,
 } from "./field";
+import { decodeOutline } from "./outline";
+import { setOutline } from "./shape";
 import { facingFrom, walk, type Facing, type Pos } from "./walker";
 import { AXE_REACH, Chop, CHOP_FRAMES, Wood } from "./wood";
 
@@ -110,7 +112,23 @@ function openStashedIsland(): Island | null {
   }
 }
 
+/**
+ * The outline someone drew, if there is one. Applied before anything draws, since
+ * every coast tile is chosen from it — an outline arriving late would be a frame
+ * of the wrong island.
+ */
+function applyDrawnOutline(): void {
+  const text = recallOutline();
+  if (text === null) return;
+  try {
+    setOutline(decodeOutline(text));
+  } catch {
+    // A stale outline is not worth stopping the game for: the grown one stands in.
+  }
+}
+
 function main(): void {
+  applyDrawnOutline();
   const canvas = document.getElementById("woods") as HTMLCanvasElement;
   const ctx = canvas.getContext("2d")!;
   const viewport = new Viewport(canvas);
@@ -175,6 +193,9 @@ function main(): void {
       // With an island in hand the editor opens it; without one it starts blank,
       // which is what "build an island" should do from the grown wood.
       location.href = island ? EDIT_STASHED_ISLAND_URL : "woodsEditor.html";
+    },
+    onOutline: () => {
+      location.href = OUTLINE_URL;
     },
     onAllGames: () => {
       location.href = "index.html";

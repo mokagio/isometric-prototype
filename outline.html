@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Island Outline | Games Playground</title>
+    <style>
+      html, body {
+        height: 100%;
+        overflow: hidden;
+        background: #0099db;
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      #outline-canvas {
+        flex: 1 1 auto;
+        min-width: 0;
+        cursor: crosshair;
+      }
+      /* Two brushes, not a library of them, so they get room to be obvious. */
+      #sidebar .ed-palette { grid-template-columns: repeat(2, 1fr); }
+      .ed-brush {
+        display: grid;
+        place-items: center;
+        height: 64px;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .ed-brush-land { background: #63c74d; color: #10240c; }
+      .ed-brush-sea { background: #0099db; color: #04283c; }
+    </style>
+  </head>
+  <body>
+    <div id="editor">
+      <aside id="sidebar"></aside>
+      <canvas id="outline-canvas"></canvas>
+    </div>
+    <script type="module" src="/src/woods/outline/main.ts"></script>
+  </body>
+</html>

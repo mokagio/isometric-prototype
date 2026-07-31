@@ -28,6 +28,7 @@ export default defineConfig({
         woods: resolve(import.meta.dirname, "woods.html"),
         editor: resolve(import.meta.dirname, "editor.html"),
         woodsEditor: resolve(import.meta.dirname, "woodsEditor.html"),
+        outline: resolve(import.meta.dirname, "outline.html"),
         library: resolve(import.meta.dirname, "library.html"),
         credits: resolve(import.meta.dirname, "credits.html"),
       },

@@ -4,6 +4,7 @@
 const SEED_KEY = "ww:world-seed";
 const MAP_KEY = "ww:map";
 const ISLAND_KEY = "ww:island";
+const OUTLINE_KEY = "ww:outline";
 
 // The stashed map is played on request rather than whenever one is lying around,
 // so the game only opens it when you arrive from the editor's Play button. It is
@@ -21,6 +22,12 @@ export const EDIT_STASHED_MAP_URL = `editor.html${PLAY_STASHED_MAP_QUERY}`;
 // the other game a file it cannot read.
 export const PLAY_STASHED_ISLAND_URL = `woods.html${PLAY_STASHED_MAP_QUERY}`;
 export const EDIT_STASHED_ISLAND_URL = `woodsEditor.html${PLAY_STASHED_MAP_QUERY}`;
+
+// The outline is a different thing again: the island's shape rather than what is
+// on it, so it has its own stash and neither can be handed over as the other.
+// Unlike a map it is not asked for by query — the game wears the last one drawn.
+export const OUTLINE_URL = "outline.html";
+export const PLAY_DRAWN_OUTLINE_URL = "woods.html";
 
 export const wantsStashedMap = (search: string): boolean =>
   new URLSearchParams(search).get(MAP_PARAM) === MAP_PARAM_VALUE;
@@ -56,6 +63,24 @@ export function stashIsland(text: string): boolean {
 export function recallIsland(): string | null {
   try {
     return localStorage.getItem(ISLAND_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Hands a drawn outline to the game. False means storage refused it. */
+export function stashOutline(text: string): boolean {
+  try {
+    localStorage.setItem(OUTLINE_KEY, text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function recallOutline(): string | null {
+  try {
+    return localStorage.getItem(OUTLINE_KEY);
   } catch {
     return null;
   }
