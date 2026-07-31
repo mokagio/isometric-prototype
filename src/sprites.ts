@@ -39,17 +39,19 @@ export function frameAt(t: number, fps: number, frames: number, loop: boolean): 
 }
 
 export interface Blit {
-  cell: number; // source cell width, taken from row 0
+  cell: number; // source cell width
   cellH?: number; // cell height, when the frames are not square (default: cell)
   scale: number;
   anchorX: number; // the point inside the cell that lands on (feetX, feetY)
   anchorY: number;
   frame: number;
+  /** Which row of a grid sheet the frame comes from. Default 0: a plain strip. */
+  row?: number;
   flip?: boolean; // mirror horizontally around feetX, for a left-facing sprite
   alpha?: number;
 }
 
-/** Draw one frame of a single-row strip at nearest-neighbour, anchored on the feet. */
+/** Draw one frame of a strip or a grid at nearest-neighbour, anchored on the feet. */
 export function blitFrame(
   ctx: CanvasRenderingContext2D,
   img: CanvasImageSource,
@@ -68,6 +70,6 @@ export function blitFrame(
     ctx.scale(-1, 1);
     ctx.translate(-feetX, 0);
   }
-  ctx.drawImage(img, b.frame * b.cell, 0, b.cell, cellH, dx, dy, b.cell * b.scale, cellH * b.scale);
+  ctx.drawImage(img, b.frame * b.cell, (b.row ?? 0) * cellH, b.cell, cellH, dx, dy, b.cell * b.scale, cellH * b.scale);
   ctx.restore();
 }

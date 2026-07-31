@@ -113,6 +113,17 @@ describe("blitFrame", () => {
     expect(dy).toBe(200 - 57 * 3); // still hung off the anchor, not the cell height
   });
 
+  it("steps down a grid sheet by whole cells when row is set", () => {
+    // The treant sheet is a 4x14 grid of 160px cells, one pose per row.
+    const [sx, sy, sw, sh] = drawWith({ cell: 160, frame: 2, row: 7 }).args;
+    expect([sx, sy, sw, sh]).toEqual([2 * 160, 7 * 160, 160, 160]);
+  });
+
+  it("steps by cellH, not cell, on a grid of oblong frames", () => {
+    const [, sy] = drawWith({ cell: 96, cellH: 64, row: 3 }).args;
+    expect(sy).toBe(3 * 64);
+  });
+
   it("draws at nearest-neighbour", () => {
     expect(drawWith({}).smoothing).toBe(false);
   });
