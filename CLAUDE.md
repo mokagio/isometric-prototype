@@ -122,3 +122,16 @@ What actually clears Safari's tab bar on an iPhone is Add to Home Screen, which 
 Fullscreen is a menu item that hides itself where the API is missing, which on an iPhone it is — `createMenu` adds it for every game rather than taking it as a `MenuActions` entry, since it asks the game for nothing.
 Class names are `ww-` prefixed, and the storage keys are `ww:` — from Whispering Woods, which is what this was called before it became a playground with more than one game in it.
 The list page is a title and one button per game, borrowing the menu button's shape, and its backdrop is the game's own grass tiles: `backdrop.ts` renders a water-free flat world through `renderer.ts` rather than shipping a second copy of the art.
+
+## What the editors share
+
+There are three — the map editor, the island editor and the outline editor — and they are furnished from the same four modules rather than each keeping a copy.
+`editorUi.ts` builds the sidebar: the swatch grid with its single-select bookkeeping, the tool row with its toggles, the tabs, the file buttons, the hint.
+`painter.ts` is the drag — press lays down, dragging keeps laying down, the right button rubs out whichever brush is in hand, and letting go ends a stroke.
+`panPad.ts` is the compass of arrows over the board's corner, which greys out an arrow when there is nothing that way.
+`history.ts` is undo, and takes its own `clone`/`same`, since a snapshot is a `slice` for a drawing of characters and a JSON round trip for a board.
+
+Undo records once per *stroke*, not per cell: `onStroke` is where each editor calls `record`, and a state no different from the last one is not a step.
+A board that arrives whole — opened from a file, loaded from the game — calls `reset` instead, so undo cannot walk back into somebody else's map.
+The `.ed-*` class names all live in `chrome.css`; a page's own `<style>` holds only what is that page's, which is why the map editor's height stepper is still in `editor.html`.
+A fourth editor should be reaching for these, and anything it has to build for itself is a sign one of them is missing a part.
