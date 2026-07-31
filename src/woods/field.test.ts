@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   blockedByTree,
-  CLIFF_RINGS,
-  COAST_RINGS,
   FENCE_RING,
   cameraAt,
   FIELD,
@@ -62,7 +60,10 @@ describe("treeAt", () => {
 
   it("scatters a wood you can still walk through", () => {
     // Thin enough to leave gaps, thick enough to be a wood: a handful per screen.
-    const share = all().length / (FIELD * FIELD);
+    // Measured over the ground trees may stand on — inside the fence — rather than
+    // the whole field, most of which is now shore and sea.
+    const planted = FIELD - 2 * (FENCE_RING + 1);
+    const share = all().length / (planted * planted);
     expect(share).toBeGreaterThan(0.02);
     expect(share).toBeLessThan(0.1);
   });
@@ -94,15 +95,18 @@ describe("treeAt", () => {
     }
   });
 
-  it("still fills most of the field, rather than hiding in the middle", () => {
-    // The edge rule must not have quietly shrunk the wood to a copse.
+  it("still fills the fenced ground, rather than hiding in the middle", () => {
+    // The edge rules must not have quietly shrunk the wood to a copse.
     const trees = all();
     const cols = trees.map(([col]) => col);
     const rows = trees.map(([, row]) => row);
-    expect(Math.min(...cols)).toBeLessThan(FIELD / 4);
-    expect(Math.max(...cols)).toBeGreaterThan((3 * FIELD) / 4);
-    expect(Math.min(...rows)).toBeLessThan(FIELD / 4);
-    expect(Math.max(...rows)).toBeGreaterThan((3 * FIELD) / 4);
+    // The band trees may stand in, and how near its edges the wood actually gets.
+    const plantable = FENCE_RING + 1 + Math.ceil(LOG_CLEARANCE / TILE);
+    const slack = 3; // the spacing rule will not always plant on the first cell
+    expect(Math.min(...cols)).toBeLessThanOrEqual(plantable + slack);
+    expect(Math.max(...cols)).toBeGreaterThanOrEqual(FIELD - 1 - plantable - slack);
+    expect(Math.min(...rows)).toBeLessThanOrEqual(plantable + slack);
+    expect(Math.max(...rows)).toBeGreaterThanOrEqual(FIELD - 1 - plantable - slack);
   });
 
   it("leaves the middle clear, so nobody starts inside a trunk", () => {
@@ -226,7 +230,7 @@ describe("fieldBounds", () => {
   const INSET = 4;
   // The fence rings the island a cell inside the last of the land, and the walker
   // stops short of it.
-  const FENCE_EDGE = (COAST_RINGS + CLIFF_RINGS + 1) * TILE;
+  const FENCE_EDGE = (FENCE_RING + 1) * TILE;
 
   it("stops the walker inside the fence, short of the water's edge", () => {
     const bounds = fieldBounds(INSET);

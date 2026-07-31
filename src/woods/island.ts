@@ -1,7 +1,7 @@
 import { footprint, solidCells, type Prop } from "../sunnyside/library";
 import { groundById, propById } from "../sunnyside/manifest";
-import { chamferTile, fenceTile, isCliffFace, isLip, ringOf } from "./coast";
-import { CLEARING, COAST_RINGS, FIELD, MIDDLE, TILE } from "./field";
+import { ringOf } from "./coast";
+import { CLEARING, FENCE_RING, FIELD, MIDDLE, TILE } from "./field";
 import type { Pos } from "./walker";
 
 // A built island: what someone painted on the inside of Whispering Woods.
@@ -47,11 +47,11 @@ export const inBounds = (col: number, row: number): boolean => col >= 0 && row >
  */
 export function buildable(col: number, row: number): boolean {
   if (!inBounds(col, row)) return false;
-  if (ringOf(col, row) < COAST_RINGS) return false;
-  if (chamferTile(col, row) !== null) return false;
-  if (fenceTile(col, row) !== null) return false;
+  // Inside the fence, the same rectangle the walker is held in. The shore beyond
+  // it wanders, and painting out there would mean painting the sea.
+  if (ringOf(col, row) <= FENCE_RING) return false;
   if (inClearing(col, row)) return false;
-  return !isCliffFace(col, row) && !isLip(col, row);
+  return true;
 }
 
 /** The few cells around where the walker arrives, which stay bare. */

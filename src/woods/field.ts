@@ -1,4 +1,5 @@
 import { variantAt } from "../sunnyside/library";
+import { JAG } from "./shape";
 import { LOG_CLEARANCE } from "./logs";
 import type { Bounds, Pos } from "./walker";
 
@@ -24,8 +25,15 @@ export const CLEARING = 3;
 /** Cells of the field given over to the island's edge — `coast.ts` draws them. */
 export const COAST_RINGS = 1; // the water's edge itself
 export const CLIFF_RINGS = 1; // the bank's face above it, on the south shore only
-/** The fence rings the island here, and the walkable grass starts inside it. */
-export const FENCE_RING = COAST_RINGS + CLIFF_RINGS;
+/**
+ * Where the fence rings the island, and so where the walkable grass starts.
+ *
+ * It stays a rectangle however the shore wanders, which is what keeps walking and
+ * editing simple: everything beyond it is scenery. Deep enough in that the
+ * deepest bay `shape.ts` can cut still leaves room outside it for the water's
+ * edge, the drop's face and the lip above it.
+ */
+export const FENCE_RING = JAG + COAST_RINGS + CLIFF_RINGS + 1;
 // Tiles kept clear along the edge, measured from the fence rather than the water:
 // a tree standing this far in cannot throw a log past the rails, where it would
 // lie in plain sight with no way to reach it.
@@ -117,10 +125,10 @@ export function tileVariant(col: number, row: number): number {
  * put the figure on a wall.
  */
 export function fieldBounds(inset: number): Bounds {
-  // Inside the fence, which rings the island a cell in from the last of the land.
-  // Stopping short of it is what keeps the figure out of the rails, with no
-  // collision to write — and on the south it keeps them off the drop's face too.
-  const edge = (COAST_RINGS + CLIFF_RINGS + 1) * TILE;
+  // Inside the fence. Stopping short of the rails is what keeps the figure out of
+  // them with no collision to write, and it is why the coast can wander as it
+  // likes: nothing out there is ever walked on.
+  const edge = (FENCE_RING + 1) * TILE;
   return {
     minX: edge + inset,
     maxX: FIELD_PX - edge - inset,

@@ -1,4 +1,5 @@
-import { CLIFF_RINGS, COAST_RINGS, FIELD, TILE } from "./field";
+import { FENCE_RING, FIELD, TILE } from "./field";
+import { isLand, neighbours } from "./shape";
 
 // What turns the field into an island. The arrangement is the pack's own — its
 // GameMaker example room builds a coast this way, read from the water inland:
@@ -57,23 +58,13 @@ export function ringOf(col: number, row: number): number {
  * and at a corner as a tongue of grass sticking out into the sea.
  */
 export function isWater(col: number, row: number): boolean {
-  return ringOf(col, row) === 0;
+  return !isLand(col, row);
 }
 
-/** Whether a cell's nearest edge is the south one — the only shore with a face. */
+/** Whether a cell's shore is the south one — the only shore with a face. */
 export function facesSouth(col: number, row: number): boolean {
-  const ring = ringOf(col, row);
-  return ring >= 0 && row === FIELD - 1 - ring;
+  return isLand(col, row) && !isLand(col, row + 1);
 }
-
-// The island's own corner cells: land runs from COAST_RINGS to
-// FIELD - 1 - COAST_RINGS, so these are its first and last cells.
-const INNER_FIRST = COAST_RINGS;
-const INNER_LAST = FIELD - 1 - COAST_RINGS;
-// The lip's run is shorter than the island is wide: nearer the sides than this and
-// a cell belongs to the west or east shore instead, which has no drop.
-const LIP_FIRST = COAST_RINGS + CLIFF_RINGS;
-const LIP_LAST = FIELD - 1 - COAST_RINGS - CLIFF_RINGS;
 
 /**
  * The wedge that chamfers a corner of the island, or null.
@@ -88,44 +79,38 @@ const LIP_LAST = FIELD - 1 - COAST_RINGS - CLIFF_RINGS;
  * each corner turns in the colour of the shore it belongs to.
  */
 export function chamferTile(col: number, row: number): Tile | null {
-  const first = col === INNER_FIRST;
-  const last = col === INNER_LAST;
-  if (row === INNER_FIRST) {
-    if (first) return RING.landBelowRight; // land to its south-east
-    if (last) return RING.landBelowLeft; // land to its south-west
-  }
-  if (row === INNER_LAST) {
-    if (first) return RING.landAboveRight; // land to its north-east
-    if (last) return RING.landAboveLeft; // land to its north-west
-  }
+  if (!isLand(col, row)) return null;
+  const { north, east, south, west } = neighbours(col, row);
+  // A headland: water on two sides at once, so the coast turns here. The wedge
+  // carries the land in the quadrant that stays dry.
+  if (!north && !west) return RING.landBelowRight;
+  if (!north && !east) return RING.landBelowLeft;
+  if (!south && !west) return RING.landAboveRight;
+  if (!south && !east) return RING.landAboveLeft;
   return null;
 }
 
-/** Whether a water cell's straight rim is left off because a chamfer covers it. */
-function chamfered(col: number, row: number): boolean {
-  const onCornerCol = col === INNER_FIRST || col === INNER_LAST;
-  const onCornerRow = row === INNER_FIRST || row === INNER_LAST;
-  const flanksAcross = (row === 0 || row === FIELD - 1) && onCornerCol;
-  const flanksDown = (col === 0 || col === FIELD - 1) && onCornerRow;
-  const diagonallyOutside = (row === 0 || row === FIELD - 1) && (col === 0 || col === FIELD - 1);
-  return flanksAcross || flanksDown || diagonallyOutside;
-}
-
-/** The shore tile at the water's edge, or null anywhere else. */
+/**
+ * The shore tile on a stretch of water, or null where the water touches nothing.
+ *
+ * Chosen from which sides of the cell the island lies on, which is why the ring's
+ * tiles are named for where their land is: a cell with land above it wants the
+ * tile whose land is above. Water with land on two sides is a bay's corner and
+ * takes the matching wedge; water touching the island only on a diagonal is open
+ * sea, and takes nothing.
+ */
 export function shoreTile(col: number, row: number): Tile | null {
-  if (ringOf(col, row) !== 0) return null;
-  if (chamfered(col, row)) return null; // the chamfer carries the rim here
-  const north = row === 0;
-  const south = row === FIELD - 1;
-  const west = col === 0;
-  const east = col === FIELD - 1;
-  // The extreme corner cells are handled by `chamferTile`, which puts the wedge on
-  // the island's own corner rather than out here where it touches nothing.
-  if ((north || south) && (west || east)) return null;
-  if (south) return RING.landAbove;
-  if (north) return RING.landBelow;
-  if (west) return RING.landRight;
-  return RING.landLeft;
+  if (isLand(col, row)) return null;
+  const { north, east, south, west } = neighbours(col, row);
+  if (north && west) return RING.landAboveLeft;
+  if (north && east) return RING.landAboveRight;
+  if (south && west) return RING.landBelowLeft;
+  if (south && east) return RING.landBelowRight;
+  if (north) return RING.landAbove;
+  if (south) return RING.landBelow;
+  if (west) return RING.landLeft;
+  if (east) return RING.landRight;
+  return null;
 }
 
 /**
@@ -136,13 +121,12 @@ export function shoreTile(col: number, row: number): Tile | null {
  */
 export function isCliffFace(col: number, row: number): boolean {
   if (chamferTile(col, row)) return false; // the corner turns on its wedge instead
-  const ring = ringOf(col, row);
-  return ring >= COAST_RINGS && ring < COAST_RINGS + CLIFF_RINGS && facesSouth(col, row);
+  return facesSouth(col, row);
 }
 
 /** Whether the grass on a cell carries the dark lip cut by the drop below it. */
 export function isLip(col: number, row: number): boolean {
-  return ringOf(col, row) === COAST_RINGS + CLIFF_RINGS && facesSouth(col, row);
+  return isLand(col, row) && isCliffFace(col, row + 1);
 }
 
 /**
@@ -152,8 +136,13 @@ export function isLip(col: number, row: number): boolean {
  */
 export function lipCornerTile(col: number, row: number): Tile | null {
   if (!isLip(col, row)) return null;
-  if (col === LIP_FIRST) return { col: 0, row: 0 };
-  if (col === LIP_LAST) return { col: 1, row: 0 };
+  // Where the drop below runs out, the dark edge has to curve down after it
+  // rather than stopping square. Which way it curves depends on which side the
+  // drop carries on.
+  const dropWest = isCliffFace(col - 1, row + 1) || isCliffFace(col - 1, row);
+  const dropEast = isCliffFace(col + 1, row + 1) || isCliffFace(col + 1, row);
+  if (dropEast && !dropWest) return { col: 0, row: 0 };
+  if (dropWest && !dropEast) return { col: 1, row: 0 };
   return null;
 }
 
@@ -167,11 +156,10 @@ const FENCE = {
   cornerRailWest: { col: 3, row: 0 },
 } as const;
 
-// The fence rings the island one cell inside the last of the land. On the south
-// that is the lip, the top of the drop; on the other three it leaves a verge of
-// grass between the rails and the water, which is how the pack's own scenes fence
-// a shore.
-const FENCE_RING = COAST_RINGS + CLIFF_RINGS;
+// The fence stays a plain rectangle however the shore wanders, and it is what the
+// walker and the editor are held inside: the coast is scenery beyond it. It sits
+// deep enough in that the deepest bay still leaves room for the water's edge, the
+// drop's face and its lip outside it — see `FENCE_RING`.
 const FENCE_FIRST = FENCE_RING;
 const FENCE_LAST = FIELD - 1 - FENCE_RING;
 

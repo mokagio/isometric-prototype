@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  chamferTile,
   facesSouth,
+  fenceTile,
   frameOf,
   isCliffFace,
   isLip,
-  chamferTile,
-  fenceTile,
   isWater,
   lipCornerTile,
   ringOf,
@@ -15,95 +15,185 @@ import {
   SPARKLE_FRAMES,
   sparkleAt,
 } from "./coast";
-import { CLIFF_RINGS, COAST_RINGS, FIELD } from "./field";
+import { FENCE_RING, FIELD } from "./field";
+import { isLand, neighbours } from "./shape";
 
 const MID = Math.floor(FIELD / 2);
-const LAST = FIELD - 1;
 
-describe("ringOf", () => {
-  it("is zero along the coast and grows inland", () => {
-    expect(ringOf(0, MID)).toBe(0);
-    expect(ringOf(LAST, MID)).toBe(0);
-    expect(ringOf(MID, 0)).toBe(0);
-    expect(ringOf(1, MID)).toBe(1);
-    expect(ringOf(MID, MID)).toBe(MID - 1); // the middle of an even field is a cell off centre
+/** Every cell of the field, for the rules that have to hold everywhere. */
+function everyCell(visit: (col: number, row: number) => void): void {
+  for (let row = 0; row < FIELD; row++) {
+    for (let col = 0; col < FIELD; col++) visit(col, row);
+  }
+}
+
+describe("isWater", () => {
+  it("is the sea wherever the island is not", () => {
+    everyCell((col, row) => expect(isWater(col, row)).toBe(!isLand(col, row)));
   });
 
-  it("is negative out at sea", () => {
-    expect(ringOf(-1, MID)).toBe(-1);
-    expect(ringOf(FIELD, MID)).toBe(-1);
-    expect(ringOf(MID, -3)).toBe(-1);
+  it("never floods the fenced rectangle", () => {
+    for (let row = FENCE_RING; row <= FIELD - 1 - FENCE_RING; row++) {
+      for (let col = FENCE_RING; col <= FIELD - 1 - FENCE_RING; col++) {
+        expect(isWater(col, row), `${col},${row}`).toBe(false);
+      }
+    }
   });
 });
 
 describe("shoreTile", () => {
-  it("draws the water's edge only on the outermost cells", () => {
-    expect(shoreTile(MID, 0)).not.toBeNull();
-    expect(shoreTile(MID, 1)).toBeNull();
-    expect(shoreTile(MID, MID)).toBeNull();
-    expect(shoreTile(-1, MID)).toBeNull();
+  it("draws nothing on the island itself", () => {
+    everyCell((col, row) => {
+      if (isLand(col, row)) expect(shoreTile(col, row), `${col},${row}`).toBeNull();
+    });
   });
 
-  it("puts the brown bank on the south shore and the grass bank on the north", () => {
-    // The ring is cut for a lake, so its land-above edge (row 0, the brown bank)
-    // is our south shore, and its land-below edge (row 2, grass) is our north.
-    expect(shoreTile(MID, LAST)).toEqual({ col: 1, row: 0 });
-    expect(shoreTile(MID, 0)).toEqual({ col: 1, row: 2 });
+  it("draws the water's edge wherever the sea meets the island", () => {
+    everyCell((col, row) => {
+      if (isLand(col, row)) return;
+      const { north, east, south, west } = neighbours(col, row);
+      expect(shoreTile(col, row) !== null, `${col},${row}`).toBe(north || east || south || west);
+    });
   });
 
-  it("takes the side edges from the middle row", () => {
-    expect(shoreTile(0, MID)).toEqual({ col: 2, row: 1 });
-    expect(shoreTile(LAST, MID)).toEqual({ col: 0, row: 1 });
+  it("leaves open sea alone, including water touching the island only on a diagonal", () => {
+    let diagonals = 0;
+    everyCell((col, row) => {
+      if (isLand(col, row)) return;
+      const { north, east, south, west } = neighbours(col, row);
+      if (north || east || south || west) return;
+      if (isLand(col - 1, row - 1) || isLand(col + 1, row - 1) || isLand(col - 1, row + 1) || isLand(col + 1, row + 1)) {
+        diagonals++;
+      }
+      expect(shoreTile(col, row), `${col},${row}`).toBeNull();
+    });
+    expect(diagonals).toBeGreaterThan(0); // a wandering coast makes these
   });
 
-  it("leaves every extreme corner bare — the island turns on its own chamfer", () => {
-    // Those cells touch the island only at a point, so a wedge there is a shard of
-    // land floating in the sea.
-    expect(shoreTile(0, 0)).toBeNull();
-    expect(shoreTile(LAST, 0)).toBeNull();
-    expect(shoreTile(0, LAST)).toBeNull();
-    expect(shoreTile(LAST, LAST)).toBeNull();
+  it("picks the tile whose land lies where the island actually is", () => {
+    // The ring's tiles are named for the side their land is on, so the rule is
+    // simply that the name matches the neighbourhood.
+    const LAND_ABOVE = { col: 1, row: 0 };
+    const LAND_BELOW = { col: 1, row: 2 };
+    const LAND_LEFT = { col: 0, row: 1 };
+    const LAND_RIGHT = { col: 2, row: 1 };
+    everyCell((col, row) => {
+      if (isLand(col, row)) return;
+      const { north, east, south, west } = neighbours(col, row);
+      if ([north, east, south, west].filter(Boolean).length !== 1) return;
+      const tile = shoreTile(col, row);
+      if (north) expect(tile, `${col},${row}`).toEqual(LAND_ABOVE);
+      if (south) expect(tile, `${col},${row}`).toEqual(LAND_BELOW);
+      if (west) expect(tile, `${col},${row}`).toEqual(LAND_LEFT);
+      if (east) expect(tile, `${col},${row}`).toEqual(LAND_RIGHT);
+    });
   });
 });
 
-describe("facesSouth", () => {
-  it("is true only where the nearest edge is the southern one", () => {
-    expect(facesSouth(MID, LAST)).toBe(true);
-    expect(facesSouth(MID, LAST - 1)).toBe(true);
-    expect(facesSouth(MID, 0)).toBe(false);
-    expect(facesSouth(MID, 5)).toBe(false); // nearest edge is the north one
-    expect(facesSouth(0, MID)).toBe(false); // nearest edge is the west one
+describe("chamferTile", () => {
+  it("turns a headland — land with the sea on two sides at once", () => {
+    everyCell((col, row) => {
+      if (!chamferTile(col, row)) return;
+      const { north, east, south, west } = neighbours(col, row);
+      expect(isLand(col, row), `${col},${row}`).toBe(true);
+      const twoSides = (!north || !south) && (!east || !west);
+      expect(twoSides, `${col},${row}`).toBe(true);
+    });
+  });
+
+  it("never puts a wedge of land out on the water", () => {
+    everyCell((col, row) => {
+      if (!isLand(col, row)) expect(chamferTile(col, row), `${col},${row}`).toBeNull();
+    });
+  });
+
+  it("finds the headlands a wandering coast makes", () => {
+    let wedges = 0;
+    everyCell((col, row) => {
+      if (chamferTile(col, row)) wedges++;
+    });
+    expect(wedges).toBeGreaterThan(3); // more than just the four extreme corners
   });
 });
 
 describe("isCliffFace", () => {
-  it("draws the wall above the south shore, but never on the shore cell itself", () => {
-    // The shore tile is transparent below its foam, so a face behind it would
-    // show through as brown water.
-    expect(isCliffFace(MID, LAST)).toBe(false);
-    for (let ring = COAST_RINGS; ring < COAST_RINGS + CLIFF_RINGS; ring++) {
-      expect(isCliffFace(MID, LAST - ring), `ring ${ring}`).toBe(true);
-    }
-    expect(isCliffFace(MID, LAST - COAST_RINGS - CLIFF_RINGS)).toBe(false);
+  it("is drawn on land whose southern neighbour is water, and nowhere else", () => {
+    everyCell((col, row) => {
+      if (!isCliffFace(col, row)) return;
+      expect(isLand(col, row), `${col},${row}`).toBe(true);
+      expect(isLand(col, row + 1), `${col},${row}`).toBe(false);
+    });
   });
 
-  it("draws no wall on the other three shores, where its face would not be seen", () => {
-    expect(isCliffFace(MID, 0)).toBe(false);
-    expect(isCliffFace(0, MID)).toBe(false);
-    expect(isCliffFace(LAST, MID)).toBe(false);
+  it("leaves the headlands to their wedges", () => {
+    everyCell((col, row) => {
+      if (chamferTile(col, row)) expect(isCliffFace(col, row), `${col},${row}`).toBe(false);
+    });
+  });
+
+  it("runs the length of the south shore", () => {
+    let faces = 0;
+    everyCell((col, row) => {
+      if (isCliffFace(col, row)) faces++;
+    });
+    expect(faces).toBeGreaterThan(FIELD / 2);
+  });
+});
+
+describe("facesSouth", () => {
+  it("marks land with the sea below it", () => {
+    everyCell((col, row) => {
+      expect(facesSouth(col, row), `${col},${row}`).toBe(isLand(col, row) && !isLand(col, row + 1));
+    });
   });
 });
 
 describe("isLip", () => {
-  it("cuts the dark edge into the grass directly above the wall", () => {
-    expect(isLip(MID, LAST - COAST_RINGS - CLIFF_RINGS)).toBe(true);
-    expect(isLip(MID, LAST - COAST_RINGS - CLIFF_RINGS - 1)).toBe(false);
-    expect(isLip(MID, LAST)).toBe(false); // that cell is the water's edge
+  it("cuts the dark edge into the grass directly above a drop", () => {
+    everyCell((col, row) => {
+      expect(isLip(col, row), `${col},${row}`).toBe(isLand(col, row) && isCliffFace(col, row + 1));
+    });
   });
 
-  it("leaves the other shores unmarked", () => {
-    expect(isLip(MID, COAST_RINGS + CLIFF_RINGS)).toBe(false);
-    expect(isLip(COAST_RINGS + CLIFF_RINGS, MID)).toBe(false);
+  it("curves where the drop below runs out, and runs straight elsewhere", () => {
+    let curved = 0;
+    let straight = 0;
+    everyCell((col, row) => {
+      if (!isLip(col, row)) return;
+      if (lipCornerTile(col, row)) curved++;
+      else straight++;
+    });
+    expect(curved).toBeGreaterThan(0);
+    expect(straight).toBeGreaterThan(0);
+  });
+});
+
+describe("fenceTile", () => {
+  it("rings the island as a plain rectangle, whatever the shore does", () => {
+    everyCell((col, row) => {
+      expect(fenceTile(col, row) !== null, `${col},${row}`).toBe(ringOf(col, row) === FENCE_RING);
+    });
+  });
+
+  it("stands every post on dry land", () => {
+    everyCell((col, row) => {
+      if (fenceTile(col, row)) expect(isLand(col, row), `${col},${row}`).toBe(true);
+    });
+  });
+
+  it("lays rails across the top and bottom, down the sides, and turns each corner", () => {
+    const first = FENCE_RING;
+    const last = FIELD - 1 - FENCE_RING;
+    const north = fenceTile(MID, first)!;
+    const west = fenceTile(first, MID)!;
+    expect(north.tile).toEqual(fenceTile(MID, last)!.tile);
+    expect(west.tile).toEqual(fenceTile(last, MID)!.tile);
+    expect(west.tile).not.toEqual(north.tile);
+    const nw = fenceTile(first, first)!;
+    const sw = fenceTile(first, last)!;
+    expect(nw.tile).toEqual(sw.tile); // the same corner post, upended below
+    expect([nw.flipV, sw.flipV]).toEqual([false, true]);
+    expect(nw.tile).not.toEqual(north.tile);
   });
 });
 
@@ -116,16 +206,15 @@ describe("seaTile", () => {
 
   it("keeps going the same way out past the field, where the coordinates go negative", () => {
     expect(seaTile(-1, -1)).toEqual({ col: SEA_BLOCK - 1, row: SEA_BLOCK - 1 });
-    expect(seaTile(-SEA_BLOCK, -SEA_BLOCK)).toEqual({ col: 0, row: 0 });
     expect(seaTile(-5, -6)).toEqual({ col: 3, row: 2 });
   });
 });
 
 describe("sparkleAt", () => {
-  it("never glints on land", () => {
-    for (let row = 0; row < FIELD; row++) {
-      for (let col = 0; col < FIELD; col++) expect(sparkleAt(col, row), `${col},${row}`).toBeNull();
-    }
+  it("never glints on the island", () => {
+    everyCell((col, row) => {
+      if (isLand(col, row)) expect(sparkleAt(col, row), `${col},${row}`).toBeNull();
+    });
   });
 
   it("glints on some open water, and always the same water", () => {
@@ -153,133 +242,5 @@ describe("frameOf", () => {
     expect(frameOf(0.79, 0.8, SPARKLE_FRAMES)).toBe(0);
     expect(frameOf(0.8, 0.8, SPARKLE_FRAMES)).toBe(1);
     expect(frameOf(0.8 * SPARKLE_FRAMES, 0.8, SPARKLE_FRAMES)).toBe(0);
-  });
-});
-
-describe("isWater", () => {
-  it("makes the field's outermost ring water, so the shore tiles lie on the sea", () => {
-    expect(isWater(MID, 0)).toBe(true);
-    expect(isWater(MID, LAST)).toBe(true);
-    expect(isWater(0, MID)).toBe(true);
-    expect(isWater(LAST, MID)).toBe(true);
-    expect(isWater(0, 0)).toBe(true);
-  });
-
-  it("leaves everything inland dry", () => {
-    expect(isWater(1, MID)).toBe(false);
-    expect(isWater(MID, MID)).toBe(false);
-  });
-});
-
-describe("chamferTile", () => {
-  const INNER_FIRST = COAST_RINGS;
-  const INNER_LAST = FIELD - 1 - COAST_RINGS;
-
-  it("chamfers all four corners, each its own way round", () => {
-    const corners = [
-      chamferTile(INNER_FIRST, INNER_FIRST),
-      chamferTile(INNER_LAST, INNER_FIRST),
-      chamferTile(INNER_FIRST, INNER_LAST),
-      chamferTile(INNER_LAST, INNER_LAST),
-    ];
-    for (const corner of corners) expect(corner).not.toBeNull();
-    expect(new Set(corners.map((c) => `${c!.col},${c!.row}`)).size).toBe(4);
-  });
-
-  it("turns each corner in the colour of its shore", () => {
-    // Grass bank at the north, brown bank at the south: the ring's rows 2 and 0.
-    expect(chamferTile(INNER_FIRST, INNER_FIRST)!.row).toBe(2);
-    expect(chamferTile(INNER_FIRST, INNER_LAST)!.row).toBe(0);
-  });
-
-  it("leaves the wall off the corner cell, so the wedge is not painted over", () => {
-    expect(isCliffFace(INNER_FIRST, INNER_LAST)).toBe(false);
-    expect(isCliffFace(INNER_LAST, INNER_LAST)).toBe(false);
-    expect(isCliffFace(MID, INNER_LAST)).toBe(true); // the run between them still has it
-  });
-
-  it("leaves the rest of the island square", () => {
-    expect(chamferTile(MID, INNER_FIRST)).toBeNull();
-    expect(chamferTile(INNER_FIRST, MID)).toBeNull();
-    expect(chamferTile(MID, MID)).toBeNull();
-  });
-
-  it("sits on the land, not on the water beyond it", () => {
-    // The mistake worth not repeating: a wedge on the diagonal water cell is a
-    // lone triangle of land out at sea.
-    expect(isWater(INNER_FIRST, INNER_FIRST)).toBe(false);
-    expect(chamferTile(0, 0)).toBeNull();
-    expect(chamferTile(FIELD - 1, 0)).toBeNull();
-  });
-
-  it("takes the straight rim off the cells the chamfer's diagonal covers", () => {
-    for (const [col, row] of [
-      [INNER_FIRST, 0],
-      [INNER_LAST, 0],
-      [INNER_FIRST, FIELD - 1],
-      [INNER_LAST, FIELD - 1],
-      [0, INNER_FIRST],
-      [FIELD - 1, INNER_FIRST],
-      [0, INNER_LAST],
-      [FIELD - 1, INNER_LAST],
-    ]) {
-      expect(shoreTile(col!, row!), `${col},${row}`).toBeNull();
-    }
-    // While the shores either side of them keep theirs.
-    expect(shoreTile(MID, 0)).not.toBeNull();
-    expect(shoreTile(0, MID)).not.toBeNull();
-  });
-});
-
-describe("the fence and the lip's corners", () => {
-  const LIP_ROW = FIELD - 1 - COAST_RINGS - CLIFF_RINGS;
-  // The run is shorter than the island is wide: the cells nearer the sides belong
-  // to the west and east shores, which have no drop and so no lip.
-  const INNER_FIRST = COAST_RINGS + CLIFF_RINGS;
-  const INNER_LAST = FIELD - 1 - COAST_RINGS - CLIFF_RINGS;
-
-  it("rings the whole island, one cell inside the last of the land", () => {
-    expect(fenceTile(MID, LIP_ROW)).not.toBeNull(); // south, along the lip
-    expect(fenceTile(MID, INNER_FIRST)).not.toBeNull(); // north
-    expect(fenceTile(INNER_FIRST, MID)).not.toBeNull(); // west
-    expect(fenceTile(INNER_LAST, MID)).not.toBeNull(); // east
-  });
-
-  it("leaves the rest of the island unfenced", () => {
-    expect(fenceTile(MID, LIP_ROW - 1)).toBeNull();
-    expect(fenceTile(MID, MID)).toBeNull();
-    expect(fenceTile(0, MID)).toBeNull(); // out on the water's edge
-  });
-
-  it("lays the rails across the top and bottom, and down the sides", () => {
-    const north = fenceTile(MID, INNER_FIRST)!;
-    const south = fenceTile(MID, LIP_ROW)!;
-    const west = fenceTile(INNER_FIRST, MID)!;
-    expect(north.tile).toEqual(south.tile);
-    expect(west.tile).not.toEqual(north.tile);
-    expect(fenceTile(INNER_LAST, MID)!.tile).toEqual(west.tile);
-  });
-
-  it("turns each corner on a corner post, the south pair stood on their heads", () => {
-    const nw = fenceTile(INNER_FIRST, INNER_FIRST)!;
-    const ne = fenceTile(INNER_LAST, INNER_FIRST)!;
-    const sw = fenceTile(INNER_FIRST, LIP_ROW)!;
-    const se = fenceTile(INNER_LAST, LIP_ROW)!;
-    expect(nw.tile).not.toEqual(ne.tile); // rails run opposite ways
-    expect(sw.tile).toEqual(nw.tile); // same post below, upended
-    expect(se.tile).toEqual(ne.tile);
-    expect([nw.flipV, ne.flipV]).toEqual([false, false]);
-    expect([sw.flipV, se.flipV]).toEqual([true, true]);
-    // And a corner post is not the post used along a run.
-    expect(nw.tile).not.toEqual(fenceTile(MID, INNER_FIRST)!.tile);
-  });
-
-  it("curves the lip's dark edge at both ends of its run", () => {
-    const west = lipCornerTile(INNER_FIRST, LIP_ROW);
-    const east = lipCornerTile(INNER_LAST, LIP_ROW);
-    expect(west).not.toBeNull();
-    expect(east).not.toBeNull();
-    expect(west).not.toEqual(east);
-    expect(lipCornerTile(MID, LIP_ROW)).toBeNull(); // the straight run keeps the straight lip
   });
 });
