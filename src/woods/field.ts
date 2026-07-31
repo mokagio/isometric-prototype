@@ -8,7 +8,9 @@ import type { Bounds, Pos } from "./walker";
 // the drawing zoom happens to be; only `screenAt` knows about zoom.
 
 export const TILE = 16; // one Sunnyside ground tile, in sprite pixels
-export const FIELD = 40; // tiles a side
+// A side of the whole field, coast included. The fence takes `FENCE_RING + 1`
+// cells off each side, so this leaves a 30x30 square to walk and to build on.
+export const FIELD = 44;
 export const GRASS_VARIANTS = 4; // frames in `grass.png`: plain, then three sprinklings
 
 const TREE_SEED = 91177;
