@@ -23,11 +23,14 @@ import {
   cameraFor,
   cellAt,
   clampOrigin,
+  pan,
+  roomToPan,
   stepZoom,
   zoomAbout,
   zoomLadder,
   ZOOM_STEPS,
   type View,
+  type Way,
 } from "./camera";
 import { History } from "./history";
 import { buildPalette, type PaletteSheets } from "./palette";
@@ -54,6 +57,13 @@ const SHEET_FILES = {
   sand: "sand.png",
   grassUnder: "grass.png",
 } as const;
+
+const ARROW_KEYS: Record<string, Way | undefined> = {
+  ArrowUp: "north",
+  ArrowDown: "south",
+  ArrowLeft: "west",
+  ArrowRight: "east",
+};
 
 const GRID_LINE = "rgba(255, 255, 255, 0.16)";
 const HOVER = "rgba(255, 255, 255, 0.35)";
@@ -96,6 +106,7 @@ function main(): void {
       onUndo: () => goTo(history.undo()),
       onRedo: () => goTo(history.redo()),
       onZoom: (by) => zoomBy(by),
+      onPan: (way) => panTo(way),
       onGrid: (on) => {
         grid = on;
       },
@@ -158,8 +169,11 @@ function main(): void {
   let view: View = { zoom: 1, origin: { x: 0, y: 0 } };
   let ladder: number[] = ZOOM_STEPS;
   const settle = (): void => {
-    view = { ...view, origin: clampOrigin(view.origin, view.zoom, canvas.clientWidth, canvas.clientHeight) };
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    view = { ...view, origin: clampOrigin(view.origin, view.zoom, w, h) };
     palette.syncZoom(view.zoom > ladder[0]!, view.zoom < ladder[ladder.length - 1]!);
+    palette.syncPan(roomToPan(view, w, h));
   };
   function fit(w: number, h: number): void {
     ladder = zoomLadder(w, h);
@@ -173,6 +187,11 @@ function main(): void {
     if (to === view.zoom) return;
     const about = anchor ?? { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 };
     view = { zoom: to, origin: zoomAbout(view.origin, view.zoom, to, about) };
+    settle();
+  }
+
+  function panTo(way: Way): void {
+    view = pan(view, way, canvas.clientWidth, canvas.clientHeight);
     settle();
   }
 
@@ -230,8 +249,12 @@ function main(): void {
       goTo(e.shiftKey ? history.redo() : history.undo());
       return;
     }
-    if (e.key === "+" || e.key === "=") zoomBy(1);
-    else if (e.key === "-" || e.key === "_") zoomBy(-1);
+    if (e.key === "+" || e.key === "=") return zoomBy(1);
+    if (e.key === "-" || e.key === "_") return zoomBy(-1);
+    const way = ARROW_KEYS[e.key];
+    if (!way) return;
+    e.preventDefault(); // or the page scrolls instead of the island moving
+    panTo(way);
   });
   canvas.addEventListener("pointerleave", () => {
     hover = null;

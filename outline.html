@@ -34,9 +34,17 @@
         white-space: pre;
       }
       #readout:empty { display: none; }
-      /* Undo and redo are the only tools here that can have nowhere to go. */
+      /* Undo, redo, the zoom and the arrows can all have nowhere to go. */
       .ed-tool:disabled { opacity: 0.4; cursor: default; }
       .ed-tool:disabled:hover { border-color: #6b4f34; }
+      .ed-pad {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .ed-pad .ed-tool { font-size: 17px; padding: 5px 0; }
+      .ed-pad-gap { visibility: hidden; }
     </style>
   </head>
   <body>

@@ -62,6 +62,44 @@ export function clampOrigin(origin: Pos, zoom: number, w: number, h: number): Po
   return { x: axis(origin.x, w), y: axis(origin.y, h) };
 }
 
+/** Tiles an arrow moves the view, whatever the zoom. Far enough to get somewhere. */
+export const PAN_TILES = 6;
+
+export type Way = "west" | "east" | "north" | "south";
+
+const WAYS: Record<Way, Pos> = {
+  west: { x: 1, y: 0 },
+  east: { x: -1, y: 0 },
+  north: { x: 0, y: 1 },
+  south: { x: 0, y: -1 },
+};
+
+/** Move the view a step towards `way`. Named for where it goes on the island. */
+export function pan(view: View, way: Way, w: number, h: number): View {
+  const step = PAN_TILES * TILE * view.zoom;
+  const { x, y } = WAYS[way];
+  const origin = { x: view.origin.x + x * step, y: view.origin.y + y * step };
+  return { zoom: view.zoom, origin: clampOrigin(origin, view.zoom, w, h) };
+}
+
+/**
+ * Which ways there is any island left to go — what greys the arrows out. A view
+ * showing the whole thing has nowhere to go at all.
+ */
+export function roomToPan(view: View, w: number, h: number): Record<Way, boolean> {
+  const span = FIELD_PX * view.zoom;
+  const { x, y } = view.origin;
+  // A hair's tolerance: the origin is rounded when an axis is centred, so an
+  // exact comparison would leave an arrow lit with nothing behind it.
+  const slack = 0.5;
+  return {
+    west: x < -slack,
+    east: x + span > w + slack,
+    north: y < -slack,
+    south: y + span > h + slack,
+  };
+}
+
 /** Which cell a canvas point is over. */
 export const cellAt = (point: Pos, view: View): Cell => ({
   col: Math.floor((point.x - view.origin.x) / (TILE * view.zoom)),

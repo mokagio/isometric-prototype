@@ -2,6 +2,7 @@ import type { Sheet } from "../../sprites";
 import { COAST_GROUPS, coastTilesIn, type CoastGroupId, type CoastTile } from "../coastTiles";
 import { TILE } from "../field";
 import type { CoastSheets, OutlineSheets } from "../ground";
+import type { Way } from "./camera";
 
 // The coast tiles down the side of the screen, a tab to a group. Every swatch is
 // cut from the sheet it will be drawn from, so what you pick is the thing itself
@@ -49,6 +50,7 @@ export interface PaletteActions {
   onUndo: () => void;
   onRedo: () => void;
   onZoom: (by: 1 | -1) => void;
+  onPan: (way: Way) => void;
   onGrid: (on: boolean) => void;
   onSave: () => void;
   onOpen: () => void;
@@ -63,6 +65,8 @@ export interface PaletteHandle {
   syncHistory(canUndo: boolean, canRedo: boolean): void;
   /** The same, for the two ends of the zoom. */
   syncZoom(canOut: boolean, canIn: boolean): void;
+  /** And for the arrows, each of which greys out at its own edge. */
+  syncPan(room: Record<Way, boolean>): void;
 }
 
 /** Everything the coast is drawn from, plus the grass a swatch shows under a tile. */
@@ -169,6 +173,30 @@ export function buildPalette(
   zooms.append(outBtn, inBtn);
   root.appendChild(zooms);
 
+  // A pad rather than a row: which way an arrow goes should be its position,
+  // not something to read off it.
+  const pad = document.createElement("div");
+  pad.className = "ed-pad";
+  const arrows = {} as Record<Way, HTMLButtonElement>;
+  const LAYOUT: (Way | null)[] = [null, "north", null, "west", null, "east", null, "south", null];
+  const GLYPH: Record<Way, string> = { north: "↑", south: "↓", west: "←", east: "→" };
+  for (const way of LAYOUT) {
+    const cell = document.createElement("button");
+    cell.className = "ed-tool";
+    if (!way) {
+      cell.className = "ed-pad-gap";
+      cell.disabled = true;
+      pad.appendChild(cell);
+      continue;
+    }
+    cell.textContent = GLYPH[way];
+    cell.title = `Look ${way}`;
+    cell.addEventListener("click", () => actions.onPan(way));
+    arrows[way] = cell;
+    pad.appendChild(cell);
+  }
+  root.appendChild(pad);
+
   const tools = document.createElement("div");
   tools.className = "ed-tools";
   eraseBtn.className = "ed-tool";
@@ -207,7 +235,7 @@ export function buildPalette(
   const hint = document.createElement("div");
   hint.className = "ed-hint";
   hint.textContent =
-    "Pick a tile, then paint it. The rubber and the right button both clear back to open water. Scroll to zoom, drag with the middle button to move about. Only the band outside the fence is yours — inside it is where the game is played.";
+    "Pick a tile, then paint it. The rubber and the right button both clear back to open water. Scroll or the arrow keys to get about. Only the band outside the fence is yours — inside it is where the game is played.";
   root.appendChild(hint);
 
   tabEls.get(showing)?.classList.add("active");
@@ -222,6 +250,9 @@ export function buildPalette(
     syncZoom(canOut: boolean, canIn: boolean): void {
       outBtn.disabled = !canOut;
       inBtn.disabled = !canIn;
+    },
+    syncPan(room: Record<Way, boolean>): void {
+      for (const [way, button] of Object.entries(arrows)) button.disabled = !room[way as Way];
     },
   };
 }
