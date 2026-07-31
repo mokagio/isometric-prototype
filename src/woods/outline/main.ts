@@ -18,6 +18,7 @@ import {
   setDrawnOutline,
   type Outline,
 } from "../outline";
+import { History } from "./history";
 import { buildPalette, type PaletteSheets } from "./palette";
 
 // Drawing the island's shape, tile by tile. The coastline the game grows for
@@ -61,11 +62,13 @@ function main(): void {
   // Whatever was last handed over, so the page picks up where the game left off.
   let outline: Outline = openStashed() ?? grownOutline();
   let brush: CoastTile = COAST_TILES[0]!;
+  let erasing = false;
   let painting: string | null = null; // the code the drag is laying down
   let grid = true;
   let hover: Cell | null = null;
   let animT = 0;
   let swatchesDrawn = false;
+  const history = new History(outline);
 
   const palette = buildPalette(
     document.getElementById("sidebar") as HTMLElement,
@@ -73,19 +76,38 @@ function main(): void {
     {
       onPick: (tile) => {
         brush = tile;
+        erasing = false;
       },
+      onErase: () => {
+        erasing = true;
+      },
+      onUndo: () => goTo(history.undo()),
+      onRedo: () => goTo(history.redo()),
       onGrid: (on) => {
         grid = on;
       },
       onSave: () => downloadText(outlineFilename(new Date()), encodeOutline(outline)),
       onOpen: () => void open(),
       onPlay: () => play(),
-      onReset: () => {
-        outline = grownOutline();
-      },
+      onReset: () => replace(grownOutline()),
     },
     brush,
   );
+  const syncHistory = (): void => palette.syncHistory(history.canUndo, history.canRedo);
+  syncHistory();
+
+  /** Go to a state undo or redo handed back. Null means there was nowhere to go. */
+  function goTo(to: Outline | null): void {
+    if (to) outline = to;
+    syncHistory();
+  }
+
+  /** A whole drawing arriving at once — opened, or started over. The past goes with it. */
+  function replace(next: Outline): void {
+    outline = next;
+    history.reset(outline);
+    syncHistory();
+  }
 
   function openStashed(): Outline | null {
     const text = recallOutline();
@@ -102,7 +124,7 @@ function main(): void {
     const text = await pickTextFile();
     if (text === null) return;
     try {
-      outline = decodeOutline(text);
+      replace(decodeOutline(text));
     } catch (e) {
       alert(e instanceof Error ? e.message : "That outline could not be opened.");
     }
@@ -129,8 +151,8 @@ function main(): void {
 
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
   canvas.addEventListener("pointerdown", (e) => {
-    // The right button clears back to open water, so a slip is undone in place.
-    painting = e.button === 2 ? SEA_CODE : brush.code;
+    // The right button clears back to open water, whichever brush is in hand.
+    painting = e.button === 2 || erasing ? SEA_CODE : brush.code;
     const cell = cellAt(e);
     draw(outline, cell.col, cell.row, painting);
     canvas.setPointerCapture(e.pointerId);
@@ -141,9 +163,18 @@ function main(): void {
   });
   for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
     canvas.addEventListener(type, () => {
+      if (painting === null) return;
       painting = null;
+      // A whole drag is one step back, however many cells it crossed.
+      if (history.record(outline)) syncHistory();
     });
   }
+
+  addEventListener("keydown", (e) => {
+    if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
+    e.preventDefault();
+    goTo(e.shiftKey ? history.redo() : history.undo());
+  });
   canvas.addEventListener("pointerleave", () => {
     hover = null;
   });

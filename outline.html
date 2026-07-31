@@ -34,6 +34,9 @@
         white-space: pre;
       }
       #readout:empty { display: none; }
+      /* Undo and redo are the only tools here that can have nowhere to go. */
+      .ed-tool:disabled { opacity: 0.4; cursor: default; }
+      .ed-tool:disabled:hover { border-color: #6b4f34; }
     </style>
   </head>
   <body>

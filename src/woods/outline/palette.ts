@@ -45,6 +45,9 @@ function swatch(sheets: PaletteSheets, tile: CoastTile): HTMLCanvasElement {
 
 export interface PaletteActions {
   onPick: (tile: CoastTile) => void;
+  onErase: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   onGrid: (on: boolean) => void;
   onSave: () => void;
   onOpen: () => void;
@@ -55,6 +58,8 @@ export interface PaletteActions {
 export interface PaletteHandle {
   /** Draw the swatches again, once the sheets they are cut from have loaded. */
   refresh(): void;
+  /** Grey out whichever of undo and redo has nowhere to go. */
+  syncHistory(canUndo: boolean, canRedo: boolean): void;
 }
 
 /** Everything the coast is drawn from, plus the grass a swatch shows under a tile. */
@@ -92,10 +97,13 @@ export function buildPalette(
 
   const swatches = new Map<string, HTMLButtonElement>();
   let picked = startWith.code;
+  let erasing = false;
   let showing: CoastGroupId = COAST_GROUPS[0]!.id;
 
+  const eraseBtn = document.createElement("button");
   const markPicked = (): void => {
-    for (const [code, el] of swatches) el.classList.toggle("selected", code === picked);
+    for (const [code, el] of swatches) el.classList.toggle("selected", !erasing && code === picked);
+    eraseBtn.classList.toggle("active", erasing);
   };
 
   const showGroup = (id: CoastGroupId): void => {
@@ -109,6 +117,7 @@ export function buildPalette(
       b.appendChild(swatch(sheets, tile));
       b.addEventListener("click", () => {
         picked = tile.code;
+        erasing = false;
         actions.onPick(tile);
         markPicked();
       });
@@ -131,8 +140,28 @@ export function buildPalette(
     tabs.appendChild(b);
   }
 
+  const steps = document.createElement("div");
+  steps.className = "ed-tools";
+  const undoBtn = document.createElement("button");
+  undoBtn.className = "ed-tool";
+  undoBtn.textContent = "↶ Undo";
+  undoBtn.addEventListener("click", () => actions.onUndo());
+  const redoBtn = document.createElement("button");
+  redoBtn.className = "ed-tool";
+  redoBtn.textContent = "↷ Redo";
+  redoBtn.addEventListener("click", () => actions.onRedo());
+  steps.append(undoBtn, redoBtn);
+  root.appendChild(steps);
+
   const tools = document.createElement("div");
   tools.className = "ed-tools";
+  eraseBtn.className = "ed-tool";
+  eraseBtn.textContent = "Rubber";
+  eraseBtn.addEventListener("click", () => {
+    erasing = true;
+    actions.onErase();
+    markPicked();
+  });
   const gridBtn = document.createElement("button");
   gridBtn.className = "ed-tool active";
   gridBtn.textContent = "Grid";
@@ -141,7 +170,7 @@ export function buildPalette(
     gridBtn.classList.toggle("active", on);
     actions.onGrid(on);
   });
-  tools.appendChild(gridBtn);
+  tools.append(eraseBtn, gridBtn);
   root.appendChild(tools);
 
   const buttons = document.createElement("div");
@@ -162,11 +191,17 @@ export function buildPalette(
   const hint = document.createElement("div");
   hint.className = "ed-hint";
   hint.textContent =
-    "Pick a tile, then paint it. Right-click clears back to open water. Only the band outside the fence is yours — inside it is where the game is played.";
+    "Pick a tile, then paint it. The rubber and the right button both clear back to open water. Only the band outside the fence is yours — inside it is where the game is played.";
   root.appendChild(hint);
 
   tabEls.get(showing)?.classList.add("active");
   showGroup(showing);
 
-  return { refresh: () => showGroup(showing) };
+  return {
+    refresh: () => showGroup(showing),
+    syncHistory(canUndo: boolean, canRedo: boolean): void {
+      undoBtn.disabled = !canUndo;
+      redoBtn.disabled = !canRedo;
+    },
+  };
 }
