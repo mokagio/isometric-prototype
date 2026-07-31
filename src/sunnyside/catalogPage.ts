@@ -1,5 +1,4 @@
 import { SheetLoader } from "../sprites";
-import { createMenu } from "../ui";
 import { catalogGroups, footprintLabel, matches, type Group } from "./catalog";
 import { drawAsset, swatchExtent, type SheetBook } from "./draw";
 import type { Asset } from "./library";
@@ -42,12 +41,6 @@ function main(): void {
   const loader = new SheetLoader(ids.length);
   const book: SheetBook = {};
   for (const id of ids) book[id] = loader.load(sheetUrl(id));
-
-  createMenu("Library", {
-    onAllGames: () => {
-      location.href = "index.html";
-    },
-  });
 
   const groups = catalogGroups();
   const cards: Card[] = [];
