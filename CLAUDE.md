@@ -62,6 +62,25 @@ Trees stand still until hit — the pack's 4-frame sway plays once, fast, as a s
 The action button and the spacebar both go through one `swingAxe`, so they cannot drift apart; `Input.jump` is the spacebar, and the press is edge-detected because holding it should not chop twice.
 The felling blow bursts three logs out of the stump (`woods/logs.ts`): the only thing in this game that leaves the ground, so `z` lives there and nowhere else, and a log is only collectable once it has settled.
 
+## The boss
+
+`treant.ts` is the one thing both games share that is neither plumbing nor scenery: an enemy that takes five blows and shows five hearts over its head while it does.
+It holds the state and the sheet; the games hold where it stands and what a lash costs, which is the only thing they disagree about.
+
+The sheet is a *grid*, not a strip — Holder's animated battlers are 4x14 cells of 160px, one pose to a row — so `blitFrame` takes a `row`, and the sheet is vendored byte-identical to the pack rather than cut up, which keeps `magick identify` on it matching the download.
+The pack ships no origin, but every pose bottoms out on the same line (y=149 despite standing different heights), so that line is the feet.
+Two poses are worth knowing: row 11 runs dark-to-lit and is played *backwards*, which is the fire going out, and row 12 is the slumped hold it settles into.
+Row 13 is the pack's credit plate and is never drawn.
+
+It is a battler — one facing, front-on, and no walk cycle anywhere in the sheet — which is why the boss is rooted in both games rather than chasing anybody.
+The rear-up is the telegraph and stepping away is the only way past a lash: a blow landing mid-roar is absorbed rather than staggering it, or a hero who simply keeps swinging cancels every roar before it lands and the boss is a punching bag.
+`ROAR_EVERY` has to stay well under the time five swings take for the same reason, and `encounter.test.ts` fights it at point blank to hold that.
+
+Peaceful Plains gives it the hero's own sword at the hero's own `MELEE`, and a lash that reaches a little further than the blade, so closing to swing is closing to be caught.
+Whispering Woods has no hearts to take, so there it is a tree: `woods/bossTree.ts` puts it through the same axe, reach and swing clock the ordinary trees go through, and it bursts an armful of logs instead of three.
+It still roars there and lands nothing — what that buys is a tree plainly awake while you are chopping it.
+Both draw it at 2x rather than the world's own density: a 160px battler at Whispering Woods' 4x would be four tiles across.
+
 ## The Sunnyside library
 
 `src/sunnyside/` names the pack's art — around 210 ground brushes and props — as a manifest over the sheets vendored whole in `public/sunnyside/`, so nothing is re-cut and a wrong tile is a number to change.
