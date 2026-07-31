@@ -88,14 +88,13 @@
         text-align: center;
         font-size: clamp(9px, 2.6vw, 11px);
       }
-      /* The title's own ink and shadow: gold is the colour of a link everywhere
-         else here, but on grass this bright it is the one thing you cannot read. */
+      /* The buttons' own brown: dark on grass this bright is what reads, where
+         the gold every other link here uses does not. */
       .ww-foot a {
-        color: var(--ww-ink);
+        color: var(--ww-panel);
         text-decoration: underline;
-        text-shadow: 0 3px 5px rgba(0, 0, 0, 0.85);
       }
-      .ww-foot a:hover { color: #c9a86a; }
+      .ww-foot a:hover { color: var(--ww-edge); }
     </style>
   </head>
   <body>
