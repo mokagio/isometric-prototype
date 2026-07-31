@@ -90,11 +90,12 @@
       }
       /* The buttons' own brown: dark on grass this bright is what reads, where
          the gold every other link here uses does not. */
+      /* The title's ink, stroked behind the letters rather than into them, so the
+         brown does not land straight on the grass. It marks the link out well
+         enough on its own, so there is no underline under it. */
       .ww-foot a {
         color: var(--ww-panel);
-        text-decoration: underline;
-        /* The title's ink, drawn behind the letters rather than into them, so the
-           brown does not land straight on the grass. */
+        text-decoration: none;
         -webkit-text-stroke: 3px var(--ww-ink);
         paint-order: stroke fill;
       }
