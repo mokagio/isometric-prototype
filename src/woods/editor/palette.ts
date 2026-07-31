@@ -1,3 +1,4 @@
+import { actionColumn, backLinks, hint, swatchGrid, tabRow, toolRow } from "../../editorUi";
 import { drawAsset, swatchExtent, type SheetBook } from "../../sunnyside/draw";
 import type { Asset, CategoryId } from "../../sunnyside/library";
 import { BRUSHES, CATEGORIES, PROPS } from "../../sunnyside/manifest";
@@ -24,7 +25,9 @@ function swatch(book: SheetBook, asset: Asset): HTMLCanvasElement {
 
 export interface PaletteActions {
   onPick: (asset: Asset) => void;
-  onErase: () => void;
+  onErasing: (on: boolean) => void;
+  onUndo: () => void;
+  onRedo: () => void;
   onGrid: (on: boolean) => void;
   onPlay: () => void;
   onSave: () => void;
@@ -34,7 +37,9 @@ export interface PaletteActions {
 
 export interface PaletteHandle {
   /** Show the rubber as picked up, or put back down. */
-  syncErasing(erasing: boolean): void;
+  syncErasing(erasing: boolean, holding: Asset | null): void;
+  /** Grey out whichever of undo and redo has nowhere to go. */
+  syncHistory(canUndo: boolean, canRedo: boolean): void;
   /** Draw the swatches again, once the sheets they are cut from have loaded. */
   refresh(): void;
 }
@@ -46,125 +51,68 @@ export function buildPalette(
   startWith: Asset,
 ): PaletteHandle {
   root.innerHTML = "";
-
-  const links = document.createElement("div");
-  links.className = "ed-links";
-  const link = (href: string, text: string): void => {
-    const a = document.createElement("a");
-    a.className = "ed-back";
-    a.href = href;
-    a.textContent = text;
-    links.appendChild(a);
-  };
-  link("woods.html", "← Woods");
-  link("library.html", "All the things →");
-  root.appendChild(links);
-
-  const tabs = document.createElement("div");
-  tabs.className = "ed-tabs";
-  root.appendChild(tabs);
-
-  const grid = document.createElement("div");
-  grid.className = "ed-palette";
-  root.appendChild(grid);
+  backLinks(root, [
+    ["woods.html", "← Woods"],
+    ["library.html", "All the things →"],
+  ]);
 
   const assets = [...BRUSHES, ...PROPS];
-  const swatches = new Map<string, HTMLButtonElement>();
-  let picked = startWith.id;
+  // Tabs first, since they sit above the grid, and nothing is shown until the
+  // grid below them exists to show it in.
+  const tabs = tabRow<CategoryId>(root, CATEGORIES, (id) =>
+    things.show(assets.filter((a) => a.category === id)),
+  );
+  const things = swatchGrid<Asset>(root, {
+    key: (asset) => asset.id,
+    label: (asset) => asset.label,
+    face: (asset) => swatch(book, asset),
+    onPick: (asset) => actions.onPick(asset),
+  });
+  tabs.show(CATEGORIES[0]!.id);
+  things.select(startWith.id);
+
+  const steps = toolRow(root, [
+    { id: "undo", label: "↶ Undo", onClick: actions.onUndo },
+    { id: "redo", label: "↷ Redo", onClick: actions.onRedo },
+  ]);
   let erasing = false;
+  let gridOn = true;
+  const tools = toolRow(root, [
+    { id: "rubber", label: "Rubber", onClick: () => actions.onErasing(!erasing) },
+    {
+      id: "grid",
+      label: "Grid",
+      active: true,
+      onClick: () => {
+        gridOn = !gridOn;
+        tools.setActive("grid", gridOn);
+        actions.onGrid(gridOn);
+      },
+    },
+  ]);
 
-  const eraseBtn = document.createElement("button");
-  let showing: CategoryId = CATEGORIES[0]!.id;
+  actionColumn(root, [
+    { label: "▶ Play this island", onClick: actions.onPlay, go: true },
+    { label: "Save island", onClick: actions.onSave },
+    { label: "Open island…", onClick: actions.onOpen },
+    { label: "Start again", onClick: actions.onClear },
+  ]);
 
-  const markPicked = (): void => {
-    for (const [id, el] of swatches) el.classList.toggle("selected", !erasing && id === picked);
-    eraseBtn.classList.toggle("active", erasing);
-  };
-
-  const showCategory = (id: CategoryId): void => {
-    showing = id;
-    grid.innerHTML = "";
-    swatches.clear();
-    for (const asset of assets.filter((a) => a.category === id)) {
-      const b = document.createElement("button");
-      b.className = "ed-swatch";
-      b.title = asset.label;
-      b.appendChild(swatch(book, asset));
-      b.addEventListener("click", () => {
-        picked = asset.id;
-        erasing = false;
-        actions.onPick(asset);
-        markPicked();
-      });
-      swatches.set(asset.id, b);
-      grid.appendChild(b);
-    }
-    markPicked();
-  };
-
-  const tabEls = new Map<CategoryId, HTMLButtonElement>();
-  for (const category of CATEGORIES) {
-    const b = document.createElement("button");
-    b.className = "ed-tab";
-    b.textContent = category.label;
-    b.addEventListener("click", () => {
-      for (const [id, el] of tabEls) el.classList.toggle("active", id === category.id);
-      showCategory(category.id);
-    });
-    tabEls.set(category.id, b);
-    tabs.appendChild(b);
-  }
-
-  const tools = document.createElement("div");
-  tools.className = "ed-tools";
-  eraseBtn.className = "ed-tool";
-  eraseBtn.textContent = "Rubber";
-  eraseBtn.addEventListener("click", () => {
-    erasing = true;
-    actions.onErase();
-    markPicked();
-  });
-  const gridBtn = document.createElement("button");
-  gridBtn.className = "ed-tool active";
-  gridBtn.textContent = "Grid";
-  gridBtn.addEventListener("click", () => {
-    const on = !gridBtn.classList.contains("active");
-    gridBtn.classList.toggle("active", on);
-    actions.onGrid(on);
-  });
-  tools.append(eraseBtn, gridBtn);
-  root.appendChild(tools);
-
-  const buttons = document.createElement("div");
-  buttons.className = "ed-map";
-  const button = (label: string, onClick: () => void, className = "ed-action"): void => {
-    const b = document.createElement("button");
-    b.className = className;
-    b.textContent = label;
-    b.addEventListener("click", onClick);
-    buttons.appendChild(b);
-  };
-  button("▶ Play this island", actions.onPlay, "ed-action ed-action-go");
-  button("Save island", actions.onSave);
-  button("Open island…", actions.onOpen);
-  button("Start again", actions.onClear);
-  root.appendChild(buttons);
-
-  const hint = document.createElement("div");
-  hint.className = "ed-hint";
-  hint.textContent = "Pick something, then paint. Right-click rubs out. Empty ground becomes grass when you play.";
-  root.appendChild(hint);
-
-  tabEls.get(CATEGORIES[0]!.id)?.classList.add("active");
-  showCategory(CATEGORIES[0]!.id);
+  hint(
+    root,
+    "Pick something, then paint. The rubber and the right button both rub out. Empty ground becomes grass when you play.",
+  );
 
   return {
-    syncErasing(on: boolean): void {
+    syncErasing(on, holding) {
       erasing = on;
-      markPicked();
+      tools.setActive("rubber", on);
+      things.select(on ? null : (holding?.id ?? null));
     },
-    refresh(): void {
-      showCategory(showing);
+    syncHistory(canUndo, canRedo) {
+      steps.setEnabled("undo", canUndo);
+      steps.setEnabled("redo", canRedo);
     },
+    refresh: () => things.refresh(),
   };
 }

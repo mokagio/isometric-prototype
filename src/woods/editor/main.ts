@@ -1,6 +1,8 @@
 import { downloadText, pickTextFile } from "../../files";
 import { PLAY_STASHED_ISLAND_URL, recallIsland, stashIsland, wantsStashedMap } from "../../handoff";
+import { History, jsonSteps } from "../../history";
 import { Loop } from "../../loop";
+import { createPainter } from "../../painter";
 import { SheetLoader } from "../../sprites";
 import type { SheetBook } from "../../sunnyside/draw";
 import { isProp, type Asset } from "../../sunnyside/library";
@@ -57,9 +59,11 @@ function main(): void {
   let erasing = false;
   let grid = true;
   let hover: Cell | null = null;
-  let painting = false;
-  let paintErasing = false;
   let animT = 0;
+  // An island is plain data, so a snapshot is a deep copy of it and no more.
+  // Reset below once whatever the page opens on is in hand, so undo cannot walk
+  // back past the island somebody arrived with.
+  const history = new History(island, jsonSteps<Island>());
 
   createMenu("Island Editor", {
     onAllGames: () => {
@@ -75,6 +79,7 @@ function main(): void {
     } catch (e) {
       alert(e instanceof Error ? e.message : "That island could not be opened.");
     }
+    history.reset(island);
   }
 
   const mayReplace = (): boolean =>
@@ -88,9 +93,9 @@ function main(): void {
         holding = asset;
         erasing = false;
       },
-      onErase: () => {
-        erasing = true;
-      },
+      onErasing: setErasing,
+      onUndo: () => goTo(history.undo()),
+      onRedo: () => goTo(history.redo()),
       onGrid: (on) => {
         grid = on;
       },
@@ -108,7 +113,7 @@ function main(): void {
           const text = await pickTextFile();
           if (text === null) return;
           try {
-            island = decodeIsland(text);
+            replace(decodeIsland(text));
           } catch (e) {
             alert(e instanceof Error ? e.message : "That island could not be opened.");
           }
@@ -116,11 +121,32 @@ function main(): void {
       },
       onClear: () => {
         if (!mayReplace()) return;
-        island = emptyIsland();
+        replace(emptyIsland());
       },
     },
     GRASS,
   );
+
+  const syncHistory = (): void => palette.syncHistory(history.canUndo, history.canRedo);
+  syncHistory();
+
+  function setErasing(on: boolean): void {
+    erasing = on;
+    palette.syncErasing(on, holding);
+  }
+
+  /** Go to a state undo or redo handed back. Null means there was nowhere to go. */
+  function goTo(to: Island | null): void {
+    if (to) island = to;
+    syncHistory();
+  }
+
+  /** An island arriving whole — opened, or started again. The past goes with it. */
+  function replace(next: Island): void {
+    island = next;
+    history.reset(island);
+    syncHistory();
+  }
 
   const zoomNow = (): number => fitZoom(canvas.clientWidth, canvas.clientHeight);
 
@@ -140,41 +166,28 @@ function main(): void {
     paint(island, cell.col, cell.row, holding.id);
   };
 
-  const cellFrom = (e: MouseEvent): Cell => {
-    const rect = canvas.getBoundingClientRect();
-    return cellAtPoint(e.clientX - rect.left, e.clientY - rect.top, canvas.clientWidth, canvas.clientHeight, zoomNow());
-  };
-
-  canvas.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    const cell = cellFrom(e);
-    hover = cell;
-    paintErasing = erasing || e.button === 2;
-    painting = true;
-    applyAt(cell, paintErasing);
-  });
-
-  canvas.addEventListener("mousemove", (e) => {
-    hover = cellFrom(e);
+  createPainter<Cell>(canvas, {
+    cellAt: (x, y) => cellAtPoint(x, y, canvas.clientWidth, canvas.clientHeight, zoomNow()),
+    rubbing: () => erasing,
+    apply: applyAt,
     // Dragging paints ground, but never scatters things: a held house would
     // otherwise stamp a row of them across the island.
-    if (painting && (paintErasing || (holding !== null && !isProp(holding)))) applyAt(hover, paintErasing);
+    dragPaints: (rubbing) => rubbing || (holding !== null && !isProp(holding)),
+    onHover: (cell) => {
+      hover = cell;
+    },
+    onStroke: () => {
+      if (history.record(island)) syncHistory();
+    },
   });
-
-  const stop = (): void => {
-    painting = false;
-  };
-  window.addEventListener("mouseup", stop);
-  canvas.addEventListener("mouseleave", () => {
-    hover = null;
-    stop();
-  });
-  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
   window.addEventListener("keydown", (e) => {
-    if (e.key !== "e" && e.key !== "E") return;
-    erasing = !erasing;
-    palette.syncErasing(erasing);
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      goTo(e.shiftKey ? history.redo() : history.undo());
+      return;
+    }
+    if (e.key === "e" || e.key === "E") setErasing(!erasing);
   });
 
   // Swatches are cut from the sheets, so they come up blank until those load.
