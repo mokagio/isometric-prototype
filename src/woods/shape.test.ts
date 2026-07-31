@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FENCE_RING, FIELD } from "./field";
-import { isLand, JAG, neighbours, shoreDepth } from "./shape";
+import { grownLand, hasOutline, isLand, JAG, neighbours, setOutline, shoreDepth } from "./shape";
 
 const SIDES = ["north", "east", "south", "west"] as const;
 
@@ -81,5 +81,49 @@ describe("neighbours", () => {
     const middle = Math.floor(FIELD / 2);
     expect(neighbours(middle, middle)).toEqual({ north: true, east: true, south: true, west: true });
     expect(neighbours(-1, -1)).toEqual({ north: false, east: false, south: false, west: false });
+  });
+});
+
+describe("a drawn outline", () => {
+  const blank = (): boolean[] => new Array<boolean>(FIELD * FIELD).fill(false);
+
+  it("stands in for the grown one, cell for cell", () => {
+    const drawn = blank();
+    drawn[5 * FIELD + 5] = true;
+    setOutline(drawn);
+    try {
+      expect(hasOutline()).toBe(true);
+      expect(isLand(5, 5)).toBe(true);
+      expect(isLand(6, 5)).toBe(false);
+    } finally {
+      setOutline(null);
+    }
+  });
+
+  it("hands back to the grown island when it is cleared", () => {
+    setOutline(blank());
+    setOutline(null);
+    expect(hasOutline()).toBe(false);
+    let same = true;
+    for (let row = 0; row < FIELD; row++) {
+      for (let col = 0; col < FIELD; col++) same &&= isLand(col, row) === grownLand(col, row);
+    }
+    expect(same).toBe(true);
+  });
+
+  it("refuses an outline of the wrong size rather than drawing half an island", () => {
+    setOutline([true, false]);
+    expect(hasOutline()).toBe(false);
+    setOutline(null);
+  });
+
+  it("is still the sea beyond the field, whatever was drawn", () => {
+    setOutline(new Array<boolean>(FIELD * FIELD).fill(true));
+    try {
+      expect(isLand(-1, 0)).toBe(false);
+      expect(isLand(FIELD, 0)).toBe(false);
+    } finally {
+      setOutline(null);
+    }
   });
 });
