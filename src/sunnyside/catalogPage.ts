@@ -47,9 +47,6 @@ function main(): void {
     onAllGames: () => {
       location.href = "index.html";
     },
-    onCredits: () => {
-      location.href = "credits.html";
-    },
   });
 
   const groups = catalogGroups();

@@ -13,8 +13,6 @@ export interface MenuActions {
   onEnemyMode?: (lurk: boolean) => void;
   /** true = draw entity bounding boxes. */
   onDebug?: (on: boolean) => void;
-  /** Open the credits page. */
-  onCredits?: () => void;
   /** Leave the game for the list of games. */
   onAllGames?: () => void;
 }
@@ -167,7 +165,6 @@ export function createMenu(title: string, actions: MenuActions): void {
       item.textContent = fullscreenLabel(fullscreenActive(document));
     });
   }
-  if (actions.onCredits) addItem("Credits", actions.onCredits);
   // Last: leaving the game sits well clear of the thumb reaching for New World.
   if (actions.onAllGames) addItem("All Games", actions.onAllGames);
 

@@ -262,9 +262,6 @@ async function main(): Promise<void> {
     onEditor: () => {
       location.href = "editor.html";
     },
-    onCredits: () => {
-      location.href = "credits.html";
-    },
     onAllGames: () => {
       location.href = "index.html";
     },
