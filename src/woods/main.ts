@@ -13,7 +13,7 @@ import { createActionButton } from "./actionButton";
 import { cellAt, fenceTile } from "./coast";
 import { createLogCounter } from "./logCounter";
 import { Logs } from "./logs";
-import { DEEP_SEA, drawCoastTile, drawIslandGround, type CoastSheets } from "./ground";
+import { DEEP_SEA, drawCoastTile, drawIslandGround, type CoastSheets, type OutlineSheets } from "./ground";
 import { blockedOn, decodeIsland, drawOrder, playedGroundAt, type Island } from "./island";
 import {
   blockedByTree,
@@ -27,8 +27,7 @@ import {
   TRUNK,
   visibleTiles,
 } from "./field";
-import { decodeOutline } from "./outline";
-import { setOutline } from "./shape";
+import { decodeOutline, setDrawnOutline } from "./outline";
 import { facingFrom, walk, type Facing, type Pos } from "./walker";
 import { AXE_REACH, Chop, CHOP_FRAMES, Wood } from "./wood";
 
@@ -113,15 +112,14 @@ function openStashedIsland(): Island | null {
 }
 
 /**
- * The outline someone drew, if there is one. Applied before anything draws, since
- * every coast tile is chosen from it — an outline arriving late would be a frame
- * of the wrong island.
+ * The coastline someone drew, if there is one. Applied before anything draws:
+ * an outline arriving late would be a frame of the wrong island.
  */
 function applyDrawnOutline(): void {
   const text = recallOutline();
   if (text === null) return;
   try {
-    setOutline(decodeOutline(text));
+    setDrawnOutline(decodeOutline(text));
   } catch {
     // A stale outline is not worth stopping the game for: the grown one stands in.
   }
@@ -139,7 +137,7 @@ function main(): void {
   // itself out of the handful of strips below.
   const libraryIds = island ? (Object.keys(SHEETS) as SheetId[]) : [];
 
-  const sheets = new SheetLoader(16 + libraryIds.length);
+  const sheets = new SheetLoader(20 + libraryIds.length);
   const walkSheet = sheets.load(url("walk.png"));
   const idleSheet = sheets.load(url("idle.png"));
   const axeSheet = sheets.load(url("axe.png"));
@@ -148,7 +146,7 @@ function main(): void {
   const treeSheet = sheets.load(url("tree.png"));
   const stumpSheet = sheets.load(url("stump.png"));
   const logSheet = sheets.load(url("log.png"));
-  const coast: CoastSheets = {
+  const coast: CoastSheets & OutlineSheets = {
     sea: sheets.load(url("sea.png")),
     sparkle: sheets.load(url("seaSparkle.png")),
     shore: sheets.load(url("shore.png")),
@@ -157,6 +155,12 @@ function main(): void {
     lip: sheets.load(url("lip.png")),
     lipCorner: sheets.load(url("cliffTop.png")),
     fence: sheets.load(url("fence.png")),
+    // Only a drawn coastline lays these, but the wood cannot know before it has
+    // read the outline whether one does.
+    grassSand: sheets.load(url("grassSand.png")),
+    grassEdge: sheets.load(url("grassEdge.png")),
+    sandDeco: sheets.load(url("sandDeco.png")),
+    sand: sheets.load(url("sand.png")),
   };
   const book: SheetBook = {};
   for (const id of libraryIds) book[id] = sheets.load(sheetUrl(id));

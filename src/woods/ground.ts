@@ -18,6 +18,8 @@ import {
   type Tile,
 } from "./coast";
 import { screenAt, TILE } from "./field";
+import { codeAt, drawnOutline } from "./outline";
+import { paintOutlineCell } from "./outlineDraw";
 import type { Pos } from "./walker";
 
 // The island's ground, drawn the one way. The game paints its own grass into it
@@ -42,6 +44,17 @@ export interface CoastSheets {
   lip: Sheet;
   lipCorner: Sheet;
   fence: Sheet;
+}
+
+/**
+ * The strips only a hand-drawn coastline reaches for. Kept out of `CoastSheets`
+ * so a page that never draws one need not load them.
+ */
+export interface OutlineSheets {
+  grassSand?: Sheet;
+  grassEdge?: Sheet;
+  sandDeco?: Sheet;
+  sand?: Sheet;
 }
 
 export interface GroundView {
@@ -83,7 +96,7 @@ export function drawCoastTile(
  */
 export function drawIslandGround(
   ctx: CanvasRenderingContext2D,
-  sheets: CoastSheets,
+  sheets: CoastSheets & OutlineSheets,
   view: GroundView,
   paintLand: (col: number, row: number, at: Pos) => void,
 ): void {
@@ -97,6 +110,7 @@ export function drawIslandGround(
   const maxCol = Math.floor((camera.x + view.width / zoom) / TILE);
   const maxRow = Math.floor((camera.y + view.height / zoom) / TILE);
   const surf = frameOf(animT, FOAM_SECONDS, 2) === 0 ? sheets.shore : sheets.shore2;
+  const drawn = drawnOutline();
 
   for (let row = minRow; row <= maxRow; row++) {
     for (let col = minCol; col <= maxCol; col++) {
@@ -108,6 +122,19 @@ export function drawIslandGround(
         tile(sheets.sparkle.img, { col: frameOf(t, SPARKLE_SECONDS, SPARKLE_FRAMES), row: 0 }, at);
       }
       if (ringOf(col, row) < 0) continue; // out at sea
+
+      // A drawn outline replaces the worked-out one entirely: its cells say
+      // which tile they hold, and that is what goes down.
+      if (drawn) {
+        paintOutlineCell(codeAt(drawn, col, row), at, surf, sheets, {
+          grass: () => paintLand(col, row, at),
+          sand: (p) => {
+            if (sheets.sand?.ok) tile(sheets.sand.img, { col: 0, row: 0 }, p);
+          },
+          tile: (sheet, src, p, flipV) => drawCoastTile(ctx, sheet.img, src, p, zoom, flipV),
+        });
+        continue;
+      }
 
       // Ground everywhere on the island but the lip and the corner chamfers,
       // which are their own. Never on the coast ring: that is water, and the

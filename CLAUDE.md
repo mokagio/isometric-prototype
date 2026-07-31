@@ -77,6 +77,17 @@ Unpainted ground plays as grass, so a half-built island is still somewhere to wa
 Things that lie flat (dug soil, a rug) are their own layer, so a carrot plants *in* the soil rather than beside it; everything else takes its cell to itself.
 `woods/ground.ts` draws the island's edge for both pages, and the game hands the editor its island through `handoff.ts` under `ww:island`, keyed off the same `?map=local` query Peaceful Plains uses.
 
+## The island's outline
+
+The coastline `coast.ts` works out from its neighbours is a guess at what somebody wants an island to look like, and describing one in prose was a slow way to find out it was the wrong guess.
+`outline.html` hands over the pen: `coastTiles.ts` names every edge tile the pack cut — the grass water's edge and the sand one, the cliff's corners and feet, the ragged grass fringes, the seams, the fence — and the page lays whichever you pick in whichever cell you point at.
+Nothing is worked out; `outlineDraw.ts` puts down the tile the cell holds, which is what makes the editor and the game the same picture.
+The band outside the fence is all it draws: `editable` stops at `FENCE_RING`, since everything inside is the game's own ground and neither the walker nor the island editor asks the outline's permission.
+
+A cell is one character, so a saved outline is `FIELD` lines of `FIELD` characters — meant to be read in a diff and pasted into the source the day a drawn island becomes the built-in one.
+`grownOutline` writes down what `coast.ts` would have drawn, so the page opens on the island as it stands rather than an empty sea, and drawing is editing.
+It reaches the game through `handoff.ts` under `ww:outline` — not by query, unlike a map: the wood wears the last coastline drawn until someone starts over.
+
 ## Maps
 
 Every map is `MAP_SIZE` (56) square, generated or hand-built, so the editor can open the world you are playing and the game can play a board you drew.

@@ -1,83 +1,123 @@
+import {
+  chamferTile,
+  fenceTile,
+  isCliffFace,
+  isLip,
+  lipCornerTile,
+  ringOf,
+  shoreTile,
+  type Tile,
+} from "./coast";
+import { COAST_TILES, GRASS_CODE, isCoastCode, SEA_CODE, type CoastSheetId } from "./coastTiles";
 import { FENCE_RING, FIELD } from "./field";
-import { grownLand } from "./shape";
+import { isLand } from "./shape";
 
-// An island's outline, drawn by hand. `shape.ts` grows one when nobody has drawn
-// anything; this is the file that overrides it.
+// An island's outline, drawn by hand: one of the pack's coast tiles per cell,
+// placed rather than worked out. `coast.ts` still grows a coastline when nobody
+// has drawn one, and `grownOutline` is that coastline written down — so the
+// editor opens on the island as it stands and the drawing starts from there.
 //
-// The cells are kept as one character each — `.` for land, `~` for sea — a row to
-// a line. It reads as a little map in the file, survives a diff, and can be
-// pasted straight into the source the day a drawn island becomes the built-in
-// one. A thousand-odd JSON booleans would do none of that.
+// A cell is one character, a row to a line. It reads as a little map in the
+// file, survives a diff, and can be pasted straight into the source the day a
+// drawn island becomes the built-in one.
 
 export const MAP_NAME = "whispering-woods-outline";
-export const VERSION = 1;
+// 1 was land-or-sea booleans, autotiled on the way in. Nothing reads those now.
+export const VERSION = 2;
 
-export const LAND = ".";
-export const SEA = "~";
-
-/** One flag per cell, row-major. */
-export type Outline = boolean[];
+/** One tile code per cell, row-major. */
+export type Outline = string[];
 
 export const index = (col: number, row: number): number => row * FIELD + col;
 
 export const inBounds = (col: number, row: number): boolean =>
   col >= 0 && row >= 0 && col < FIELD && row < FIELD;
 
-/** The outline the island grows for itself: what the editor opens on. */
+/**
+ * Whether a cell is the outline's to draw.
+ *
+ * Everything from the fence inwards belongs to the game: it is where the walker
+ * is held and where the island editor paints, and neither asks the outline's
+ * permission. So the drawing is the band outside the fence — which is the whole
+ * of what anybody looking at the island calls its outline.
+ */
+export const editable = (col: number, row: number): boolean =>
+  inBounds(col, row) && ringOf(col, row) < FENCE_RING;
+
+// The way back: a sheet position to the character that stands for it, so the
+// autotiler's choices can be written down as placed tiles.
+const CODE_AT = new Map(
+  COAST_TILES.filter((t) => t.sheet && !t.flipV).map((t) => [`${t.sheet!}:${t.col!}:${t.row!}`, t.code]),
+);
+
+const codeOf = (sheet: CoastSheetId, tile: Tile): string =>
+  CODE_AT.get(`${sheet}:${tile.col}:${tile.row}`) ?? SEA_CODE;
+
+/**
+ * The coastline `coast.ts` grows, written down as tiles: what the editor opens
+ * on. A cell carries one tile, so where the autotiler stacks a face over ground
+ * the face is what gets written — it is the tile you would place there.
+ */
 export function grownOutline(): Outline {
-  const cells: Outline = new Array<boolean>(FIELD * FIELD).fill(false);
+  const cells: Outline = new Array<string>(FIELD * FIELD).fill(SEA_CODE);
   for (let row = 0; row < FIELD; row++) {
-    for (let col = 0; col < FIELD; col++) cells[index(col, row)] = grownLand(col, row);
+    for (let col = 0; col < FIELD; col++) {
+      cells[index(col, row)] = grownCode(col, row);
+    }
   }
   return cells;
 }
 
-/**
- * Whether a cell may be drawn as sea.
- *
- * Everything from the fence inwards has to stay land: it is where the walker is
- * held and where the island editor paints, and neither asks the outline's
- * permission. Drawing the sea in there would put the ground under someone's feet
- * out at sea. The mirror of `island.ts`'s `buildable`.
- */
-export function floodable(col: number, row: number): boolean {
-  if (!inBounds(col, row)) return false;
-  const ring = Math.min(col, row, FIELD - 1 - col, FIELD - 1 - row);
-  return ring < FENCE_RING;
+function grownCode(col: number, row: number): string {
+  const shore = shoreTile(col, row);
+  if (shore) return codeOf("shore", shore);
+  const chamfer = chamferTile(col, row);
+  if (chamfer) return codeOf("shore", chamfer);
+  if (isCliffFace(col, row)) return codeOf("cliff", { col: col % 3, row: 1 });
+  if (isLip(col, row)) {
+    const corner = lipCornerTile(col, row);
+    return corner ? codeOf("lipCorner", corner) : "_";
+  }
+  if (fenceTile(col, row)) return GRASS_CODE; // the fence is drawn standing, not as ground
+  return isLand(col, row) ? GRASS_CODE : SEA_CODE;
 }
 
-/** Draw one cell, land or sea. Refuses to flood the fenced square. */
-export function draw(outline: Outline, col: number, row: number, land: boolean): void {
-  if (!inBounds(col, row)) return;
-  if (!land && !floodable(col, row)) return;
-  outline[index(col, row)] = land;
+export const codeAt = (outline: Outline, col: number, row: number): string =>
+  inBounds(col, row) ? (outline[index(col, row)] ?? SEA_CODE) : SEA_CODE;
+
+/** Lay a tile in a cell. Refuses anything the outline does not own. */
+export function draw(outline: Outline, col: number, row: number, code: string): void {
+  if (!editable(col, row) || !isCoastCode(code)) return;
+  outline[index(col, row)] = code;
 }
 
-export const landAt = (outline: Outline, col: number, row: number): boolean =>
-  inBounds(col, row) && outline[index(col, row)] === true;
-
-/** The outline as rows of `.` and `~`, which is how it is written down. */
+/** The outline as rows of characters, which is how it is written down. */
 export function toRows(outline: Outline): string[] {
   const rows: string[] = [];
   for (let row = 0; row < FIELD; row++) {
     let line = "";
-    for (let col = 0; col < FIELD; col++) line += outline[index(col, row)] ? LAND : SEA;
+    for (let col = 0; col < FIELD; col++) line += outline[index(col, row)] ?? SEA_CODE;
     rows.push(line);
   }
   return rows;
 }
 
-/** Rows back to cells. Anything that is not land reads as sea. */
+/**
+ * Rows back to cells. A character nobody recognises reads as open water, and
+ * whatever the file says about the fenced square is dropped: that is the game's
+ * ground, and a file is not the place to find out it has been flooded.
+ */
 export function fromRows(rows: readonly string[]): Outline {
-  const cells: Outline = new Array<boolean>(FIELD * FIELD).fill(false);
-  rows.forEach((line, row) => {
-    for (let col = 0; col < FIELD; col++) cells[index(col, row)] = line[col] === LAND;
-  });
-  // Whatever the file says, the fenced square is land: an outline that floods it
-  // would strand the walker, and a file is not the place to find that out.
+  const cells: Outline = new Array<string>(FIELD * FIELD).fill(SEA_CODE);
   for (let row = 0; row < FIELD; row++) {
+    const line = rows[row] ?? "";
     for (let col = 0; col < FIELD; col++) {
-      if (!floodable(col, row)) cells[index(col, row)] = true;
+      if (!editable(col, row)) {
+        cells[index(col, row)] = GRASS_CODE;
+        continue;
+      }
+      const code = line[col] ?? SEA_CODE;
+      cells[index(col, row)] = isCoastCode(code) ? code : SEA_CODE;
     }
   }
   return cells;
@@ -136,6 +176,17 @@ export function decodeOutline(text: string): Outline {
   }
   return fromRows(file.rows);
 }
+
+// The outline in play, if one has been drawn. `ground.ts` asks for it every
+// frame: with one set it draws the cells as they were placed instead of working
+// the coastline out, which is the whole point of having drawn it.
+let current: Outline | null = null;
+
+export function setDrawnOutline(outline: Outline | null): void {
+  current = outline && outline.length === FIELD * FIELD ? outline : null;
+}
+
+export const drawnOutline = (): Outline | null => current;
 
 const pad = (n: number): string => String(n).padStart(2, "0");
 
