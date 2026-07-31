@@ -48,6 +48,7 @@ export interface PaletteActions {
   onErase: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  onZoom: (by: 1 | -1) => void;
   onGrid: (on: boolean) => void;
   onSave: () => void;
   onOpen: () => void;
@@ -60,6 +61,8 @@ export interface PaletteHandle {
   refresh(): void;
   /** Grey out whichever of undo and redo has nowhere to go. */
   syncHistory(canUndo: boolean, canRedo: boolean): void;
+  /** The same, for the two ends of the zoom. */
+  syncZoom(canOut: boolean, canIn: boolean): void;
 }
 
 /** Everything the coast is drawn from, plus the grass a swatch shows under a tile. */
@@ -153,6 +156,19 @@ export function buildPalette(
   steps.append(undoBtn, redoBtn);
   root.appendChild(steps);
 
+  const zooms = document.createElement("div");
+  zooms.className = "ed-tools";
+  const outBtn = document.createElement("button");
+  outBtn.className = "ed-tool";
+  outBtn.textContent = "− Out";
+  outBtn.addEventListener("click", () => actions.onZoom(-1));
+  const inBtn = document.createElement("button");
+  inBtn.className = "ed-tool";
+  inBtn.textContent = "+ In";
+  inBtn.addEventListener("click", () => actions.onZoom(1));
+  zooms.append(outBtn, inBtn);
+  root.appendChild(zooms);
+
   const tools = document.createElement("div");
   tools.className = "ed-tools";
   eraseBtn.className = "ed-tool";
@@ -191,7 +207,7 @@ export function buildPalette(
   const hint = document.createElement("div");
   hint.className = "ed-hint";
   hint.textContent =
-    "Pick a tile, then paint it. The rubber and the right button both clear back to open water. Only the band outside the fence is yours — inside it is where the game is played.";
+    "Pick a tile, then paint it. The rubber and the right button both clear back to open water. Scroll to zoom, drag with the middle button to move about. Only the band outside the fence is yours — inside it is where the game is played.";
   root.appendChild(hint);
 
   tabEls.get(showing)?.classList.add("active");
@@ -202,6 +218,10 @@ export function buildPalette(
     syncHistory(canUndo: boolean, canRedo: boolean): void {
       undoBtn.disabled = !canUndo;
       redoBtn.disabled = !canRedo;
+    },
+    syncZoom(canOut: boolean, canIn: boolean): void {
+      outBtn.disabled = !canOut;
+      inBtn.disabled = !canIn;
     },
   };
 }

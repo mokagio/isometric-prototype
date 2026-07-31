@@ -83,6 +83,7 @@ The coastline `coast.ts` works out from its neighbours is a guess at what somebo
 `outline.html` hands over the pen: `coastTiles.ts` names every edge tile the pack cut — the grass water's edge and the sand one, the cliff's corners and feet, the ragged grass fringes, the seams, the fence — and the page lays whichever you pick in whichever cell you point at.
 Nothing is worked out; `outlineDraw.ts` puts down the tile the cell holds, which is what makes the editor and the game the same picture.
 The band outside the fence is all it draws: `editable` stops at `FENCE_RING`, since everything inside is the game's own ground and neither the walker nor the island editor asks the outline's permission.
+Unlike the island editor it also zooms and pans (`camera.ts`), because a coastline is drawn a tile at a time along the very edge: the way out stops at the whole island, since there is nothing past it to see, and the way in at four times life size.
 
 A cell is one character, so a saved outline is `FIELD` lines of `FIELD` characters — meant to be read in a diff and pasted into the source the day a drawn island becomes the built-in one.
 `grownOutline` writes down what `coast.ts` would have drawn, so the page opens on the island as it stands rather than an empty sea, and drawing is editing.
