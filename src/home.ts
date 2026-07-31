@@ -1,5 +1,5 @@
 import tilesheetUrl from "../isometric_fantasy_tiles.png";
-import { drawBackdrop } from "./backdrop";
+import { BACKDROPS, backdropById, drawBackdrop, type Backdrop } from "./backdrop";
 import { GAMES } from "./games";
 import { loadTileset } from "./tileset";
 import { Viewport } from "./viewport";
@@ -17,6 +17,30 @@ function buildList(list: HTMLElement): void {
   }
 }
 
+/**
+ * Temporary: a way to look at every ground and say which one the page keeps.
+ * The whole thing — button, query and all — comes out once one is chosen.
+ */
+function buildBackdropPicker(chosen: Backdrop, onPick: (backdrop: Backdrop) => void): void {
+  let at = BACKDROPS.indexOf(chosen);
+  const button = document.createElement("button");
+  button.className = "ww-bg-pick";
+  const label = (): void => {
+    const backdrop = BACKDROPS[at]!;
+    button.textContent = `${at + 1}/${BACKDROPS.length} ${backdrop.id}`;
+  };
+  button.addEventListener("click", () => {
+    at = (at + 1) % BACKDROPS.length;
+    const backdrop = BACKDROPS[at]!;
+    label();
+    // In the address bar too, so a favourite can be sent to somebody or reloaded.
+    history.replaceState(null, "", `?bg=${backdrop.id}`);
+    onPick(backdrop);
+  });
+  label();
+  document.body.appendChild(button);
+}
+
 async function main(): Promise<void> {
   buildList(document.getElementById("games")!);
 
@@ -25,13 +49,21 @@ async function main(): Promise<void> {
   const viewport = new Viewport(canvas);
   const tileset = await loadTileset(tilesheetUrl);
 
-  const paint = (): void => {
-    if (!viewport.fit()) return; // same size, same grass
+  let backdrop = backdropById(new URLSearchParams(location.search).get("bg"));
+  const paint = (force = false): void => {
+    // `fit` is false when nothing resized, which is also when there is nothing
+    // to redraw — unless the ground itself just changed.
+    if (!viewport.fit() && !force) return;
     viewport.applyTransform(ctx); // resizing the canvas drops the transform
-    drawBackdrop(ctx, tileset, viewport.width, viewport.height);
+    drawBackdrop(ctx, tileset, viewport.width, viewport.height, backdrop);
   };
-  paint();
-  window.addEventListener("resize", paint);
+  paint(true);
+  window.addEventListener("resize", () => paint());
+
+  buildBackdropPicker(backdrop, (picked) => {
+    backdrop = picked;
+    paint(true);
+  });
 }
 
 void main();

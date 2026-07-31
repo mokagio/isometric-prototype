@@ -16,6 +16,24 @@ const FLOWERS: Tile[] = [
   [1, 8],
   [2, 2],
 ];
+
+/**
+ * What a flat world's dry land is paved with: one tile in the majority, a few
+ * sprinkled over it, and rarer still the odd patch of something else.
+ */
+export interface GroundPalette {
+  base: Tile;
+  variants: Tile[];
+  specks: Tile[];
+  /** Share of cells taking a variant, and taking a speck. Both stay a minority. */
+  variantShare?: number;
+  speckShare?: number;
+}
+
+/** The grass the game has always generated. */
+export const MEADOW: GroundPalette = { base: GRASS, variants: GRASS_VARIANTS, specks: FLOWERS };
+const VARIANT_SHARE = 0.14;
+const SPECK_SHARE = 0.04;
 const DIRT: Tile = [0, 1]; // cliff-face body cube
 const WATER: Tile = [0, 10]; // the bright blue water cube
 const LAVA: Tile = [3, 10];
@@ -56,6 +74,8 @@ export interface WorldOptions {
   flat?: boolean;
   /** Default true. `false` lays nothing but dry land, for a backdrop with no shore in it. */
   water?: boolean;
+  /** Default `MEADOW`. What the dry land of a flat world is paved with. */
+  ground?: GroundPalette;
 }
 
 // The surface tile decides what a cell does underfoot, so there is nothing here
@@ -151,16 +171,21 @@ function isWaterAt(col: number, row: number, seed: number): boolean {
   return river && !ford;
 }
 
-function flatCell(col: number, row: number, seed: number, water: boolean): Cell {
-  // Water pools and rivers; a hash sprinkles grass variants and the odd flower
-  // patch onto the dry land. Every column stays at ground level.
+function flatCell(col: number, row: number, seed: number, water: boolean, ground: GroundPalette): Cell {
+  // Water pools and rivers; a hash sprinkles the variants and the odd speck onto
+  // the dry land. Every column stays at ground level.
   if (water && isWaterAt(col, row, seed)) {
     return { height: GROUND_HEIGHT, surface: WATER };
   }
+  const specks = ground.speckShare ?? SPECK_SHARE;
+  const variants = ground.variantShare ?? VARIANT_SHARE;
   const v = hash(col, row, seed + 7);
-  let surface = GRASS;
-  if (v > 0.96) surface = FLOWERS[Math.floor(hash(col, row, seed + 13) * FLOWERS.length)]!;
-  else if (v > 0.82) surface = GRASS_VARIANTS[Math.floor(hash(col, row, seed + 11) * GRASS_VARIANTS.length)]!;
+  let surface = ground.base;
+  if (ground.specks.length > 0 && v > 1 - specks) {
+    surface = ground.specks[Math.floor(hash(col, row, seed + 13) * ground.specks.length)]!;
+  } else if (ground.variants.length > 0 && v > 1 - specks - variants) {
+    surface = ground.variants[Math.floor(hash(col, row, seed + 11) * ground.variants.length)]!;
+  }
   return { height: GROUND_HEIGHT, surface };
 }
 
@@ -185,11 +210,12 @@ function terracedCell(col: number, row: number, cols: number, rows: number, seed
 export function generateWorld(cols: number, rows: number, seed = 1337, options: WorldOptions = {}): World {
   const flat = options.flat ?? true;
   const water = options.water ?? true;
+  const ground = options.ground ?? MEADOW;
   const cells: Cell[][] = [];
   for (let row = 0; row < rows; row++) {
     const line: Cell[] = [];
     for (let col = 0; col < cols; col++) {
-      line.push(flat ? flatCell(col, row, seed, water) : terracedCell(col, row, cols, rows, seed));
+      line.push(flat ? flatCell(col, row, seed, water, ground) : terracedCell(col, row, cols, rows, seed));
     }
     cells.push(line);
   }
