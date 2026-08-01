@@ -26,8 +26,13 @@ export interface Figure {
 
 export interface MonsterSkin {
   readonly ready: boolean;
-  /** Which creature a fresh spawn should be. */
-  pick(): number;
+  /** How many creatures the skin holds. The level picks one of them for its wave. */
+  readonly cast: number;
+  /**
+   * Screen pixels above the feet the art tops out, so a caller can put something
+   * over its head — the heart row — without knowing any of the sheet's geometry.
+   */
+  readonly lift: number;
   /**
    * Draw one monster with its feet at (feetX, feetY). `alphaScale` dims the whole
    * sprite — the blit sets alpha outright, so a caller cannot dim it from outside.
@@ -46,6 +51,8 @@ const SLIME_DEATH_FRAMES = 10;
 export const SLIME_FPS = 10; // walk playback rate
 
 export class SlimeSkin implements MonsterSkin {
+  readonly cast = 1;
+  readonly lift = SLIME_ANCHOR_Y * SLIME_SCALE;
   private walk: Sheet;
   private death: Sheet;
   private loader = new SheetLoader(2);
@@ -57,10 +64,6 @@ export class SlimeSkin implements MonsterSkin {
 
   get ready(): boolean {
     return this.loader.ready;
-  }
-
-  pick(): number {
-    return 0;
   }
 
   draw(ctx: CanvasRenderingContext2D, m: Figure, feetX: number, feetY: number, alphaScale = 1): void {
@@ -107,36 +110,26 @@ const MON_FRAMES = 4;
 export const MON_BOB_FPS = 8;
 export const MONS_IN_CAST = 35;
 
-/**
- * Which of the cast to send in. `null` draws a different creature for every
- * spawn, so a wave arrives as a mixed pack; a number sends the same one every
- * time — 0-based, so `20` is the red horned one the sheet numbers 21.
- */
-export const MON_PICK: number | null = null;
-
 export class MonSkin implements MonsterSkin {
-  private cast: Sheet;
+  readonly cast = MONS_IN_CAST;
+  readonly lift = MON_ANCHOR_Y * MON_SCALE;
+  private sheet: Sheet;
   private loader = new SheetLoader(1);
 
   constructor(base: string = import.meta.env.BASE_URL) {
-    this.cast = this.loader.load(`${base}mons/monsCast.png`);
+    this.sheet = this.loader.load(`${base}mons/monsCast.png`);
   }
 
   get ready(): boolean {
     return this.loader.ready;
   }
 
-  pick(): number {
-    if (MON_PICK !== null) return Math.min(MONS_IN_CAST - 1, Math.max(0, MON_PICK));
-    return Math.floor(Math.random() * MONS_IN_CAST);
-  }
-
   draw(ctx: CanvasRenderingContext2D, m: Figure, feetX: number, feetY: number, alphaScale = 1): void {
-    if (!this.ready || !this.cast.ok) return;
+    if (!this.ready || !this.sheet.ok) return;
     // The pack draws no death, so the end is the fade alone, spread over the
     // whole of it rather than saved for a tail with nothing behind it.
     const alpha = (m.dying ? Math.max(0, 1 - m.dyingT / FADE) : 1) * alphaScale;
-    blitFrame(ctx, this.cast.img, feetX, feetY, {
+    blitFrame(ctx, this.sheet.img, feetX, feetY, {
       cell: MON_CELL,
       scale: MON_SCALE,
       anchorX: MON_ANCHOR_X,

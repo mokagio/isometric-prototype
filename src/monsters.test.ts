@@ -4,6 +4,8 @@ import {
   AGGRO_REACH,
   CONTACT,
   FADE,
+  GIVE_UP,
+  HURT,
   KNOCKBACK,
   MELEE,
   MonsterField,
@@ -20,7 +22,7 @@ import {
   WAVE_STAGGER,
   type Monster,
 } from "./monsters";
-import { SLIME_FPS as MON_FPS, SLIME_FRAMES as FRAMES } from "./monsterSkin";
+import { MONS_IN_CAST, SLIME_FPS as MON_FPS, SLIME_FRAMES as FRAMES } from "./monsterSkin";
 import type { World } from "./world";
 
 // The field loads its sheets through `new Image()`, which the node test
@@ -317,6 +319,198 @@ describe("MonsterField swings", () => {
   });
 });
 
+describe("MonsterField giving up", () => {
+  // A river all the way across, with the hero on the far side of it: nothing can
+  // reach them, which before `GIVE_UP` meant the field never emptied again.
+  const MOAT = {
+    cols: 200,
+    rows: 200,
+    blocks: (c: number, r: number) => r > HERO.row + 2 && r < HERO.row + 6 && c > -1,
+  } as unknown as World;
+
+  /** Run a field for `secs` against the moat, with the whole wave parked south of it. */
+  function marooned(secs: number): { field: MonsterField; mon: Monster } {
+    const field = loaded();
+    const wave = field.list();
+    // All of them, or the ones left on open ground would keep the field busy and
+    // the "next wave arrives" case would never be reached.
+    wave.forEach((m, i) => park(m, HERO.col + i * SEPARATION * 2, HERO.row + 8));
+    for (let i = 0; i < secs / DT; i++) field.update(DT, HERO, MOAT);
+    return { field, mon: wave[0]! };
+  }
+
+  it("keeps trying for a while before it does", () => {
+    expect(marooned(GIVE_UP / 2).mon.dying).toBe(false);
+  });
+
+  it("gives up on a hero it cannot reach", () => {
+    expect(marooned(GIVE_UP * 2).mon.dying).toBe(true);
+  });
+
+  it("leaves empty-handed: only a killing blow drops anything", () => {
+    // `knock` is what a felled monster carries; giving up must not fake one, and
+    // `attackAt` is the only thing that hands a monster back to be looted.
+    expect(marooned(GIVE_UP + 1).mon.knock).toBe(null);
+  });
+
+  it("clears the way for the next wave, so the ladder cannot stall", () => {
+    const { field } = marooned(GIVE_UP * 2 + FADE + WAVE_BREAK + 2);
+    // The marooned one is gone and a fresh wave has walked in behind it.
+    expect(field.list().length).toBe(WAVE_SIZE);
+    expect(field.list().every((m) => !m.dying)).toBe(true);
+  });
+
+  it("never gives up on open ground, however long the walk", () => {
+    const { mon } = (() => {
+      const field = loaded();
+      const [m, ...rest] = field.list();
+      park(m!, HERO.col, HERO.row + SPAWN_MAX);
+      rest.forEach((r, i) => park(r, OFFSTAGE + i * SEPARATION * 4, OFFSTAGE));
+      for (let i = 0; i < (GIVE_UP * 3) / DT; i++) field.update(DT, HERO, WORLD);
+      return { mon: m! };
+    })();
+    expect(mon.dying).toBe(false);
+  });
+
+  it("does not count bumping the hero as being stuck", () => {
+    // It has arrived and stopped: standing still on purpose is not being blocked.
+    const { field, mon } = fieldWith(HERO.col, HERO.row + CONTACT / 2);
+    for (let i = 0; i < (GIVE_UP * 3) / DT; i++) field.update(DT, HERO, WORLD);
+    expect(mon.dying).toBe(false);
+  });
+});
+
+describe("MonsterField hearts", () => {
+  /** A loaded field on `hp` hearts, with one monster parked in reach of the origin. */
+  function atLevel(hp: number): { field: MonsterField; mon: Monster } {
+    const field = new MonsterField(BASE, "slime");
+    loadAll();
+    field.setLevel(hp, 0);
+    field.update(0, HERO, WORLD);
+    const [mon, ...rest] = field.list();
+    park(mon!, 0, 0);
+    rest.forEach((m, i) => park(m, OFFSTAGE + i * SEPARATION * 4, OFFSTAGE));
+    return { field, mon: mon! };
+  }
+
+  it("spawns a wave on the level's hearts", () => {
+    const { field } = atLevel(3);
+    for (const m of field.list()) {
+      expect(m.hp).toBe(3);
+      expect(m.hpMax).toBe(3);
+    }
+  });
+
+  it("takes a heart per blow, and only the last one kills", () => {
+    const { field, mon } = atLevel(3);
+    expect(field.attackAt(0, 0)).toEqual([]);
+    expect(mon.hp).toBe(2);
+    expect(mon.dying).toBe(false);
+    expect(field.attackAt(0, 0)).toEqual([]);
+    expect(mon.hp).toBe(1);
+    expect(field.attackAt(0, 0)).toEqual([mon]);
+    expect(mon.dying).toBe(true);
+  });
+
+  it("dies to a single blow on a one-heart level", () => {
+    const { field, mon } = atLevel(1);
+    expect(field.attackAt(0, 0)).toEqual([mon]);
+    expect(mon.dying).toBe(true);
+  });
+
+  it("blinks while smarting from a blow it survived, and settles again", () => {
+    const { field, mon } = atLevel(2);
+    field.attackAt(0, 0);
+    expect(mon.hurtT).toBeGreaterThan(0);
+    field.update(HURT / 2, HERO, WORLD);
+    expect(mon.hurtT).toBeGreaterThan(0);
+    field.update(HURT, HERO, WORLD);
+    expect(mon.hurtT).toBe(0);
+  });
+
+  it("keeps a wave to one creature, so a level looks like itself", () => {
+    const field = new MonsterField(BASE, "mons");
+    loadAll();
+    field.setLevel(1, 7);
+    field.update(0, HERO, WORLD);
+    expect(new Set(field.list().map((m) => m.kind))).toEqual(new Set([7]));
+  });
+
+  it("leaves a wave already walking on the level it spawned with", () => {
+    const field = new MonsterField(BASE, "mons");
+    loadAll();
+    field.setLevel(1, 3);
+    field.update(0, HERO, WORLD);
+    field.setLevel(2, 4);
+    for (const m of field.list()) {
+      expect(m.kind).toBe(3);
+      expect(m.hpMax).toBe(1);
+    }
+  });
+
+  it("never sends in a monster that cannot be hit at all", () => {
+    const field = new MonsterField(BASE, "slime");
+    loadAll();
+    field.setLevel(0, 0);
+    field.update(0, HERO, WORLD);
+    for (const m of field.list()) expect(m.hp).toBeGreaterThanOrEqual(1);
+  });
+
+  it("tells the ladder how many creatures it has to choose from", () => {
+    expect(new MonsterField(BASE, "mons").cast).toBe(MONS_IN_CAST);
+    expect(new MonsterField(BASE, "slime").cast).toBe(1);
+  });
+
+  /** The heart pips one monster in the given state puts on the canvas. */
+  function pipsFor(hp: number, mutate: (m: Monster) => void = () => {}): Pip[] {
+    const field = new MonsterField(BASE, "slime");
+    loadAll();
+    field.setLevel(hp, 0);
+    field.update(0, HERO, WORLD);
+    const mon = field.list()[0]!;
+    mutate(mon);
+    const { ctx, pips } = recordingCtx();
+    field.draw(ctx, mon, 0, 0);
+    return pips;
+  }
+
+  it("shows one heart over a one-heart monster", () => {
+    expect(pipsFor(1)).toHaveLength(1);
+  });
+
+  it("keeps the row's width as hearts are taken", () => {
+    const full = pipsFor(3);
+    const hurt = pipsFor(3, (m) => (m.hp = 1));
+    expect(hurt).toHaveLength(3);
+    expect(hurt.map((p) => p.x)).toEqual(full.map((p) => p.x));
+    expect(hurt.map((p) => p.alpha < 1)).toEqual([false, true, true]);
+  });
+
+  it("lays them clear of the top of the art, not over the monster's face", () => {
+    // Screen y runs downward, so above the feet is negative.
+    for (const pip of pipsFor(1)) expect(pip.y).toBeLessThan(0);
+  });
+
+  it("takes the hearts away with the body", () => {
+    expect(pipsFor(1, (m) => (m.dying = true))).toHaveLength(0);
+  });
+
+  it("holds the hearts steady through the hurt blink", () => {
+    // A count that flickers is one nobody can read, however hard the sprite blinks.
+    const field = new MonsterField(BASE, "slime");
+    loadAll();
+    field.setLevel(2, 0);
+    field.update(0, HERO, WORLD);
+    const mon = field.list()[0]!;
+    park(mon, 0, 0);
+    field.attackAt(0, 0);
+    const { ctx, calls, pips } = recordingCtx();
+    field.draw(ctx, mon, 0, 0);
+    expect(calls[0]!.alpha).toBeLessThan(1); // the sprite is mid-blink
+    expect(pips[0]!.alpha).toBe(1); // the heart it has left is not
+  });
+});
+
 // The blow has to land inside MELEE or the monster simply is not killed, so the
 // struck monster sits one cell along +col from a swing at the origin.
 const STRUCK_AT = 1;
@@ -513,8 +707,16 @@ interface DrawCall {
 }
 
 /** Records `drawImage` off an inert 2D context, with the alpha and flip in force. */
-function recordingCtx(): { ctx: CanvasRenderingContext2D; calls: DrawCall[] } {
+/** One heart pip laid over a monster's head. */
+interface Pip {
+  x: number;
+  y: number;
+  alpha: number;
+}
+
+function recordingCtx(): { ctx: CanvasRenderingContext2D; calls: DrawCall[]; pips: Pip[] } {
   const calls: DrawCall[] = [];
+  const pips: Pip[] = [];
   let mirrored = false;
   const ctx = {
     globalAlpha: 1,
@@ -530,8 +732,16 @@ function recordingCtx(): { ctx: CanvasRenderingContext2D; calls: DrawCall[] } {
     drawImage(img: FakeImage, ...args: number[]) {
       calls.push({ src: img.src, args, alpha: ctx.globalAlpha, mirrored });
     },
+    // The heart row goes over the same canvas; these tests are about the sprite,
+    // so the pips are recorded separately and the sprite calls stay uncluttered.
+    font: "",
+    textAlign: "",
+    textBaseline: "",
+    fillText(_text: string, x: number, y: number) {
+      pips.push({ x, y, alpha: ctx.globalAlpha });
+    },
   };
-  return { ctx: ctx as unknown as CanvasRenderingContext2D, calls };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, calls, pips };
 }
 
 /** The one draw call a monster in the given state produces. */
@@ -555,6 +765,10 @@ describe("MonsterField.draw", () => {
       dyingT: 0,
       faceLeft: false,
       kind: 0,
+      hp: 1,
+      hpMax: 1,
+      hurtT: 0,
+      stuckT: 0,
       knock: null,
       home: { col: 0, row: 0 },
       waypoint: { col: 0, row: 0 },
