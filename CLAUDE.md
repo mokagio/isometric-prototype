@@ -78,7 +78,11 @@ Re-run it if the pack is ever updated; the original sheet stays alongside it, un
 `gems.ts` is Peaceful Plains' experience: a blue gem per monster felled, popped out of the body and left lying until the hero walks over it.
 It is Whispering Woods' logs in the other game's units — cells, and `z` in the elevation levels the hero's own jump uses, falling under the same gravity so a drop reads like anything else in the air.
 `attackAt` hands back what it felled so the drop lands where the blow caught the monster rather than where the knockback throws the body, and a gem in flight cannot be swept up: snatching one mid-hop looks like it was never dropped.
-The boss drops nothing — it has hearts to take rather than a body to loot.
+The boss is worth `BOSS_GEMS` where a monster is worth one, thrown as a burst — Whispering Woods' armful of logs in the other game's units.
+
+A burst has to be told where it may land, which is what `Terrain` is for.
+Every gem's landing cell is settled at the throw rather than found on impact, so one aimed over a river comes down short of the bank instead of into it, and where every bearing is blocked they huddle inside the cell they were thrown from rather than stacking on its centre, which would draw as one gem however many there really are.
+A burst never leaves the level it was thrown from: terraces are whole levels and the hop clears a third of one, so a gem resting a step up or down would have got there by teleporting — and it is that flatness that lets `FLIGHT` be a constant.
 
 The gem is one 10px tile cut out of the Sunnyside 16px tileset (cell 55, 26 — the blue ore nugget), trimmed to its own content so it stands on the bottom of its frame, as `stump.png` and `log.png` are cut.
 It draws at 3x rather than the world's 2x, since a 10px sprite beside a 96px tile is otherwise a speck.

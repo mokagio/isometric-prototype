@@ -36,7 +36,7 @@ import { createActionPad } from "./actionPad";
 import { AGGRO_HALF, MELEE, MonsterField } from "./monsters";
 import { bossPost, LASH_REACH, Treant, TreantArt, type Post } from "./treant";
 import { Lives } from "./lives";
-import { GemArt, Gems, gemUrl } from "./gems";
+import { BOSS_GEMS, GemArt, Gems, gemUrl, type Terrain } from "./gems";
 import { createTally } from "./tally";
 import { createHud } from "./hud";
 import { Swing } from "./swing";
@@ -102,6 +102,12 @@ async function main(): Promise<void> {
   const lives = new Lives();
   const gems = new Gems();
   const gemArt = new GemArt();
+  // Reads whichever world is current, so a burst on a map loaded mid-session is
+  // thrown across that map's ground rather than the one it replaced.
+  const terrain: Terrain = {
+    heightAt: (col, row) => world.heightAt(col, row),
+    barred: (col, row) => world.blocks(col, row) || world.isHazard(col, row),
+  };
   let facing: Facing = 2; // faces the camera to start
   let moving = false;
   let animClock = 0; // continuous clock for the looping idle/run cycles
@@ -237,11 +243,12 @@ async function main(): Promise<void> {
       monsters.update(dt, hero, world);
       const fromBoss = Math.hypot(hero.col - bossAt.col, hero.row - bossAt.row);
       if (swing.update(dt)) {
-        for (const felled of monsters.attackAt(hero.col, hero.row)) {
-          gems.spawn(felled.col, felled.row, world.heightAt(Math.round(felled.col), Math.round(felled.row)));
+        for (const felled of monsters.attackAt(hero.col, hero.row)) gems.spawn(felled.col, felled.row, terrain);
+        // The same blade, the same reach — the boss simply takes more of them, and
+        // is worth an armful where a monster is worth one.
+        if (boss.alive && fromBoss <= MELEE && boss.hit()) {
+          gems.spawn(bossAt.col, bossAt.row, terrain, BOSS_GEMS);
         }
-        // The same blade, the same reach — the boss simply takes more of them.
-        if (boss.alive && fromBoss <= MELEE) boss.hit();
       }
       if (gems.update(dt, hero) > 0) tally.set(gems.collected);
       // Rooted: it never closes on the hero, so the lash is the only way it can
