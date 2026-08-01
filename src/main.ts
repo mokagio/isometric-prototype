@@ -36,6 +36,8 @@ import { createActionPad } from "./actionPad";
 import { AGGRO_HALF, MELEE, MonsterField } from "./monsters";
 import { bossPost, LASH_REACH, Treant, TreantArt, type Post } from "./treant";
 import { Lives } from "./lives";
+import { GemArt, Gems, gemUrl } from "./gems";
+import { createTally } from "./tally";
 import { createHud } from "./hud";
 import { Swing } from "./swing";
 import { drawArea, drawBox, HERO_BOX, MONSTER_BOX } from "./debug";
@@ -98,6 +100,8 @@ async function main(): Promise<void> {
   let boss = new Treant();
   let bossAt: Post = bossFor(world, spawn);
   const lives = new Lives();
+  const gems = new Gems();
+  const gemArt = new GemArt();
   let facing: Facing = 2; // faces the camera to start
   let moving = false;
   let animClock = 0; // continuous clock for the looping idle/run cycles
@@ -116,6 +120,8 @@ async function main(): Promise<void> {
     boss = new Treant();
     bossAt = bossFor(world, spawn);
     lives.reset();
+    gems.reset();
+    tally.set(gems.collected);
     hud.setLives(lives.lives);
     hud.hideGameOver();
   }
@@ -161,6 +167,7 @@ async function main(): Promise<void> {
 
   const hud = createHud(restart);
   hud.setLives(lives.lives);
+  const tally = createTally(gemUrl(), "Gems");
 
   const viewport = new Viewport(canvas);
 
@@ -230,10 +237,13 @@ async function main(): Promise<void> {
       monsters.update(dt, hero, world);
       const fromBoss = Math.hypot(hero.col - bossAt.col, hero.row - bossAt.row);
       if (swing.update(dt)) {
-        monsters.attackAt(hero.col, hero.row);
+        for (const felled of monsters.attackAt(hero.col, hero.row)) {
+          gems.spawn(felled.col, felled.row, world.heightAt(Math.round(felled.col), Math.round(felled.row)));
+        }
         // The same blade, the same reach — the boss simply takes more of them.
         if (boss.alive && fromBoss <= MELEE) boss.hit();
       }
+      if (gems.update(dt, hero) > 0) tally.set(gems.collected);
       // Rooted: it never closes on the hero, so the lash is the only way it can
       // take a heart, and the rear-up is the warning to be somewhere else.
       const lashed = boss.update(dt) && fromBoss <= LASH_REACH;
@@ -274,6 +284,16 @@ async function main(): Promise<void> {
         draw: () => {
           const feet = project(m.col, m.row, 0, origin);
           monsters.draw(ctx, m, feet.x, feet.y + SY);
+        },
+      });
+    }
+    for (const gem of gems.list()) {
+      entities.push({
+        col: gem.col,
+        row: gem.row,
+        draw: () => {
+          const at = project(gem.col, gem.row, gem.z, origin);
+          gemArt.draw(ctx, at.x, at.y + SY);
         },
       });
     }

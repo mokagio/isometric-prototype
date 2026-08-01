@@ -299,6 +299,22 @@ describe("MonsterField swings", () => {
     field.attackAt(mon.col, mon.row);
     expect(mon.dyingT).toBe(partway);
   });
+
+  it("hands back what it felled, standing where the blow caught it", () => {
+    const { field, mon } = fieldWith(HERO.col + MELEE * 0.9, HERO.row);
+    const at = { col: mon.col, row: mon.row };
+    const felled = field.attackAt(HERO.col, HERO.row);
+    expect(felled).toEqual([mon]);
+    expect(felled[0]!.col).toBe(at.col);
+    expect(felled[0]!.row).toBe(at.row);
+  });
+
+  it("hands back nothing when the swing misses, or lands on a body", () => {
+    const { field, mon } = fieldWith(HERO.col + MELEE * 1.1, HERO.row);
+    expect(field.attackAt(HERO.col, HERO.row)).toEqual([]);
+    field.attackAt(mon.col, mon.row);
+    expect(field.attackAt(mon.col, mon.row)).toEqual([]);
+  });
 });
 
 // The blow has to land inside MELEE or the monster simply is not killed, so the

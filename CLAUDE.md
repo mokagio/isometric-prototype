@@ -73,6 +73,16 @@ The mons sheet is the one asset here that is *re-cut* rather than vendored whole
 The script recovers the cell edges from the gaps between content instead, and re-lays each creature one per row, four frames across, centred and standing on a fixed baseline so one anchor serves all 35 — taking the box across a creature's four frames together, or the re-cut would flatten out its bob.
 Re-run it if the pack is ever updated; the original sheet stays alongside it, untouched.
 
+## What a kill is worth
+
+`gems.ts` is Peaceful Plains' experience: a blue gem per monster felled, popped out of the body and left lying until the hero walks over it.
+It is Whispering Woods' logs in the other game's units — cells, and `z` in the elevation levels the hero's own jump uses, falling under the same gravity so a drop reads like anything else in the air.
+`attackAt` hands back what it felled so the drop lands where the blow caught the monster rather than where the knockback throws the body, and a gem in flight cannot be swept up: snatching one mid-hop looks like it was never dropped.
+The boss drops nothing — it has hearts to take rather than a body to loot.
+
+The gem is one 10px tile cut out of the Sunnyside 16px tileset (cell 55, 26 — the blue ore nugget), trimmed to its own content so it stands on the bottom of its frame, as `stump.png` and `log.png` are cut.
+It draws at 3x rather than the world's 2x, since a 10px sprite beside a 96px tile is otherwise a speck.
+
 ## The boss
 
 `treant.ts` is the one thing both games share that is neither plumbing nor scenery: an enemy that takes five blows and shows five hearts over its head while it does.
@@ -139,9 +149,12 @@ The game and the editor hand work to each other through `handoff.ts`, never in m
 
 ## UI chrome
 
-`src/chrome.css` holds what every page shares — the `--ww-*` custom properties, and the menu, stick and action-pad rules that `ui.ts`, `stick.ts` and `actionPad.ts` build against.
+`src/chrome.css` holds what every page shares — the `--ww-*` custom properties, and the menu, stick, action-pad and tally rules that `ui.ts`, `stick.ts`, `actionPad.ts` and `tally.ts` build against.
 A page's own `<style>` block holds only what is that page's, and loads after the shared sheet, so it wins any tie.
 Neither lives in the TypeScript.
+
+`tally.ts` is the corner count both games keep: Whispering Woods' logs and Peaceful Plains' gems are the same widget with a different icon.
+Only where it sits is the page's — in Peaceful Plains it drops below the hearts, which have the corner itself.
 
 `sharedHead.ts` is the other half: a `transformIndexHtml` plugin that injects the shared `<head>` — charset, viewport, the Home Screen metas, the link to `chrome.css` — into every Rollup input.
 A new page therefore gets the chrome by being listed in `vite.config.ts` and nothing else, which is what `sharedHead.test.ts` pins, along with no page having grown its own copy of a meta.

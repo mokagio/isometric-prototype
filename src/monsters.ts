@@ -272,8 +272,14 @@ export class MonsterField {
     return this.mons.find((m) => !m.dying && Math.hypot(m.col - col, m.row - row) <= CONTACT) ?? null;
   }
 
-  /** A swing at (col, row): every alive monster within melee range dies, thrown clear of the blow. */
-  attackAt(col: number, row: number): void {
+  /**
+   * A swing at (col, row): every alive monster within melee range dies, thrown
+   * clear of the blow. Returns the ones felled, still standing where the blow
+   * caught them — which is where whatever they drop belongs, rather than wherever
+   * the knockback carries the body.
+   */
+  attackAt(col: number, row: number): Monster[] {
+    const felled: Monster[] = [];
     for (const m of this.mons) {
       if (m.dying) continue;
       const dx = m.col - col;
@@ -285,7 +291,9 @@ export class MonsterField {
       // A blow landing dead-on leaves no direction to throw along; pick one.
       const away = d > 0 ? { dx: dx / d, dy: dy / d } : { dx: 0, dy: 1 };
       m.knock = { col: m.col, row: m.row, ...away };
+      felled.push(m);
     }
+    return felled;
   }
 
   /** Draw one monster with its feet at (feetX, feetY), through whichever skin is in play. */
