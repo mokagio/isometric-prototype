@@ -1,5 +1,6 @@
 export interface Tally {
-  set(count: number): void;
+  /** With a `target`, reads `3 / 6`: a count of something being collected toward it. */
+  set(count: number, target?: number): void;
 }
 
 /**
@@ -24,8 +25,8 @@ export function createTally(iconUrl: string, alt: string): Tally {
   wrap.append(icon, count);
   document.body.appendChild(wrap);
   return {
-    set: (n) => {
-      count.textContent = String(n);
+    set: (n, target) => {
+      count.textContent = target === undefined ? String(n) : `${n} / ${target}`;
     },
   };
 }

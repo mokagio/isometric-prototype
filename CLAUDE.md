@@ -66,7 +66,7 @@ The felling blow bursts three logs out of the stump (`woods/logs.ts`): the only 
 
 `monsterSkin.ts` is to `monsters.ts` what `heroSkin.ts` is to the hero: the field owns the wave, the chase and the death, and knows nothing about a sheet.
 `MONSTER_SKIN` is the one line that says which art is in play, so the slimes are a word away rather than a revert.
-A skin is asked what a fresh spawn should be, which is how one skin can hold a whole cast: `MON_PICK` left `null` draws a different creature per spawn, so a wave of three is three creatures, and a number pins it to one.
+A skin says how many creatures it holds (`cast`) and how far above the feet its art tops out (`lift`, in screen pixels, so the heart row clears the sprite without the field knowing any sheet geometry); which of the cast walks in is the ladder's call, not the skin's.
 A skin with no death animation, as the mons pack is, fades across the whole of `FADE` rather than saving it for a tail with nothing behind it.
 
 The mons sheet is the one asset here that is *re-cut* rather than vendored whole, and `scripts/cutMonsCast.py` is how: the pack lays its 35 creatures out once per animation frame on a grid 30 wide and 31.2 tall, and a fractional cell cannot be indexed by multiplication.
@@ -78,33 +78,44 @@ Re-run it if the pack is ever updated; the original sheet stays alongside it, un
 `gems.ts` is Peaceful Plains' experience: a blue gem per monster felled, popped out of the body and left lying until the hero walks over it.
 It is Whispering Woods' logs in the other game's units — cells, and `z` in the elevation levels the hero's own jump uses, falling under the same gravity so a drop reads like anything else in the air.
 `attackAt` hands back what it felled so the drop lands where the blow caught the monster rather than where the knockback throws the body, and a gem in flight cannot be swept up: snatching one mid-hop looks like it was never dropped.
-The boss is worth `BOSS_GEMS` where a monster is worth one, thrown as a burst — Whispering Woods' armful of logs in the other game's units.
-
-A burst has to be told where it may land, which is what `Terrain` is for.
-Every gem's landing cell is settled at the throw rather than found on impact, so one aimed over a river comes down short of the bank instead of into it, and where every bearing is blocked they huddle inside the cell they were thrown from rather than stacking on its centre, which would draw as one gem however many there really are.
-A burst never leaves the level it was thrown from: terraces are whole levels and the hop clears a third of one, so a gem resting a step up or down would have got there by teleporting — and it is that flatness that lets `FLIGHT` be a constant.
+`PICKUP_RANGE` covers the whole of `MELEE` rather than being a walk-up radius, because gems gate the ladder: one left lying where a monster died at the tip of the blade would stall the run, and `gems.test.ts` pins the pair.
 
 The gem is one 10px tile cut out of the Sunnyside 16px tileset (cell 55, 26 — the blue ore nugget), trimmed to its own content so it stands on the bottom of its frame, as `stump.png` and `log.png` are cut.
 It draws at 3x rather than the world's 2x, since a 10px sprite beside a 96px tile is otherwise a speck.
 
+## The ladder
+
+`levels.ts` is what Peaceful Plains is played for. A level is one creature, a number of gems to collect before the next, and how many blows each of that creature takes; one dial moves per level, alternating, so neither the grind nor the fight runs ahead of the other:
+
+| level | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| gems | 6 | 8 | 8 | 10 | 10 | 12 |
+| hearts | 1 | 1 | 2 | 2 | 3 | 3 |
+
+A formula rather than a table, so it never runs out of rungs, and `Progress` is where a run sits on it — the target resets each level and the surplus carries, so picking two up at once on 5 of 6 starts the next level on 1.
+The hero's own hearts are untouched by any of it: there is no refill, so a long run is a war of attrition.
+
+`MonsterField.setLevel` is the only way in, and it says what the *next* wave is made of: a wave already walking keeps the creature and the hearts it spawned with, so levelling up never re-skins what is on the field.
+A blow takes one heart and only the last one kills, which is what makes `attackAt` return a list rather than nothing — a survivor blinks (`HURT`) where the boss would recoil, since the mons pack draws no hurt pose.
+One swing lands on a single frame, so nothing can lose two hearts to one blow and a monster needs no immunity window of its own.
+`hearts.ts` draws the row over a head for the monsters and the boss alike; neither game's own heart row in the corner goes through it.
+
 ## The boss
 
-`treant.ts` is the one thing both games share that is neither plumbing nor scenery: an enemy that takes five blows and shows five hearts over its head while it does.
-It holds the state and the sheet; the games hold where it stands and what a lash costs, which is the only thing they disagree about.
+`treant.ts` is Whispering Woods' boss: an enemy that takes five blows and shows five hearts over its head while it does.
+It holds the state and the sheet; the game holds where it stands.
 
 The sheet is a *grid*, not a strip — Holder's animated battlers are 4x14 cells of 160px, one pose to a row — so `blitFrame` takes a `row`, and the sheet is vendored byte-identical to the pack rather than cut up, which keeps `magick identify` on it matching the download.
 The pack ships no origin, but every pose bottoms out on the same line (y=149 despite standing different heights), so that line is the feet.
 Two poses are worth knowing: row 11 runs dark-to-lit and is played *backwards*, which is the fire going out, and row 12 is the slumped hold it settles into.
 Row 13 is the pack's credit plate and is never drawn.
 
-It is a battler — one facing, front-on, and no walk cycle anywhere in the sheet — which is why the boss is rooted in both games rather than chasing anybody.
-The rear-up is the telegraph and stepping away is the only way past a lash: a blow landing mid-roar is absorbed rather than staggering it, or a hero who simply keeps swinging cancels every roar before it lands and the boss is a punching bag.
-`ROAR_EVERY` has to stay well under the time five swings take for the same reason, and `encounter.test.ts` fights it at point blank to hold that.
+It is a battler — one facing, front-on, and no walk cycle anywhere in the sheet — which is why the boss is rooted rather than chasing anybody.
+A blow landing mid-roar is absorbed rather than staggering it, so a chopper who simply keeps swinging cannot cancel every roar before it finishes.
 
-Peaceful Plains gives it the hero's own sword at the hero's own `MELEE`, and a lash that reaches a little further than the blade, so closing to swing is closing to be caught.
 Whispering Woods has no hearts to take, so there it is a tree: `woods/bossTree.ts` puts it through the same axe, reach and swing clock the ordinary trees go through, and it bursts an armful of logs instead of three.
-It still roars there and lands nothing — what that buys is a tree plainly awake while you are chopping it.
-Both draw it at 2x rather than the world's own density: a 160px battler at Whispering Woods' 4x would be four tiles across.
+It roars and lands nothing — what that buys is a tree plainly awake while you are chopping it.
+It draws at 2x rather than the world's own density: a 160px battler at Whispering Woods' 4x would be four tiles across.
 
 ## The Sunnyside library
 

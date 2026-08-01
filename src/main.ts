@@ -33,10 +33,10 @@ import { Hero, drawHeroPlaceholder, drawHeroShadow } from "./hero";
 import { facingFromAxis, type Facing } from "./heroSprite";
 import { createHeroSkin, type HeroAction } from "./heroSkin";
 import { createActionPad } from "./actionPad";
-import { AGGRO_HALF, MELEE, MonsterField } from "./monsters";
-import { bossPost, LASH_REACH, Treant, TreantArt, type Post } from "./treant";
+import { AGGRO_HALF, MonsterField } from "./monsters";
 import { Lives } from "./lives";
-import { BOSS_GEMS, GemArt, Gems, gemUrl, type Terrain } from "./gems";
+import { GemArt, Gems, gemUrl } from "./gems";
+import { Progress } from "./levels";
 import { createTally } from "./tally";
 import { createHud } from "./hud";
 import { Swing } from "./swing";
@@ -45,11 +45,6 @@ import tilesheetUrl from "../isometric_fantasy_tiles.png";
 
 // How faintly a figure shows through whatever is standing in front of it.
 const GHOST_ALPHA = 0.35;
-
-// The treant is drawn at a finer resolution than this tileset: at 2x it stands
-// 124x150 screen pixels against the hero's 63x57 and a 96px tile, which is a boss
-// without being a wall.
-const BOSS_SCALE = 2;
 
 // The seed is stashed as the world is made, so the editor can open the very
 // world you are walking around in.
@@ -74,11 +69,6 @@ function stashedWorld(): World | null {
   }
 }
 
-/** The boss's post, kept off ground the hero could not follow it onto. */
-function bossFor(world: World, spawn: { col: number; row: number }): Post {
-  return bossPost(spawn, world, (col, row) => world.blocks(col, row) || world.isHazard(col, row));
-}
-
 async function main(): Promise<void> {
   const canvas = document.getElementById("game") as HTMLCanvasElement;
   const ctx = canvas.getContext("2d")!;
@@ -94,20 +84,10 @@ async function main(): Promise<void> {
 
   const heroSprite = createHeroSkin();
   const monsters = new MonsterField();
-  const treantArt = new TreantArt();
-  // The boss is rooted — the pack draws no walk cycle — so where it stands is
-  // settled once, when the world is.
-  let boss = new Treant();
-  let bossAt: Post = bossFor(world, spawn);
   const lives = new Lives();
   const gems = new Gems();
   const gemArt = new GemArt();
-  // Reads whichever world is current, so a burst on a map loaded mid-session is
-  // thrown across that map's ground rather than the one it replaced.
-  const terrain: Terrain = {
-    heightAt: (col, row) => world.heightAt(col, row),
-    barred: (col, row) => world.blocks(col, row) || world.isHazard(col, row),
-  };
+  const progress = new Progress();
   let facing: Facing = 2; // faces the camera to start
   let moving = false;
   let animClock = 0; // continuous clock for the looping idle/run cycles
@@ -123,13 +103,18 @@ async function main(): Promise<void> {
     hero = new Hero(spawn.col, spawn.row, world);
     camera.snap(hero.z);
     monsters.reset();
-    boss = new Treant();
-    bossAt = bossFor(world, spawn);
     lives.reset();
     gems.reset();
-    tally.set(gems.collected);
+    progress.reset();
+    startLevel();
     hud.setLives(lives.lives);
     hud.hideGameOver();
+  }
+
+  /** Point the field at whatever level the run is on, and say so in the corner. */
+  function startLevel(): void {
+    monsters.setLevel(progress.hp, progress.kind(monsters.cast));
+    tally.set(progress.banked, progress.target);
   }
 
   /** Try again: back onto the same ground you died on, hand-built map included. */
@@ -174,6 +159,7 @@ async function main(): Promise<void> {
   const hud = createHud(restart);
   hud.setLives(lives.lives);
   const tally = createTally(gemUrl(), "Gems");
+  startLevel();
 
   const viewport = new Viewport(canvas);
 
@@ -208,19 +194,11 @@ async function main(): Promise<void> {
     ctx.restore();
   }
 
-  function drawBoss(o: Origin, alpha = 1): void {
-    const feet = project(bossAt.col, bossAt.row, 0, o);
-    treantArt.draw(ctx, boss, feet.x, feet.y + SY, BOSS_SCALE, alpha);
-  }
-
   // Anything a tall column hides gets drawn again over the top of it, faintly.
   // Without this the hero can vanish behind their own tower — and worse, so can a
   // slime that is still perfectly able to take a heart off you.
   function drawGhosts(o: Origin): void {
     if (isHidden(world, hero.col, hero.row, hero.z)) drawHero(o, true);
-    if (isHidden(world, bossAt.col, bossAt.row, world.heightAt(bossAt.col, bossAt.row))) {
-      drawBoss(o, GHOST_ALPHA);
-    }
     for (const m of monsters.list()) {
       const groundZ = world.heightAt(Math.round(m.col), Math.round(m.row));
       if (!isHidden(world, m.col, m.row, groundZ)) continue;
@@ -241,24 +219,20 @@ async function main(): Promise<void> {
 
       hero.update(dt, input, world);
       monsters.update(dt, hero, world);
-      const fromBoss = Math.hypot(hero.col - bossAt.col, hero.row - bossAt.row);
       if (swing.update(dt)) {
-        for (const felled of monsters.attackAt(hero.col, hero.row)) gems.spawn(felled.col, felled.row, terrain);
-        // The same blade, the same reach — the boss simply takes more of them, and
-        // is worth an armful where a monster is worth one.
-        if (boss.alive && fromBoss <= MELEE && boss.hit()) {
-          gems.spawn(bossAt.col, bossAt.row, terrain, BOSS_GEMS);
+        for (const felled of monsters.attackAt(hero.col, hero.row)) {
+          gems.spawn(felled.col, felled.row, world.heightAt(Math.round(felled.col), Math.round(felled.row)));
         }
       }
-      if (gems.update(dt, hero) > 0) tally.set(gems.collected);
-      // Rooted: it never closes on the hero, so the lash is the only way it can
-      // take a heart, and the rear-up is the warning to be somewhere else.
-      const lashed = boss.update(dt) && fromBoss <= LASH_REACH;
+      const banked = gems.update(dt, hero);
+      if (banked > 0) {
+        // Clearing a level only changes what walks in next: a wave already on the
+        // field keeps the creature and the hearts it spawned with.
+        if (progress.bank(banked)) hud.showLevel(progress.level + 1);
+        startLevel();
+      }
       const bumping = monsters.contactAt(hero.col, hero.row);
-      if (lashed && lives.hit()) {
-        hero.knockback(hero.col - bossAt.col, hero.row - bossAt.row);
-        hud.setLives(lives.lives);
-      } else if (bumping && lives.hit()) {
+      if (bumping && lives.hit()) {
         hero.knockback(hero.col - bumping.col, hero.row - bumping.row);
         hud.setLives(lives.lives);
       } else if (hazardToll(world, hero, lives)) {
@@ -280,10 +254,7 @@ async function main(): Promise<void> {
     viewport.fit();
     viewport.applyTransform(ctx);
     const origin = camera.origin(hero, { width: viewport.width, height: viewport.height });
-    const entities: Entity[] = [
-      { col: hero.col, row: hero.row, draw: () => drawHero(origin) },
-      { col: bossAt.col, row: bossAt.row, draw: () => drawBoss(origin) },
-    ];
+    const entities: Entity[] = [{ col: hero.col, row: hero.row, draw: () => drawHero(origin) }];
     for (const m of monsters.list()) {
       entities.push({
         col: m.col,
@@ -311,8 +282,6 @@ async function main(): Promise<void> {
       const hf = project(hero.col, hero.row, hero.z, origin);
       drawBox(ctx, hf.x, hf.y + SY, HERO_BOX, "#7cff5a");
       drawArea(ctx, hero.col, hero.row, 0, origin, "#7cff5a"); // the hero's footprint
-      // Roughly how far the boss's lash carries — a square standing in for a radius.
-      drawArea(ctx, bossAt.col, bossAt.row, Math.floor(LASH_REACH), origin, "#ff8a3a");
       for (const m of monsters.list()) {
         drawArea(ctx, m.home.col, m.home.row, AGGRO_HALF, origin, "#ffd24a"); // the lurk square, anchored at its post
         const mf = project(m.col, m.row, 0, origin);

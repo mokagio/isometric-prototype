@@ -1,9 +1,10 @@
 import type { World } from "./world";
 import { createMonsterSkin, type MonsterSkin, type MonsterSkinKind } from "./monsterSkin";
+import { drawHearts } from "./hearts";
 
-// Monsters home in on the hero and bump; a hit plays their end while fading out.
-// What they look like is the skin's business — this file is the wave, the chase
-// and the death, and knows nothing about a sheet.
+// Monsters home in on the hero and bump; enough blows plays their end while fading
+// out. What they look like is the skin's business — this file is the wave, the
+// chase and the death, and knows nothing about a sheet.
 export { FADE, MONSTER_SKIN } from "./monsterSkin";
 import { FADE } from "./monsterSkin";
 
@@ -22,8 +23,17 @@ export const CONTACT = 0.55; // stop advancing this close: the "bump"
 // Reach has to cover the ground a monster crosses between swings, or it can
 // step from outside the blade to bumping the hero in a gap and take a heart
 // however well the swing was timed. `encounter.test.ts` pins the relationship.
-export const MELEE = 2; // a swing kills monsters within this radius
+export const MELEE = 2; // a swing takes a heart off monsters within this radius
 export const KNOCKBACK = 1.6; // cells a killed monster is thrown, over the fade
+// A monster that survives a blow blinks, the way the boss does: the mons pack
+// draws no hurt pose, so the blink is the whole tell that the blow landed.
+export const HURT = 0.3; // seconds of blinking per blow survived
+export const BLINK_HZ = 14;
+export const BLINK_ALPHA = 0.3;
+// The heart row over a monster's head, in screen pixels. Deliberately smaller
+// than the boss's: it sits over a 62px creature, not a 300px battler.
+export const HEART_SCALE = 1.2;
+export const HEART_LIFT = 8; // clear of the top of the art, which the skin's `lift` gives
 export const SPAWN_MIN = 7;
 export const SPAWN_MAX = 12;
 // "lurk" mode: the monster watches a 9x9 square (this many cells each way),
@@ -34,6 +44,21 @@ export const AGGRO_HALF = 4;
 // the hero is fully inside it — the Minkowski sum of the square's edge (+0.5)
 // and the footprint's half-width (0.5). "hunt" mode ignores this.
 export const AGGRO_REACH = AGGRO_HALF + 0.5 + 0.5;
+
+/**
+ * Seconds a chasing monster will grind against something before giving up and
+ * leaving. Long enough that rounding a corner never triggers it, short enough
+ * that a wave stranded across a river does not hold the ladder up.
+ */
+export const GIVE_UP = 6;
+/**
+ * How fast that count falls again once the way is clear. It decays rather than
+ * resetting because a monster juddering against a shore comes free for the odd
+ * frame — it ends up sitting right on a cell's rounding boundary — and a hard
+ * reset would let one such frame in twenty wipe the record and strand it there
+ * for good.
+ */
+export const GIVE_UP_RECOVER = 2;
 
 // Idle wandering while it lurks: amble to a waypoint near the post, stand still
 // for a beat, pick another. Displaced monsters wander home again, since every
@@ -68,8 +93,15 @@ export interface Monster {
   dying: boolean;
   dyingT: number;
   faceLeft: boolean;
-  /** Which of the skin's cast this one is — a mixed wave is three different creatures. */
+  /** Which of the skin's cast this one is. The level says, so a wave is all one creature. */
   kind: number;
+  /** Blows it has left. What it spawned with is the level's, and shows as hearts over its head. */
+  hp: number;
+  hpMax: number;
+  /** Seconds left of the blink that says a blow landed without felling it. */
+  hurtT: number;
+  /** Seconds it has spent chasing with something in the way. */
+  stuckT: number;
   knock: Knock | null;
   /** Where it spawned: the centre of the square it guards and wanders inside. */
   home: Pos;
@@ -91,13 +123,28 @@ export class MonsterField {
   // Starts spent so the first wave walks in as soon as the sheets are ready.
   private calm = WAVE_BREAK;
   private mode: AggroMode = "hunt";
+  // What the next wave will be. The ladder sets it; a wave already walking keeps
+  // whatever it spawned with, so levelling up never re-skins what is on the field.
+  private hp = 1;
+  private kind = 0;
 
   get ready(): boolean {
     return this.skin.ready;
   }
 
+  /** How many creatures the art holds, so the ladder knows what it may pick from. */
+  get cast(): number {
+    return this.skin.cast;
+  }
+
   setMode(mode: AggroMode): void {
     this.mode = mode;
+  }
+
+  /** What the next wave is made of: one creature, and how many blows each takes. */
+  setLevel(hp: number, kind: number): void {
+    this.hp = Math.max(1, Math.floor(hp));
+    this.kind = kind;
   }
 
   constructor(base?: string, kind?: MonsterSkinKind) {
@@ -138,7 +185,11 @@ export class MonsterField {
         dying: false,
         dyingT: 0,
         faceLeft: false,
-        kind: this.skin.pick(),
+        kind: this.kind,
+        hp: this.hp,
+        hpMax: this.hp,
+        hurtT: 0,
+        stuckT: 0,
         knock: null,
         home: { col, row },
         waypoint: { col, row },
@@ -217,6 +268,7 @@ export class MonsterField {
     if (!this.ready) return;
     for (const m of this.mons) {
       m.animT += dt;
+      if (m.hurtT > 0) m.hurtT = Math.max(0, m.hurtT - dt);
       if (m.dying) {
         m.dyingT += dt;
         if (m.knock) {
@@ -247,9 +299,18 @@ export class MonsterField {
         const step = SPEED * dt;
         // Per-axis, blocked by water, so a slime slides along the shore.
         const nc = m.col + (dx / d) * step;
-        if (!barred(world, Math.round(nc), Math.round(m.row))) m.col = nc;
+        const colFree = !barred(world, Math.round(nc), Math.round(m.row));
+        if (colFree) m.col = nc;
         const nr = m.row + (dy / d) * step;
-        if (!barred(world, Math.round(m.col), Math.round(nr))) m.row = nr;
+        const rowFree = !barred(world, Math.round(m.col), Math.round(nr));
+        if (rowFree) m.row = nr;
+        // Something is in the way. Brushing a corner clears in a frame or two;
+        // grinding against the same shore for GIVE_UP seconds means the hero is
+        // across water this monster cannot cross, and it stops trying.
+        m.stuckT = colFree && rowFree ? Math.max(0, m.stuckT - dt * GIVE_UP_RECOVER) : m.stuckT + dt;
+        if (m.stuckT >= GIVE_UP) this.giveUp(m);
+      } else {
+        m.stuckT = 0; // arrived: bumping is not being stuck
       }
     }
     this.mons = this.mons.filter((m) => !(m.dying && m.dyingT >= FADE));
@@ -267,16 +328,31 @@ export class MonsterField {
     this.calm = 0;
   }
 
+  /**
+   * A monster that cannot reach the hero fades out and leaves, dropping nothing —
+   * only a killing blow does that. Without this a wave stranded across a river
+   * never empties the field, no next wave comes, and since gems gate the ladder
+   * the run is over without ever saying so.
+   */
+  private giveUp(m: Monster): void {
+    m.dying = true;
+    m.dyingT = 0;
+    m.knock = null; // nothing threw it: it just walks out of the story
+  }
+
   /** The live monster bumping (col, row), if any. They stop at `CONTACT`, so that is the bump radius. */
   contactAt(col: number, row: number): Monster | null {
     return this.mons.find((m) => !m.dying && Math.hypot(m.col - col, m.row - row) <= CONTACT) ?? null;
   }
 
   /**
-   * A swing at (col, row): every alive monster within melee range dies, thrown
-   * clear of the blow. Returns the ones felled, still standing where the blow
-   * caught them — which is where whatever they drop belongs, rather than wherever
-   * the knockback carries the body.
+   * A swing at (col, row): every alive monster within melee range loses a heart,
+   * and the ones that run out die, thrown clear of the blow. Returns those, still
+   * standing where the blow caught them — which is where whatever they drop
+   * belongs, rather than wherever the knockback carries the body.
+   *
+   * One swing lands on a single frame (`Swing.update`), so a monster cannot lose
+   * two hearts to one blow and needs no immunity window of its own.
    */
   attackAt(col: number, row: number): Monster[] {
     const felled: Monster[] = [];
@@ -286,6 +362,11 @@ export class MonsterField {
       const dy = m.row - row;
       const d = Math.hypot(dx, dy);
       if (d > MELEE) continue;
+      m.hp -= 1;
+      if (m.hp > 0) {
+        m.hurtT = HURT;
+        continue;
+      }
       m.dying = true;
       m.dyingT = 0;
       // A blow landing dead-on leaves no direction to throw along; pick one.
@@ -296,8 +377,22 @@ export class MonsterField {
     return felled;
   }
 
-  /** Draw one monster with its feet at (feetX, feetY), through whichever skin is in play. */
+  /** How solidly one draws: it blinks while smarting from a blow it survived. */
+  private alphaOf(m: Monster): number {
+    if (m.hurtT <= 0) return 1;
+    return Math.floor((HURT - m.hurtT) * BLINK_HZ) % 2 === 0 ? BLINK_ALPHA : 1;
+  }
+
+  /**
+   * Draw one monster with its feet at (feetX, feetY), through whichever skin is in
+   * play, with its remaining hearts over its head. The hearts go with it when it
+   * dies, and hold steady through the hurt blink — a health count that flickers is
+   * one nobody can read.
+   */
   draw(ctx: CanvasRenderingContext2D, m: Monster, feetX: number, feetY: number, alphaScale = 1): void {
-    this.skin.draw(ctx, m, feetX, feetY, alphaScale);
+    this.skin.draw(ctx, m, feetX, feetY, this.alphaOf(m) * alphaScale);
+    if (m.dying) return;
+    const baseY = feetY - this.skin.lift - HEART_LIFT;
+    drawHearts(ctx, m.hp, m.hpMax, feetX, baseY, HEART_SCALE, alphaScale);
   }
 }

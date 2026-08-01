@@ -3,7 +3,6 @@ import {
   createMonsterSkin,
   FADE,
   MON_BOB_FPS,
-  MON_PICK,
   MONS_IN_CAST,
   MonSkin,
   SlimeSkin,
@@ -112,23 +111,19 @@ describe("MonSkin loading", () => {
   });
 });
 
-describe("MonSkin.pick", () => {
-  it("stays inside the cast", () => {
-    const skin = new MonSkin("/");
-    for (let i = 0; i < 300; i++) {
-      const k = skin.pick();
-      expect(Number.isInteger(k)).toBe(true);
-      expect(k).toBeGreaterThanOrEqual(0);
-      expect(k).toBeLessThan(MONS_IN_CAST);
-    }
+describe("what a skin tells the field about itself", () => {
+  it("counts out the whole cast, so the ladder knows what it may send in", () => {
+    expect(new MonSkin("/").cast).toBe(MONS_IN_CAST);
   });
 
-  it("sends a mixed wave while the pick is left open", () => {
-    // Guards the default: pinned to one creature this would be a single value.
-    if (MON_PICK !== null) return;
-    const skin = new MonSkin("/");
-    const seen = new Set(Array.from({ length: 200 }, () => skin.pick()));
-    expect(seen.size).toBeGreaterThan(1);
+  it("keeps the slime a skin of one", () => {
+    expect(new SlimeSkin("/").cast).toBe(1);
+  });
+
+  it("lifts above the feet by the height of its own art, so hearts clear the sprite", () => {
+    // Screen pixels, so the scale is already in: the slime is drawn far bigger.
+    expect(new MonSkin("/").lift).toBeGreaterThan(0);
+    expect(new SlimeSkin("/").lift).toBeGreaterThan(new MonSkin("/").lift);
   });
 });
 
@@ -189,9 +184,5 @@ describe("createMonsterSkin", () => {
 
   it("hands back the mons otherwise", () => {
     expect(createMonsterSkin("mons", "/")).toBeInstanceOf(MonSkin);
-  });
-
-  it("keeps the slime a skin of one", () => {
-    expect(new SlimeSkin("/").pick()).toBe(0);
   });
 });
