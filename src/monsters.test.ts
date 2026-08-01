@@ -4,10 +4,8 @@ import {
   AGGRO_REACH,
   CONTACT,
   FADE,
-  FRAMES,
   KNOCKBACK,
   MELEE,
-  MON_FPS,
   MonsterField,
   SPAWN_MAX,
   SPAWN_MIN,
@@ -22,6 +20,7 @@ import {
   WAVE_STAGGER,
   type Monster,
 } from "./monsters";
+import { SLIME_FPS as MON_FPS, SLIME_FRAMES as FRAMES } from "./monsterSkin";
 import type { World } from "./world";
 
 // The field loads its sheets through `new Image()`, which the node test
@@ -58,7 +57,7 @@ const DT = 1 / 60;
 
 /** A field with both sheets loaded and its first wave spawned. */
 function loaded(): MonsterField {
-  const field = new MonsterField(BASE);
+  const field = new MonsterField(BASE, "slime");
   loadAll();
   field.update(0, HERO, WORLD);
   return field;
@@ -92,7 +91,7 @@ const distanceToHero = (m: Monster): number => Math.hypot(m.col - HERO.col, m.ro
 
 describe("MonsterField loading", () => {
   it("waits for every sheet before it is ready", () => {
-    const field = new MonsterField(BASE);
+    const field = new MonsterField(BASE, "slime");
     expect(field.ready).toBe(false);
     pending[0]!.onload?.();
     expect(field.ready).toBe(false);
@@ -101,7 +100,7 @@ describe("MonsterField loading", () => {
   });
 
   it("prefixes the sheet paths with the given base", () => {
-    new MonsterField("/isometric-prototype/");
+    new MonsterField("/isometric-prototype/", "slime");
     for (const img of pending) {
       expect(img.src.startsWith("/isometric-prototype/oboro/slime/")).toBe(true);
     }
@@ -117,15 +116,26 @@ describe("MonsterField loading", () => {
 
     expect(pending.length).toBeGreaterThan(0);
     for (const img of pending) {
-      expect(img.src.startsWith("/isometric-prototype/oboro/slime/")).toBe(true);
+      expect(img.src.startsWith("/isometric-prototype/")).toBe(true);
     }
 
     vi.unstubAllEnvs();
     vi.resetModules();
   });
 
+  it("sends in whichever skin is the active one, not a hardcoded slime", async () => {
+    vi.resetModules();
+    const { MONSTER_SKIN } = await import("./monsterSkin");
+    const { MonsterField: Fresh } = await import("./monsters");
+    pending = [];
+    new Fresh("/");
+    const wanted = MONSTER_SKIN === "slime" ? "oboro/slime/" : "mons/";
+    for (const img of pending) expect(img.src).toContain(wanted);
+    vi.resetModules();
+  });
+
   it("holds off spawning until the sheets have loaded", () => {
-    const field = new MonsterField(BASE);
+    const field = new MonsterField(BASE, "slime");
     field.update(0.1, HERO, WORLD);
     expect(field.list()).toHaveLength(0);
   });
@@ -154,7 +164,7 @@ describe("MonsterField spawning", () => {
     // The spawn ring reaches well past this map's edge, so every spawn clamps.
     const small = worldOf(10, 10);
     const corner = { col: 1, row: 1 };
-    const field = new MonsterField(BASE);
+    const field = new MonsterField(BASE, "slime");
     loadAll();
     for (let i = 0; i < 200; i++) {
       field.reset();
@@ -519,7 +529,7 @@ function drawOnce(mutate: (m: Monster) => void, feetX = 0, feetY = 0, alphaScale
 
 describe("MonsterField.draw", () => {
   it("draws nothing before the sheets have loaded", () => {
-    const field = new MonsterField(BASE);
+    const field = new MonsterField(BASE, "slime");
     const { ctx, calls } = recordingCtx();
     const mon: Monster = {
       col: 0,
@@ -528,6 +538,7 @@ describe("MonsterField.draw", () => {
       dying: false,
       dyingT: 0,
       faceLeft: false,
+      kind: 0,
       knock: null,
       home: { col: 0, row: 0 },
       waypoint: { col: 0, row: 0 },

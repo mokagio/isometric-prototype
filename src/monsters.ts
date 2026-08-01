@@ -1,17 +1,11 @@
 import type { World } from "./world";
-import { blitFrame, frameAt, SheetLoader, type Sheet } from "./sprites";
+import { createMonsterSkin, type MonsterSkin, type MonsterSkinKind } from "./monsterSkin";
 
-// oboropixel slime (public/oboro/slime/): 96x96 side-view frames, one row per
-// animation. Monsters home in on the hero and bump; a hit plays the death
-// animation while fading out. Same pack as the "slime" hero skin.
-const CELL = 96;
-const SCALE = 3;
-const ANCHOR_X = 48; // frame centre
-const ANCHOR_Y = 56; // feet baseline within the 96px frame
-const DEATH_FRAMES = 10;
-
-export const FRAMES = 8; // slime walk frames
-export const MON_FPS = 10; // walk playback rate
+// Monsters home in on the hero and bump; a hit plays their end while fading out.
+// What they look like is the skin's business — this file is the wave, the chase
+// and the death, and knows nothing about a sheet.
+export { FADE, MONSTER_SKIN } from "./monsterSkin";
+import { FADE } from "./monsterSkin";
 
 export const WAVE_SIZE = 3; // monsters per wave
 export const WAVE_BREAK = 1.5; // seconds of calm once a wave is cleared
@@ -29,8 +23,6 @@ export const CONTACT = 0.55; // stop advancing this close: the "bump"
 // step from outside the blade to bumping the hero in a gap and take a heart
 // however well the swing was timed. `encounter.test.ts` pins the relationship.
 export const MELEE = 2; // a swing kills monsters within this radius
-export const FADE = 0.6; // death: seconds to play the deflate animation out
-const FADE_TAIL = 0.3; // last fraction of the death that fades — the rest is full opacity
 export const KNOCKBACK = 1.6; // cells a killed monster is thrown, over the fade
 export const SPAWN_MIN = 7;
 export const SPAWN_MAX = 12;
@@ -76,6 +68,8 @@ export interface Monster {
   dying: boolean;
   dyingT: number;
   faceLeft: boolean;
+  /** Which of the skin's cast this one is — a mixed wave is three different creatures. */
+  kind: number;
   knock: Knock | null;
   /** Where it spawned: the centre of the square it guards and wanders inside. */
   home: Pos;
@@ -92,25 +86,22 @@ const barred = (world: World, col: number, row: number): boolean =>
   world.blocks?.(col, row) === true || world.isHazard?.(col, row) === true;
 
 export class MonsterField {
-  private walk: Sheet;
-  private death: Sheet;
+  private skin: MonsterSkin;
   private mons: Monster[] = [];
-  private loader = new SheetLoader(2);
   // Starts spent so the first wave walks in as soon as the sheets are ready.
   private calm = WAVE_BREAK;
   private mode: AggroMode = "hunt";
 
   get ready(): boolean {
-    return this.loader.ready;
+    return this.skin.ready;
   }
 
   setMode(mode: AggroMode): void {
     this.mode = mode;
   }
 
-  constructor(base: string = import.meta.env.BASE_URL) {
-    this.walk = this.loader.load(`${base}oboro/slime/walk.png`);
-    this.death = this.loader.load(`${base}oboro/slime/death.png`);
+  constructor(base?: string, kind?: MonsterSkinKind) {
+    this.skin = createMonsterSkin(kind, base);
   }
 
   reset(): void {
@@ -147,6 +138,7 @@ export class MonsterField {
         dying: false,
         dyingT: 0,
         faceLeft: false,
+        kind: this.skin.pick(),
         knock: null,
         home: { col, row },
         waypoint: { col, row },
@@ -296,36 +288,8 @@ export class MonsterField {
     }
   }
 
-  /**
-   * Draw one monster with its feet at (feetX, feetY). `alphaScale` dims the whole
-   * sprite — the blit sets alpha outright, so a caller cannot dim it from outside.
-   */
+  /** Draw one monster with its feet at (feetX, feetY), through whichever skin is in play. */
   draw(ctx: CanvasRenderingContext2D, m: Monster, feetX: number, feetY: number, alphaScale = 1): void {
-    if (!this.ready) return;
-    const sheet = m.dying ? this.death : this.walk;
-    if (!sheet.ok) return;
-
-    let frame: number;
-    let alpha = 1;
-    if (m.dying) {
-      const p = Math.min(1, m.dyingT / FADE);
-      frame = Math.min(DEATH_FRAMES - 1, Math.floor(p * DEATH_FRAMES));
-      // Full opacity through the deflate, fading only over the tail, so the
-      // death reads as an animation rather than a fade.
-      alpha = p < 1 - FADE_TAIL ? 1 : Math.max(0, (1 - p) / FADE_TAIL);
-    } else {
-      frame = frameAt(m.animT, MON_FPS, FRAMES, true);
-    }
-    alpha *= alphaScale;
-
-    blitFrame(ctx, sheet.img, feetX, feetY, {
-      cell: CELL,
-      scale: SCALE,
-      anchorX: ANCHOR_X,
-      anchorY: ANCHOR_Y,
-      frame,
-      flip: m.faceLeft,
-      alpha,
-    });
+    this.skin.draw(ctx, m, feetX, feetY, alphaScale);
   }
 }
