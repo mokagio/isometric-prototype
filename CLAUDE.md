@@ -62,6 +62,17 @@ Trees stand still until hit — the pack's 4-frame sway plays once, fast, as a s
 The action button and the spacebar both go through one `swingAxe`, so they cannot drift apart; `Input.jump` is the spacebar, and the press is edge-detected because holding it should not chop twice.
 The felling blow bursts three logs out of the stump (`woods/logs.ts`): the only thing in this game that leaves the ground, so `z` lives there and nowhere else, and a log is only collectable once it has settled.
 
+## What the enemies look like
+
+`monsterSkin.ts` is to `monsters.ts` what `heroSkin.ts` is to the hero: the field owns the wave, the chase and the death, and knows nothing about a sheet.
+`MONSTER_SKIN` is the one line that says which art is in play, so the slimes are a word away rather than a revert.
+A skin is asked what a fresh spawn should be, which is how one skin can hold a whole cast: `MON_PICK` left `null` draws a different creature per spawn, so a wave of three is three creatures, and a number pins it to one.
+A skin with no death animation, as the mons pack is, fades across the whole of `FADE` rather than saving it for a tail with nothing behind it.
+
+The mons sheet is the one asset here that is *re-cut* rather than vendored whole, and `scripts/cutMonsCast.py` is how: the pack lays its 35 creatures out once per animation frame on a grid 30 wide and 31.2 tall, and a fractional cell cannot be indexed by multiplication.
+The script recovers the cell edges from the gaps between content instead, and re-lays each creature one per row, four frames across, centred and standing on a fixed baseline so one anchor serves all 35 — taking the box across a creature's four frames together, or the re-cut would flatten out its bob.
+Re-run it if the pack is ever updated; the original sheet stays alongside it, untouched.
+
 ## The boss
 
 `treant.ts` is the one thing both games share that is neither plumbing nor scenery: an enemy that takes five blows and shows five hearts over its head while it does.
