@@ -11,7 +11,7 @@ import { createMenu } from "../ui";
 import { Viewport } from "../viewport";
 import { createActionButton } from "./actionButton";
 import { cellAt, fenceTile } from "./coast";
-import { createLogCounter } from "./logCounter";
+import { createTally } from "../tally";
 import { Logs } from "./logs";
 import { DEEP_SEA, drawCoastTile, drawIslandGround, type CoastSheets, type OutlineSheets } from "./ground";
 import { blockedOn, decodeIsland, drawOrder, playedGroundAt, type Island } from "./island";
@@ -201,7 +201,7 @@ function main(): void {
   };
   const action = createActionButton(swingAxe);
   const logs = new Logs();
-  const counter = createLogCounter(url("log.png"));
+  const counter = createTally(url("log.png"), "Logs");
 
   let debug = false;
   createMenu("Whispering Woods", {
