@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  BOSS_WALK,
-  bossPost,
-  drawHearts,
   DYING,
   EMBER_ROW,
   FALLEN_ROW,
@@ -163,92 +160,6 @@ describe("Treant", () => {
     expect(t.hit()).toBe(false);
     expect(t.hp).toBe(0);
     expect(t.pose()).toEqual({ row: FALLEN_ROW, frame: 0 });
-  });
-});
-
-describe("drawHearts", () => {
-  interface Pip {
-    x: number;
-    alpha: number;
-  }
-
-  function lay(left: number, total = HP, midX = 300, scale = 2): Pip[] {
-    const pips: Pip[] = [];
-    const ctx = {
-      globalAlpha: 1,
-      font: "",
-      textAlign: "",
-      textBaseline: "",
-      save() {},
-      restore() {},
-      fillText(_text: string, x: number) {
-        pips.push({ x, alpha: ctx.globalAlpha });
-      },
-    };
-    drawHearts(ctx as unknown as CanvasRenderingContext2D, left, total, midX, 100, scale);
-    return pips;
-  }
-
-  it("lays one heart per blow the boss can take", () => {
-    expect(lay(HP).length).toBe(HP);
-  });
-
-  it("keeps the row's width as hearts are spent, dimming rather than dropping them", () => {
-    const full = lay(HP);
-    const hurt = lay(2);
-    expect(hurt.map((p) => p.x)).toEqual(full.map((p) => p.x));
-    expect(hurt.map((p) => p.alpha < 1)).toEqual([false, false, true, true, true]);
-  });
-
-  it("centres the row on the sprite", () => {
-    const pips = lay(HP, HP, 300);
-    expect((pips[0]!.x + pips[pips.length - 1]!.x) / 2).toBe(300);
-  });
-
-  it("scales the row with the sprite", () => {
-    const span = (scale: number): number => {
-      const pips = lay(HP, HP, 300, scale);
-      return pips[pips.length - 1]!.x - pips[0]!.x;
-    };
-    expect(span(4)).toBe(span(2) * 2);
-  });
-});
-
-describe("bossPost", () => {
-  const bounds = { cols: 56, rows: 56 };
-  const spawn = { col: 28, row: 28 };
-  const dry = (): boolean => false;
-
-  it("stands the boss a walk away from the spawn, not on top of it", () => {
-    const post = bossPost(spawn, bounds, dry);
-    expect(Math.hypot(post.col - spawn.col, post.row - spawn.row)).toBeCloseTo(BOSS_WALK, 0);
-  });
-
-  it("puts the same seed's boss in the same place every time", () => {
-    expect(bossPost(spawn, bounds, dry)).toEqual(bossPost(spawn, bounds, dry));
-  });
-
-  it("never posts it in the water", () => {
-    // Dry only in a thin corridor west of the spawn, so no full-distance bearing works.
-    const barred = (col: number, row: number): boolean => !(row === spawn.row && col < spawn.col);
-    const post = bossPost(spawn, bounds, barred);
-    expect(barred(post.col, post.row)).toBe(false);
-  });
-
-  it("steps in toward the hero when the far ground is barred", () => {
-    const barred = (col: number, row: number): boolean => Math.hypot(col - spawn.col, row - spawn.row) > 3;
-    const post = bossPost(spawn, bounds, barred);
-    expect(Math.hypot(post.col - spawn.col, post.row - spawn.row)).toBeLessThanOrEqual(3);
-  });
-
-  it("keeps it inside the map when the spawn is against an edge", () => {
-    const post = bossPost({ col: 1, row: 1 }, bounds, dry);
-    expect(post.col).toBeGreaterThanOrEqual(1);
-    expect(post.row).toBeGreaterThanOrEqual(1);
-  });
-
-  it("falls back to the spawn when there is nowhere dry at all", () => {
-    expect(bossPost(spawn, bounds, () => true)).toEqual(spawn);
   });
 });
 

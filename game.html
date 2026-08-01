@@ -41,6 +41,31 @@
         top: calc(var(--ww-inset-top) + 30px);
       }
 
+      /* The level banner: nothing at all until a level is cleared, then a beat
+         over the middle of the field. Transparent rather than hidden, so the
+         fade back out is a transition rather than a pop. */
+      .ww-level {
+        position: fixed;
+        top: 22%;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-family: var(--ww-pixel);
+        font-size: 30px;
+        color: #f4e4c1;
+        text-shadow: 0 3px 0 rgba(0, 0, 0, 0.55);
+        opacity: 0;
+        transform: scale(0.85);
+        transition: opacity 0.5s ease, transform 0.5s ease;
+        pointer-events: none;
+        user-select: none;
+      }
+      .ww-level-up {
+        opacity: 1;
+        transform: scale(1);
+        transition-duration: 0.18s;
+      }
+
       .ww-gameover {
         position: fixed;
         inset: 0;
