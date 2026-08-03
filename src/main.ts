@@ -35,7 +35,7 @@ import { createHeroSkin, type HeroAction } from "./heroSkin";
 import { createActionPad } from "./actionPad";
 import { AGGRO_HALF, MonsterField } from "./monsters";
 import { Lives } from "./lives";
-import { GemArt, Gems, gemUrl } from "./gems";
+import { GemArt, Gems, gemUrl, type Terrain } from "./gems";
 import { Progress } from "./levels";
 import { createTally } from "./tally";
 import { createHud } from "./hud";
@@ -87,6 +87,12 @@ async function main(): Promise<void> {
   const lives = new Lives();
   const gems = new Gems();
   const gemArt = new GemArt();
+  // Reads whichever world is current, so a gem thrown on a map loaded mid-session
+  // crosses that map's ground rather than the one it replaced.
+  const terrain: Terrain = {
+    heightAt: (col, row) => world.heightAt(col, row),
+    barred: (col, row) => world.blocks(col, row) || world.isHazard(col, row),
+  };
   const progress = new Progress();
   let facing: Facing = 2; // faces the camera to start
   let moving = false;
@@ -220,9 +226,7 @@ async function main(): Promise<void> {
       hero.update(dt, input, world);
       monsters.update(dt, hero, world);
       if (swing.update(dt)) {
-        for (const felled of monsters.attackAt(hero.col, hero.row)) {
-          gems.spawn(felled.col, felled.row, world.heightAt(Math.round(felled.col), Math.round(felled.row)));
-        }
+        for (const felled of monsters.attackAt(hero.col, hero.row)) gems.spawn(felled.col, felled.row, terrain, hero);
       }
       const banked = gems.update(dt, hero);
       if (banked > 0) {
