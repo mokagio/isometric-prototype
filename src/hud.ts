@@ -1,3 +1,4 @@
+import { corner } from "./corner";
 import { MAX_LIVES } from "./lives";
 
 export interface Hud {
@@ -48,7 +49,8 @@ export function createHud(onRestart: () => void): Hud {
 
   panel.append(title, restart);
   sign.appendChild(panel);
-  document.body.append(hearts, banner, sign);
+  corner().appendChild(hearts);
+  document.body.append(banner, sign);
 
   return {
     setLives: (lives) => {

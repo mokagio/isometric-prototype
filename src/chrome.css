@@ -216,12 +216,27 @@ canvas {
   pointer-events: none;
 }
 
-/* A tally of what has been picked up: the icon, then the number. Each game says
-   where it sits; both games get the same face. */
-.ww-tally {
+/* The top-left corner: one column holding whatever a game keeps up there, in
+   the order it was added. A stack rather than each overlay placing itself, so a
+   heart row that wraps pushes the tally down instead of being drawn over by it. */
+.ww-corner {
   position: fixed;
   top: var(--ww-inset-top);
   left: var(--ww-inset-left);
+  /* Wrap rather than run under the menu button, which owns the far corner. */
+  max-width: calc(
+    100% - var(--ww-btn) - var(--ww-inset-left) - var(--ww-inset-right) - var(--ww-gap)
+  );
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* A tally of what has been picked up: the icon, then the number. */
+.ww-tally {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -230,8 +245,6 @@ canvas {
   color: #f4e4c1;
   /* It sits straight on bright grass, so it needs an outline to read. */
   text-shadow: 0 2px 3px rgba(0, 0, 0, 0.8);
-  pointer-events: none;
-  user-select: none;
 }
 .ww-tally-icon {
   width: 44px;

@@ -169,7 +169,8 @@ A page's own `<style>` block holds only what is that page's, and loads after the
 Neither lives in the TypeScript.
 
 `tally.ts` is the corner count both games keep: Whispering Woods' logs and Peaceful Plains' gems are the same widget with a different icon.
-Only where it sits is the page's — in Peaceful Plains it drops below the hearts, which have the corner itself.
+Nothing up there places itself: `corner.ts` is the one top-left column, and hearts and tally stack in it in the order they were made.
+That is what stops the gem count being drawn over the hearts on a screen narrow enough for ten of them to wrap onto a second row.
 
 `sharedHead.ts` is the other half: a `transformIndexHtml` plugin that injects the shared `<head>` — charset, viewport, the Home Screen metas, the link to `chrome.css` — into every Rollup input.
 A new page therefore gets the chrome by being listed in `vite.config.ts` and nothing else, which is what `sharedHead.test.ts` pins, along with no page having grown its own copy of a meta.
