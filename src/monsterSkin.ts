@@ -29,10 +29,13 @@ export interface MonsterSkin {
   /** How many creatures the skin holds. The level picks one of them for its wave. */
   readonly cast: number;
   /**
-   * Screen pixels above the feet the art tops out, so a caller can put something
-   * over its head — the heart row — without knowing any of the sheet's geometry.
+   * Screen pixels above the feet that creature `kind`'s art tops out, so a caller
+   * can put something over its head — the heart row — without knowing any of the
+   * sheet's geometry. Per creature, not per sheet: a cast stands on one baseline
+   * in a cell cut for the tallest of them, so a single figure would float the row
+   * most of a creature's height above a small one.
    */
-  readonly lift: number;
+  lift(kind: number): number;
   /**
    * Draw one monster with its feet at (feetX, feetY). `alphaScale` dims the whole
    * sprite — the blit sets alpha outright, so a caller cannot dim it from outside.
@@ -46,13 +49,13 @@ const SLIME_CELL = 96;
 const SLIME_SCALE = 3;
 const SLIME_ANCHOR_X = 48; // frame centre
 const SLIME_ANCHOR_Y = 56; // feet baseline within the 96px frame
+const SLIME_ART_TOP = 44; // highest row the walk cycle reaches: the slime is short in a tall frame
 export const SLIME_FRAMES = 8; // walk frames
 const SLIME_DEATH_FRAMES = 10;
 export const SLIME_FPS = 10; // walk playback rate
 
 export class SlimeSkin implements MonsterSkin {
   readonly cast = 1;
-  readonly lift = SLIME_ANCHOR_Y * SLIME_SCALE;
   private walk: Sheet;
   private death: Sheet;
   private loader = new SheetLoader(2);
@@ -64,6 +67,10 @@ export class SlimeSkin implements MonsterSkin {
 
   get ready(): boolean {
     return this.loader.ready;
+  }
+
+  lift(): number {
+    return (SLIME_ANCHOR_Y - SLIME_ART_TOP) * SLIME_SCALE;
   }
 
   draw(ctx: CanvasRenderingContext2D, m: Figure, feetX: number, feetY: number, alphaScale = 1): void {
@@ -109,10 +116,21 @@ const MON_ANCHOR_Y = 31;
 const MON_FRAMES = 4;
 export const MON_BOB_FPS = 8;
 export const MONS_IN_CAST = 35;
+// The row each creature's art starts on inside its cell. The cell is cut for the
+// tallest of the 35 and they all stand on one baseline, so this is the only thing
+// that says how tall any one of them is. `scripts/cutMonsCast.py` prints it.
+export const MON_ART_TOP = [
+  18, 17, 15, 12, 15, 11, 10, 11, 14, 11, 15, 13, 11, 13, 7, 8, 12, 13, 10, 7, 4, 14, 9, 12, 8, 10,
+  9, 9, 10, 10, 9, 11, 6, 8, 8,
+];
+
+/** Which row of the cast a `kind` names, whatever it is handed. */
+function castRow(kind: number): number {
+  return Math.min(MONS_IN_CAST - 1, Math.max(0, Math.floor(kind)));
+}
 
 export class MonSkin implements MonsterSkin {
   readonly cast = MONS_IN_CAST;
-  readonly lift = MON_ANCHOR_Y * MON_SCALE;
   private sheet: Sheet;
   private loader = new SheetLoader(1);
 
@@ -122,6 +140,10 @@ export class MonSkin implements MonsterSkin {
 
   get ready(): boolean {
     return this.loader.ready;
+  }
+
+  lift(kind: number): number {
+    return (MON_ANCHOR_Y - MON_ART_TOP[castRow(kind)]!) * MON_SCALE;
   }
 
   draw(ctx: CanvasRenderingContext2D, m: Figure, feetX: number, feetY: number, alphaScale = 1): void {
@@ -134,7 +156,7 @@ export class MonSkin implements MonsterSkin {
       scale: MON_SCALE,
       anchorX: MON_ANCHOR_X,
       anchorY: MON_ANCHOR_Y,
-      row: Math.min(MONS_IN_CAST - 1, Math.max(0, Math.floor(m.kind))),
+      row: castRow(m.kind),
       frame: frameAt(m.animT, MON_BOB_FPS, MON_FRAMES, true),
       flip: m.faceLeft,
       alpha,

@@ -392,7 +392,7 @@ export class MonsterField {
   draw(ctx: CanvasRenderingContext2D, m: Monster, feetX: number, feetY: number, alphaScale = 1): void {
     this.skin.draw(ctx, m, feetX, feetY, this.alphaOf(m) * alphaScale);
     if (m.dying) return;
-    const baseY = feetY - this.skin.lift - HEART_LIFT;
+    const baseY = feetY - this.skin.lift(m.kind) - HEART_LIFT;
     drawHearts(ctx, m.hp, m.hpMax, feetX, baseY, HEART_SCALE, alphaScale);
   }
 }

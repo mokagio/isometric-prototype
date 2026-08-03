@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createMonsterSkin,
   FADE,
+  MON_ART_TOP,
   MON_BOB_FPS,
   MONS_IN_CAST,
   MonSkin,
@@ -120,10 +121,31 @@ describe("what a skin tells the field about itself", () => {
     expect(new SlimeSkin("/").cast).toBe(1);
   });
 
-  it("lifts above the feet by the height of its own art, so hearts clear the sprite", () => {
-    // Screen pixels, so the scale is already in: the slime is drawn far bigger.
-    expect(new MonSkin("/").lift).toBeGreaterThan(0);
-    expect(new SlimeSkin("/").lift).toBeGreaterThan(new MonSkin("/").lift);
+  it("gives every creature in the cast a height of its own", () => {
+    expect(MON_ART_TOP).toHaveLength(MONS_IN_CAST);
+  });
+
+  it("lifts by the creature's own art, not by the cell it was cut into", () => {
+    const skin = new MonSkin("/");
+    const tallest = MON_ART_TOP.indexOf(Math.min(...MON_ART_TOP));
+    const shortest = MON_ART_TOP.indexOf(Math.max(...MON_ART_TOP));
+    expect(skin.lift(shortest)).toBeGreaterThan(0);
+    // Otherwise the heart row of a small creature floats where a tall one's head
+    // would be, which is what a flat lift off the cell height does.
+    expect(skin.lift(shortest)).toBeLessThan(skin.lift(tallest));
+  });
+
+  it("holds a kind past the end of the cast to a real height", () => {
+    const skin = new MonSkin("/");
+    expect(skin.lift(MONS_IN_CAST + 4)).toBe(skin.lift(MONS_IN_CAST - 1));
+    expect(skin.lift(-3)).toBe(skin.lift(0));
+  });
+
+  it("keeps the slime's row over the slime, which is short in a tall frame", () => {
+    const tallest = MON_ART_TOP.indexOf(Math.min(...MON_ART_TOP));
+    expect(new SlimeSkin("/").lift()).toBeGreaterThan(0);
+    // Drawn three times life size and still the shorter of the two.
+    expect(new SlimeSkin("/").lift()).toBeLessThan(new MonSkin("/").lift(tallest));
   });
 });
 

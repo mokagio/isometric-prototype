@@ -66,12 +66,14 @@ The felling blow bursts three logs out of the stump (`woods/logs.ts`): the only 
 
 `monsterSkin.ts` is to `monsters.ts` what `heroSkin.ts` is to the hero: the field owns the wave, the chase and the death, and knows nothing about a sheet.
 `MONSTER_SKIN` is the one line that says which art is in play, so the slimes are a word away rather than a revert.
-A skin says how many creatures it holds (`cast`) and how far above the feet its art tops out (`lift`, in screen pixels, so the heart row clears the sprite without the field knowing any sheet geometry); which of the cast walks in is the ladder's call, not the skin's.
+A skin says how many creatures it holds (`cast`) and how far above the feet each one's art tops out (`lift`, in screen pixels, so the heart row clears the sprite without the field knowing any sheet geometry); which of the cast walks in is the ladder's call, not the skin's.
+`lift` takes a creature rather than being one number per sheet: a cast stands on one baseline in a cell cut for the tallest of them, so a flat figure floats the heart row most of a creature's height over a small one.
 A skin with no death animation, as the mons pack is, fades across the whole of `FADE` rather than saving it for a tail with nothing behind it.
 
 The mons sheet is the one asset here that is *re-cut* rather than vendored whole, and `scripts/cutMonsCast.py` is how: the pack lays its 35 creatures out once per animation frame on a grid 30 wide and 31.2 tall, and a fractional cell cannot be indexed by multiplication.
 The script recovers the cell edges from the gaps between content instead, and re-lays each creature one per row, four frames across, centred and standing on a fixed baseline so one anchor serves all 35 — taking the box across a creature's four frames together, or the re-cut would flatten out its bob.
-Re-run it if the pack is ever updated; the original sheet stays alongside it, untouched.
+It also prints `MON_ART_TOP`, since where each creature reaches up its cell is knowable only at the cut.
+Re-run it if the pack is ever updated — the cut is deterministic, so an unchanged pack rewrites the same bytes — and paste that list back; the original sheet stays alongside it, untouched.
 
 ## What a kill is worth
 

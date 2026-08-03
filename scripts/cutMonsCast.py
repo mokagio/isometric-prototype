@@ -57,6 +57,7 @@ def bbox(x0, x1, y0, y1):
 
 out = [[(0, 0, 0, 0)] * (CELL_W * FRAMES) for _ in range(CELL_H * MONS)]
 widest = tallest = 0
+tops = []
 for r, (ry0, ry1) in enumerate(row_cells):
     for c, (cx0, cx1) in enumerate(col_cells):
         mon = r * COLS + c
@@ -69,6 +70,7 @@ for r, (ry0, ry1) in enumerate(row_cells):
         tallest = max(tallest, by1 - by0 + 1)
         dx = CELL_W // 2 - (bx0 + bx1 + 1) // 2
         dy = BASELINE - by1
+        tops.append(BASELINE - (by1 - by0))
         for f in range(FRAMES):
             for y in range(ry1 - ry0):
                 for x in range(cx1 - cx0):
@@ -78,6 +80,9 @@ for r, (ry0, ry1) in enumerate(row_cells):
                     out[mon * CELL_H + y + dy][f * CELL_W + x + dx] = p
 
 print(f"widest {widest}, tallest {tallest} (cell {CELL_W}x{CELL_H}, baseline {BASELINE})")
+# Each mon reaches a different way up its cell, and `MON_ART_TOP` in
+# `src/monsterSkin.ts` is this list: paste it back after a re-cut.
+print("MON_ART_TOP =", tops)
 assert widest <= CELL_W and tallest <= BASELINE + 1, "a mon does not fit its cell"
 
 OW, OH = CELL_W * FRAMES, CELL_H * MONS
