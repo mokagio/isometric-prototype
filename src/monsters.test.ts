@@ -9,6 +9,8 @@ import {
   KNOCKBACK,
   MELEE,
   MonsterField,
+  RECOIL,
+  RECOIL_TIME,
   SPAWN_MAX,
   SPAWN_MIN,
   SEPARATION,
@@ -569,6 +571,74 @@ describe("MonsterField knockback", () => {
   });
 });
 
+describe("MonsterField recoil", () => {
+  /** A two-heart monster parked at the hero's shoulder and hit there, so it survives. */
+  function shoved(): { field: MonsterField; mon: Monster } {
+    const field = new MonsterField(BASE, "slime");
+    loadAll();
+    field.setLevel(2, 0);
+    field.update(0, HERO, WORLD);
+    const [mon, ...rest] = field.list();
+    park(mon!, HERO.col + CONTACT, HERO.row);
+    rest.forEach((m, i) => park(m, OFFSTAGE + i * SEPARATION * 4, OFFSTAGE));
+    field.attackAt(HERO.col, HERO.row);
+    return { field, mon: mon! };
+  }
+
+  it("shoves a survivor back along the blow", () => {
+    const { field, mon } = shoved();
+    field.update(RECOIL_TIME, HERO, WORLD);
+    expect(mon.col - (HERO.col + CONTACT)).toBeCloseTo(RECOIL);
+    expect(mon.row).toBeCloseTo(HERO.row);
+    expect(mon.dying).toBe(false);
+  });
+
+  it("cannot bump on the frame the blow lands, before the shove has moved it", () => {
+    // The whole point: the swing and the bump resolve in the same frame, so a
+    // shove that only shows up in the next one saves the hero from nothing.
+    const { field } = shoved();
+    expect(field.contactAt(HERO.col, HERO.row)).toBeNull();
+  });
+
+  it("takes up the chase again once it has finished reeling", () => {
+    const { field, mon } = shoved();
+    field.update(RECOIL_TIME, HERO, WORLD);
+    const shovedTo = mon.col;
+    field.update(DT, HERO, WORLD);
+    expect(mon.col).toBeLessThan(shovedTo);
+    expect(mon.reelT).toBe(0);
+  });
+
+  it("covers the same ground however the frames are sliced", () => {
+    const coarse = shoved();
+    coarse.field.update(RECOIL_TIME, HERO, WORLD);
+    const fine = shoved();
+    for (let i = 0; i < 30; i++) fine.field.update(RECOIL_TIME / 30, HERO, WORLD);
+    expect(fine.mon.col).toBeCloseTo(coarse.mon.col, 6);
+  });
+
+  it("stops a shove at the bank rather than reeling into water", () => {
+    const field = new MonsterField(BASE, "slime");
+    loadAll();
+    field.setLevel(2, 0);
+    field.update(0, HERO, RIVER);
+    const [mon, ...rest] = field.list();
+    // On the dry side, with the river the shove would carry it into.
+    park(mon!, 100, 100);
+    rest.forEach((m, i) => park(m, OFFSTAGE + i * SEPARATION * 4, OFFSTAGE));
+    field.attackAt(100 - CONTACT, 100);
+    for (let i = 0; i < 30; i++) field.update(RECOIL_TIME / 30, HERO, RIVER);
+    expect(RIVER.isHazard!(Math.round(mon!.col), Math.round(mon!.row))).toBe(false);
+  });
+
+  it("leaves the killing blow to throw the body the full distance", () => {
+    // The shove is what a survivor gets; a corpse is still thrown clear.
+    const { field, mon } = struck();
+    field.update(FADE, HERO, WORLD);
+    expect(mon.col - STRUCK_AT).toBeCloseTo(KNOCKBACK);
+  });
+});
+
 describe("MonsterField death", () => {
   it("keeps a dying monster on screen while it plays out", () => {
     const { field, mon } = fieldWith(HERO.col + 3, HERO.row);
@@ -768,6 +838,7 @@ describe("MonsterField.draw", () => {
       hp: 1,
       hpMax: 1,
       hurtT: 0,
+      reelT: 0,
       stuckT: 0,
       knock: null,
       home: { col: 0, row: 0 },

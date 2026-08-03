@@ -100,6 +100,10 @@ The hero's own hearts are untouched by any of it: there is no refill, so a long 
 `MonsterField.setLevel` is the only way in, and it says what the *next* wave is made of: a wave already walking keeps the creature and the hearts it spawned with, so levelling up never re-skins what is on the field.
 A blow takes one heart and only the last one kills, which is what makes `attackAt` return a list rather than nothing — a survivor blinks (`HURT`) where the boss would recoil, since the mons pack draws no hurt pose.
 One swing lands on a single frame, so nothing can lose two hearts to one blow and a monster needs no immunity window of its own.
+Every blow also shoves: a survivor reels (`RECOIL`, `RECOIL_TIME`), neither advancing nor bumping while it does, and the ground it has to make up afterwards is what a player who keeps swinging is buying.
+Without it a creature that takes more than one hit charged a heart for each of them — the bump and the blow resolve in the same frame — and no amount of timing could avoid the trade.
+The shove is bounded at both ends and `encounter.test.ts` pins both: long enough that the next swing lands before the monster is back at `CONTACT`, short enough that it is still inside `MELEE` when it does.
+A killing blow throws the body the whole of `KNOCKBACK` instead, and through terrain, since it is fading out; a shove stops at the water's edge like a walk.
 `hearts.ts` draws the row over a head for the monsters and the boss alike; neither game's own heart row in the corner goes through it.
 
 ## The boss

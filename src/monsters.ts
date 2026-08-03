@@ -25,6 +25,14 @@ export const CONTACT = 0.55; // stop advancing this close: the "bump"
 // however well the swing was timed. `encounter.test.ts` pins the relationship.
 export const MELEE = 2; // a swing takes a heart off monsters within this radius
 export const KNOCKBACK = 1.6; // cells a killed monster is thrown, over the fade
+// Every blow shoves a monster back, not just the killing one. A survivor left
+// standing where it was hit is still bumping the hero with its blow already
+// spent, so a creature that takes more than one hit always traded a heart for
+// each of them, however well the swing was timed. Reeling, it neither advances
+// nor bumps, and by the time it is over it has ground to make up: that gap is
+// what a player who keeps swinging is buying. `encounter.test.ts` pins it.
+export const RECOIL = 1.2; // cells a monster is shoved by a blow it survives
+export const RECOIL_TIME = 0.15; // seconds the shove takes
 // A monster that survives a blow blinks, the way the boss does: the mons pack
 // draws no hurt pose, so the blink is the whole tell that the blow landed.
 export const HURT = 0.3; // seconds of blinking per blow survived
@@ -100,6 +108,8 @@ export interface Monster {
   hpMax: number;
   /** Seconds left of the blink that says a blow landed without felling it. */
   hurtT: number;
+  /** Seconds left of the shove a survived blow put it into. */
+  reelT: number;
   /** Seconds it has spent chasing with something in the way. */
   stuckT: number;
   knock: Knock | null;
@@ -111,6 +121,16 @@ export interface Monster {
 }
 
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
+
+/**
+ * Where a throw has carried a monster by `p` (0 to 1) of its run. Anchored to
+ * where the blow landed rather than integrated per frame, so it covers the same
+ * ground whatever the frame rate.
+ */
+function thrownTo(k: Knock, dist: number, p: number): Pos {
+  const eased = p * (2 - p); // ease-out: thrown hard, settling as it goes
+  return { col: k.col + k.dx * dist * eased, row: k.row + k.dy * dist * eased };
+}
 
 // Monsters keep out of every pool, walls and hazards alike. The hero can wade
 // lava at a heart a second; nothing follows them in, which is the point.
@@ -189,6 +209,7 @@ export class MonsterField {
         hp: this.hp,
         hpMax: this.hp,
         hurtT: 0,
+        reelT: 0,
         stuckT: 0,
         knock: null,
         home: { col, row },
@@ -272,13 +293,20 @@ export class MonsterField {
       if (m.dying) {
         m.dyingT += dt;
         if (m.knock) {
-          // Anchored to where the blow landed rather than integrated per frame,
-          // so the throw covers the same ground whatever the frame rate.
-          const p = Math.min(1, m.dyingT / FADE);
-          const eased = p * (2 - p); // ease-out: thrown hard, settling as it fades
-          m.col = m.knock.col + m.knock.dx * KNOCKBACK * eased;
-          m.row = m.knock.row + m.knock.dy * KNOCKBACK * eased;
+          const to = thrownTo(m.knock, KNOCKBACK, Math.min(1, m.dyingT / FADE));
+          // A body on its way out is not stopped by the ground: it is fading.
+          m.col = to.col;
+          m.row = to.row;
         }
+        continue;
+      }
+      if (m.reelT > 0 && m.knock) {
+        m.reelT = Math.max(0, m.reelT - dt);
+        const to = thrownTo(m.knock, RECOIL, 1 - m.reelT / RECOIL_TIME);
+        // Per-axis and blocked like a walk, so one shoved towards a river ends up
+        // on the bank rather than reeling into water it could never have entered.
+        if (!barred(world, Math.round(to.col), Math.round(m.row))) m.col = to.col;
+        if (!barred(world, Math.round(m.col), Math.round(to.row))) m.row = to.row;
         continue;
       }
       // Home in on the hero; stop at contact distance and keep bumping.
@@ -340,9 +368,18 @@ export class MonsterField {
     m.knock = null; // nothing threw it: it just walks out of the story
   }
 
-  /** The live monster bumping (col, row), if any. They stop at `CONTACT`, so that is the bump radius. */
+  /**
+   * The live monster bumping (col, row), if any. They stop at `CONTACT`, so that
+   * is the bump radius. One still reeling from a blow is not bumping anybody:
+   * without that the blow and the bump land on the same frame, and the shove
+   * would arrive a frame too late to have saved the hero from anything.
+   */
   contactAt(col: number, row: number): Monster | null {
-    return this.mons.find((m) => !m.dying && Math.hypot(m.col - col, m.row - row) <= CONTACT) ?? null;
+    return (
+      this.mons.find(
+        (m) => !m.dying && m.reelT <= 0 && Math.hypot(m.col - col, m.row - row) <= CONTACT,
+      ) ?? null
+    );
   }
 
   /**
@@ -362,16 +399,17 @@ export class MonsterField {
       const dy = m.row - row;
       const d = Math.hypot(dx, dy);
       if (d > MELEE) continue;
+      // A blow landing dead-on leaves no direction to throw along; pick one.
+      const away = d > 0 ? { dx: dx / d, dy: dy / d } : { dx: 0, dy: 1 };
+      m.knock = { col: m.col, row: m.row, ...away };
       m.hp -= 1;
       if (m.hp > 0) {
         m.hurtT = HURT;
+        m.reelT = RECOIL_TIME;
         continue;
       }
       m.dying = true;
       m.dyingT = 0;
-      // A blow landing dead-on leaves no direction to throw along; pick one.
-      const away = d > 0 ? { dx: dx / d, dy: dy / d } : { dx: 0, dy: 1 };
-      m.knock = { col: m.col, row: m.row, ...away };
       felled.push(m);
     }
     return felled;
