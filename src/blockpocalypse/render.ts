@@ -1,7 +1,14 @@
 import * as THREE from "three";
 import { buildBackdrop } from "./backdrop";
 import { buildCity } from "./city";
-import { animateWalk, buildFigure, tintFigure, type Figure, type FigurePalette } from "./figure";
+import {
+  animateWalk,
+  buildFigure,
+  paintFigure,
+  tintFigure,
+  type Figure,
+  type FigurePalette,
+} from "./figure";
 import { loadRifle, RIFLE_MOUNT, RIFLE_SPIN } from "./gun";
 import { MAX_ZOMBIES, type Game } from "./game";
 import { JOY_CEIL, JOY_FLOOR } from "./joyride";
@@ -29,18 +36,22 @@ export const JOY_SCREEN_X = 0.28;
  */
 const ACTOR_Z = 0.3;
 
-const PLAYER_PALETTE = {
+const PLAYER_PALETTE: FigurePalette = {
   skin: 0xd9a066,
   shirt: 0x3f76b5,
   legs: 0x2f3b4a,
   hair: 0x3a2a1a,
+  dark: 0x24252b,
+  eye: 0xf1ece0,
   gun: 0x24252b,
 };
 
+// The eye is where the breed reads from across a street: the living have white
+// ones, and every one of these is lit from inside.
 const ZOMBIE_PALETTE: Record<ZombieKind, FigurePalette> = {
-  walker: { skin: 0x6aa84f, shirt: 0x4a3b52, legs: 0x33352c, hair: 0x2d3a24 },
-  runner: { skin: 0x86b850, shirt: 0x7a2f2f, legs: 0x2c2c33, hair: 0x1f2a18 },
-  flyer: { skin: 0x9fd06a, shirt: 0x4b3f6b, legs: 0x2b2f45, hair: 0x22301c },
+  walker: { skin: 0x6aa84f, shirt: 0x4a3b52, legs: 0x33352c, hair: 0x2d3a24, dark: 0x1e2019, eye: 0xd8e04a },
+  runner: { skin: 0x86b850, shirt: 0x7a2f2f, legs: 0x2c2c33, hair: 0x1f2a18, dark: 0x201a1a, eye: 0xff7a3c },
+  flyer: { skin: 0x9fd06a, shirt: 0x4b3f6b, legs: 0x2b2f45, hair: 0x22301c, dark: 0x1b1d2c, eye: 0x74e8ff },
 };
 
 export interface Renderer {
@@ -92,6 +103,10 @@ export function createRenderer(canvas: HTMLCanvasElement, level: Level): Rendere
   player.group.add(pack);
 
   const zombiePool: Figure[] = [];
+  // What each pooled body is currently painted as. Repainting rewrites every
+  // vertex of a figure, so it happens when a body changes breed and not once a
+  // frame for thirty of them.
+  const poolKind: (ZombieKind | null)[] = [];
   const zombieGroup = new THREE.Group();
   scene.add(zombieGroup);
 
@@ -191,6 +206,7 @@ export function createRenderer(canvas: HTMLCanvasElement, level: Level): Rendere
     while (zombiePool.length < Math.min(game.zombies.length, MAX_ZOMBIES)) {
       const figure = buildFigure(ZOMBIE_PALETTE.walker, 1.7);
       zombiePool.push(figure);
+      poolKind.push("walker");
       zombieGroup.add(figure.group);
     }
     zombiePool.forEach((figure, index) => {
@@ -200,7 +216,10 @@ export function createRenderer(canvas: HTMLCanvasElement, level: Level): Rendere
         return;
       }
       const breed = BREEDS[zombie.kind];
-      const palette = ZOMBIE_PALETTE[zombie.kind];
+      if (poolKind[index] !== zombie.kind) {
+        paintFigure(figure, ZOMBIE_PALETTE[zombie.kind]);
+        poolKind[index] = zombie.kind;
+      }
       figure.group.visible = true;
       figure.group.position.set(zombie.body.x, zombie.body.y, ACTOR_Z);
       figure.group.scale.setScalar(breed.height / PLAYER_HEIGHT);
@@ -209,8 +228,6 @@ export function createRenderer(canvas: HTMLCanvasElement, level: Level): Rendere
       // Both arms out in front, which is the whole of a zombie's body language.
       aimArm(figure, 0, zombie.facing);
       figure.armBack.rotation.copy(figure.armFront.rotation);
-      recolour(figure.torso, palette.shirt);
-      recolour(figure.head, palette.skin);
       tintFigure(figure, 0xffffff, zombie.flash > 0 ? 0.9 : 0);
     });
   }
@@ -337,11 +354,6 @@ function buildJetpack(materials: THREE.MeshLambertMaterial[]): THREE.Group {
 
   group.add(tank, nozzle);
   return group;
-}
-
-function recolour(mesh: THREE.Mesh, colour: number): void {
-  const material = mesh.material;
-  if (material instanceof THREE.MeshLambertMaterial) material.color.setHex(colour);
 }
 
 function skyTexture(): THREE.CanvasTexture {

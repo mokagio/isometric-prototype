@@ -48,6 +48,21 @@ Nothing in the game turns air back into a block, so a cell that starts empty nev
 
 Figures are turned round with `rotation.y`, never a negative scale — mirroring turns the normals inside out and the lighting goes with them. `faceFigure` then swaps the gun arm to the near side by hand, or it ends up behind the body.
 
+## What a person is made of
+
+`figure.ts` is a table of bricks, not a tree of meshes: `TORSO_BRICKS`, `HEAD_BRICKS`, `LEG_BRICKS` and `ARM_BRICKS` say where every box sits in its own part's space, and each part is **merged into one geometry** carrying a colour per vertex.
+Six meshes come out — two legs, two arms, a torso and a head — because that is how many things move on their own, and `MAX_ZOMBIES` is thirty: a mesh per brick would be five hundred draw calls for a handful of people.
+A brick therefore names a `ROLES` entry rather than a colour, and `paintFigure` looks that role up in a palette and rewrites the colour attribute.
+That is what lets the pool hand the same body to a walker on one frame and a runner on the next; `render.ts` keeps `poolKind` so it repaints on the change rather than every frame.
+
+Two things the detail has to survive, both of which it got wrong first:
+
+- **A figure walking away is the back of its head.** Facing west spins the whole group, so the hair down the back only covers its top half — a full-height slab leaves a figure with no head at all from behind.
+- **Anything on the face is a brick standing proud of it**, not a coplanar decal: the eyes and mouth sit at z 0.225 against a face at 0.22, which is the difference between a feature and a z-fight.
+
+The origin of a limb is the joint it swings about, so a leg's bricks hang below zero and `animateWalk` rotates about the hip.
+The whole model is `MODEL_HEIGHT` tall and scaled to the body it is given, so the feet stay on `group.position` — `figure.test.ts` pins that with a bounding box rather than trusting the arithmetic.
+
 ## The level, and what generation must guarantee
 
 `generateLevel(seed)` lays a street and then walks left to right dropping set pieces: gaps, gutted buildings, scaffolding, rubble.
