@@ -85,6 +85,10 @@ export function createInput(target: HTMLElement): InputSource {
   };
 
   const onKeyDown = (event: KeyboardEvent): void => {
+    // Before the repeat guard: it is the last keydown before a keyup that
+    // decides whether Space scrolls the page or activates whatever holds the
+    // focus, and every keydown but the first of a held key is a repeat.
+    if (event.code === "Space") event.preventDefault();
     if (event.repeat) return;
     if (event.code === "Escape") pausePressed = true;
     else anyPressed = true;
@@ -95,7 +99,6 @@ export function createInput(target: HTMLElement): InputSource {
     if (event.code === "ShiftLeft" || event.code === "ShiftRight") state.grapple = true;
     down.add(event.code);
     sync();
-    if (event.code === "Space") event.preventDefault();
   };
 
   const onKeyUp = (event: KeyboardEvent): void => {

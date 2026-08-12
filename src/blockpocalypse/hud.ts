@@ -43,7 +43,14 @@ export function createHud(
 
   for (const button of buttons) {
     const pick = button.dataset["pick"];
-    if (pick && isPick(pick)) button.addEventListener("click", () => onPick(pick));
+    if (!pick || !isPick(pick)) continue;
+    button.addEventListener("click", () => {
+      // A clicked button keeps the focus, and a focused button activates on
+      // the Space *keyup* — so the first time a joyride player let go of fly,
+      // the picker fired again and started them a new run.
+      button.blur();
+      onPick(pick);
+    });
   }
 
   let shownHealth = -1;
