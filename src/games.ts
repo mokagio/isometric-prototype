@@ -8,4 +8,5 @@ export interface GameEntry {
 export const GAMES: GameEntry[] = [
   { name: "Peaceful Plains", href: "game.html" },
   { name: "Whispering Woods", href: "woods.html" },
+  { name: "Blockpocalypse", href: "blockpocalypse.html" },
 ];

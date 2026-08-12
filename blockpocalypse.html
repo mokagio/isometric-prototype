@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Blockpocalypse | Games Playground</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23101a33'/><rect x='4' y='3' width='8' height='8' fill='%236aa84f'/><rect x='5' y='6' width='2' height='2' fill='%23101a33'/><rect x='9' y='6' width='2' height='2' fill='%23101a33'/></svg>"
+    />
+    <!-- Linked rather than inlined like the other pages' <style> blocks: this
+         game brought a whole stylesheet with it. It loads after the shared
+         `chrome.css`, which `sharedHead.ts` prepends, so it wins any tie. -->
+    <link rel="stylesheet" href="/src/blockpocalypse/style.css" />
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div id="hud"></div>
+    <div id="pads" class="is-hidden">
+      <button class="pad" data-pad="fly" type="button"><b>FLY</b><span>hold</span></button>
+      <button class="pad" data-pad="shoot" type="button"><b>SHOOT</b><span>hold</span></button>
+    </div>
+    <aside id="controls">
+      <h1>Blockpocalypse</h1>
+      <p class="tagline">The city has fallen. The helipad is east.</p>
+
+      <ul class="keys">
+        <li><kbd>A</kbd><kbd>D</kbd><span>run</span></li>
+        <li><kbd>Space</kbd><span>jump</span></li>
+        <li><kbd class="is-wide">Left click</kbd><span>shoot where you point</span></li>
+        <li><kbd>Esc</kbd><span>pause, and read this again</span></li>
+        <li><kbd>R</kbd><span>brand new city, same gear</span></li>
+      </ul>
+
+      <ul class="keys gear-keys" data-pick="hook">
+        <li>
+          <kbd class="is-wide">Right click</kbd><kbd>Shift</kbd
+          ><span>fire the hook, hold to swing</span>
+        </li>
+        <li><kbd>W</kbd><kbd>S</kbd><span>on the rope: climb it, or let it out</span></li>
+        <li><kbd>Space</kbd><span>on the rope: let go and launch</span></li>
+      </ul>
+      <ul class="keys gear-keys" data-pick="jetpack">
+        <li><kbd>Space</kbd><span>hold it in the air to fly</span></li>
+        <li><span class="no-key">land on anything to fill the tank back up</span></li>
+      </ul>
+      <ul class="keys gear-keys" data-pick="joyride">
+        <li><kbd>Space</kbd><span>or the FLY pad — hold to climb, let go to drop</span></li>
+        <li><kbd class="is-wide">Left click</kbd><span>or the SHOOT pad — fires straight ahead</span></li>
+        <li><span class="no-key">you fly east on your own, and it keeps speeding up</span></li>
+        <li><span class="no-key">red beams cost a heart; shoot the flyers or duck them</span></li>
+      </ul>
+
+      <p class="gear-label">Pick your game</p>
+      <div class="picker">
+        <button type="button" data-pick="jetpack">
+          <i class="gear-icon" data-icon="jetpack"></i>
+          <b>Jetpack</b>
+          <span>Cross the city. Hold jump and fly.</span>
+          <em>easy to fly</em>
+        </button>
+        <button type="button" data-pick="hook">
+          <i class="gear-icon" data-icon="hook"></i>
+          <b>Grappling hook</b>
+          <span>Cross the city. Swing the big gaps.</span>
+          <em>hard to master</em>
+        </button>
+        <button type="button" data-pick="joyride">
+          <i class="gear-icon" data-icon="joyride"></i>
+          <b>Joyride</b>
+          <span>One button. Dodge the lasers, grab the coins.</span>
+          <em>never stops</em>
+        </button>
+      </div>
+
+      <p class="tip">
+        In the city, green pillars are checkpoints — run past one and that is where you come
+        back.
+      </p>
+      <p class="dismiss">pick one to start</p>
+      <p class="home"><a href="index.html">← Games Playground</a></p>
+    </aside>
+    <script type="module" src="/src/blockpocalypse/main.ts"></script>
+  </body>
+</html>

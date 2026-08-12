@@ -26,6 +26,7 @@ export default defineConfig({
         main: resolve(import.meta.dirname, "index.html"),
         game: resolve(import.meta.dirname, "game.html"),
         woods: resolve(import.meta.dirname, "woods.html"),
+        blockpocalypse: resolve(import.meta.dirname, "blockpocalypse.html"),
         editor: resolve(import.meta.dirname, "editor.html"),
         woodsEditor: resolve(import.meta.dirname, "woodsEditor.html"),
         outline: resolve(import.meta.dirname, "outline.html"),

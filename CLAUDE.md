@@ -1,9 +1,10 @@
 # Games Playground
 
-An isometric browser prototype: TypeScript, Vite, no framework, no runtime dependencies.
-Seven pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), Peaceful Plains (`game.html`, entry `main.ts`), Whispering Woods (`woods.html`, entry `woods/main.ts`), a world editor for it (`editor.html`), an island editor for the Woods (`woodsEditor.html`, entry `woods/editor/main.ts`), the asset library (`library.html`, entry `sunnyside/catalogPage.ts`), and credits (`credits.html`).
+A browser games prototype: TypeScript, Vite, no framework, and one runtime dependency that only Blockpocalypse uses.
+Nine pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), Peaceful Plains (`game.html`, entry `main.ts`), Whispering Woods (`woods.html`, entry `woods/main.ts`), Blockpocalypse (`blockpocalypse.html`, entry `blockpocalypse/main.ts`), a world editor for the Plains (`editor.html`), an island editor for the Woods (`woodsEditor.html`, entry `woods/editor/main.ts`), a coastline editor (`outline.html`), the asset library (`library.html`, entry `sunnyside/catalogPage.ts`), and credits (`credits.html`).
 A new game is an entry in `games.ts` plus its own page and Rollup input.
 Only Peaceful Plains is isometric: Whispering Woods is drawn straight down the screen, and shares the input, sprite, loop, and viewport plumbing but none of `iso.ts`.
+Blockpocalypse shares none of it — see below.
 
 ## Commands
 
@@ -124,7 +125,18 @@ Whispering Woods has no hearts to take, so there it is a tree: `woods/bossTree.t
 It roars and lands nothing — what that buys is a tree plainly awake while you are chopping it.
 It draws at 2x rather than the world's own density: a 160px battler at Whispering Woods' 4x would be four tiles across.
 
-## The Sunnyside library
+## Blockpocalypse
+
+`src/blockpocalypse/` is a voxel side-scroller ported whole from its own repo, and it shares nothing with the rest of the playground but the page furniture: no canvas 2D, no spritesheets, no `iso.ts`, no stick.
+It draws with three.js — the one runtime dependency, imported from nowhere else, and the reason `blockpocalypse.html` is the only page whose bundle is half a megabyte.
+`src/blockpocalypse/CLAUDE.md` is its own documentation and stayed with the code; read that before touching anything inside the folder.
+
+Four things the port changed, and nothing else did:
+
+- **A subfolder, not the shared `src/`.** It brought its own `backdrop.ts`, `input.ts`, `hud.ts` and `world.ts`, each of which the playground already had under that name and meaning something else.
+- **Its stylesheet is a `<link>`, not a `<style>` block.** Every other page's own CSS is short enough to inline; 570 lines is not. It loads after the `chrome.css` that `sharedHead.ts` prepends, so it still wins any tie — and the only tie is `canvas { image-rendering: pixelated }`, which costs a WebGL canvas drawn at device resolution nothing.
+- **The gun is imported, not in `public/`.** `?url` from `blockpocalypse/assets/` is how it arrived and it needs no base-prefix care: Vite rewrites a bundled asset's URL, which is what `public/` is exactly not.
+- **The card carries the way home.** This game has no `ui.ts` menu, so without the link on the card the only way back to the games list is the browser's own back button.
 
 `src/sunnyside/` names the pack's art — around 210 ground brushes and props — as a manifest over the sheets vendored whole in `public/sunnyside/`, so nothing is re-cut and a wrong tile is a number to change.
 `ASSETS.md` is the whole story: what an asset is, how to add one, what the pack's own GameMaker project tells you (and the two things it says that are wrong), and why autotiled paths are deferred.
