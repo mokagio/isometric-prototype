@@ -1,9 +1,9 @@
 import { blitFrame, SheetLoader, type Sheet } from "./sprites";
 
-// The experience a slain monster leaves behind: a gem that pops out of the body,
-// away from whoever struck it, and lies where it lands until the hero walks over
-// it. World coordinates are the map's own cells, and `z` is elevation levels, as
-// the hero's own jump is.
+// The experience a slain monster leaves behind: a gem per heart it had, popped
+// out of the body away from whoever struck it, lying where they land until the
+// hero walks over them. World coordinates are the map's own cells, and `z` is
+// elevation levels, as the hero's own jump is.
 
 /**
  * One 10x10 tile cut from the Sunnyside tileset — the blue ore nugget at cell
@@ -15,7 +15,6 @@ export const ANCHOR_Y = 10;
 /** A 10px gem at the world's own 2x is a speck beside a 96px tile. */
 export const SCALE = 3;
 
-export const GEMS_PER_KILL = 1;
 export const POP_UP = 5; // levels/sec out of the body
 export const GRAVITY = 34; // levels/sec² — the hero's own fall, so a gem drops like one
 /** Seconds a hop lasts: up and back down again, which is what turns a distance into a speed. */
@@ -29,6 +28,13 @@ export const FLIGHT = (2 * POP_UP) / GRAVITY;
 export const THROW = 1.4;
 /** How near the hero has to be to sweep a gem up, in cells. */
 export const PICKUP_RANGE = 0.9;
+/**
+ * How wide a fan a drop of several gems is thrown in, in radians, centred on the
+ * bearing away from the blow. Wide enough that a three-heart monster leaves three
+ * things to walk over rather than one pile, narrow enough that no gem in the fan
+ * comes down behind the hero who earned it.
+ */
+export const SPREAD = Math.PI / 2;
 // How finely a blocked landing is walked back in toward the body — the same
 // "draw it in to dry land" move a monster spawned in a lake makes. Where every
 // step is blocked the gem drops where it fell, which is ground a monster was
@@ -74,23 +80,24 @@ export class Gems {
   }
 
   /**
-   * A kill's worth thrown out of a body standing on (col, row), along the bearing
-   * away from `from` — where the blow came from, so it lands clear of the hero
-   * rather than at their feet. The landing cell is settled here rather than found
-   * on impact, so a throw over a river comes down short of the bank instead of
-   * into it.
+   * `count` gems thrown out of a body standing on (col, row), along the bearing
+   * away from `from` — where the blow came from, so they land clear of the hero
+   * rather than at their feet. Several fan out around that bearing, each finding
+   * its own landing. The landing cell is settled here rather than found on impact,
+   * so a throw over a river comes down short of the bank instead of into it.
    */
-  spawn(col: number, row: number, terrain: Terrain, from: Pos): void {
+  spawn(col: number, row: number, terrain: Terrain, from: Pos, count = 1): void {
     const level = terrain.heightAt(Math.round(col), Math.round(row));
     const dc = col - from.col;
     const dr = row - from.row;
-    const d = Math.hypot(dc, dr);
     // A blow landing dead-on leaves no bearing to throw along; pick one.
-    const away = d > 0 ? { dc: dc / d, dr: dr / d } : { dc: 0, dr: 1 };
-    const reach = this.clearOf(col, row, away, terrain, level);
-    const restCol = col + away.dc * reach;
-    const restRow = row + away.dr * reach;
-    for (let i = 0; i < GEMS_PER_KILL; i++) {
+    const bearing = Math.hypot(dc, dr) > 0 ? Math.atan2(dr, dc) : Math.PI / 2;
+    for (let i = 0; i < count; i++) {
+      const angle = count > 1 ? bearing + SPREAD * (i / (count - 1) - 0.5) : bearing;
+      const away = { dc: Math.cos(angle), dr: Math.sin(angle) };
+      const reach = this.clearOf(col, row, away, terrain, level);
+      const restCol = col + away.dc * reach;
+      const restRow = row + away.dr * reach;
       this.gems.push({
         col,
         row,

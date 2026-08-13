@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_DT } from "./loop";
-import { GemArt, Gems, GEMS_PER_KILL, PICKUP_RANGE, THROW, type Terrain } from "./gems";
+import { GemArt, Gems, PICKUP_RANGE, SPREAD, THROW, type Terrain } from "./gems";
 
 const DT = 1 / 60;
 const KILL = { col: 20, row: 20 };
@@ -22,10 +22,39 @@ const settle = (gems: Gems, secs = 2, hero = FAR): number => {
 };
 
 describe("Gems.spawn", () => {
-  it("drops a gem per kill", () => {
+  it("drops one gem for a kill worth one", () => {
     const gems = new Gems();
     gems.spawn(KILL.col, KILL.row, flat(), KILLER);
-    expect(gems.list().length).toBe(GEMS_PER_KILL);
+    expect(gems.list().length).toBe(1);
+  });
+
+  it("drops as many as it is asked for", () => {
+    const gems = new Gems();
+    gems.spawn(KILL.col, KILL.row, flat(), KILLER, 3);
+    expect(gems.list().length).toBe(3);
+  });
+
+  it("fans a several-gem drop out rather than piling it up", () => {
+    const gems = new Gems();
+    gems.spawn(KILL.col, KILL.row, flat(), KILLER, 3);
+    settle(gems);
+    const rows = gems.list().map((g) => g.row);
+    // The fan opens across the throw, so the outer two straddle the middle one.
+    expect(Math.min(...rows)).toBeLessThan(KILL.row);
+    expect(Math.max(...rows)).toBeGreaterThan(KILL.row);
+    for (const gem of gems.list()) expect(distance(gem, KILL)).toBeCloseTo(THROW);
+  });
+
+  it("keeps every gem in the fan clear of whoever struck the blow", () => {
+    // The whole point of throwing them: no gem in a fan lands in the killer's lap.
+    expect(SPREAD).toBeLessThan(Math.PI);
+    const gems = new Gems();
+    gems.spawn(KILL.col, KILL.row, flat(), KILLER, 5);
+    settle(gems);
+    for (const gem of gems.list()) {
+      expect(distance(gem, KILLER)).toBeGreaterThan(distance(KILL, KILLER));
+      expect(distance(gem, KILLER)).toBeGreaterThan(PICKUP_RANGE);
+    }
   });
 
   it("throws it up out of the body", () => {
@@ -114,9 +143,18 @@ describe("Gems.update", () => {
   it("sweeps up a settled gem the hero walks over, and counts it", () => {
     const gems = new Gems();
     gems.spawn(KILL.col, KILL.row, flat(), KILLER);
-    expect(settle(gems, 2, restingPlace())).toBe(GEMS_PER_KILL);
+    expect(settle(gems, 2, restingPlace())).toBe(1);
     expect(gems.list().length).toBe(0);
-    expect(gems.collected).toBe(GEMS_PER_KILL);
+    expect(gems.collected).toBe(1);
+  });
+
+  it("sweeps up a fan a gem at a time", () => {
+    const gems = new Gems();
+    gems.spawn(KILL.col, KILL.row, flat(), KILLER, 3);
+    settle(gems);
+    const one = gems.list()[0]!;
+    expect(settle(gems, 2, { col: one.col, row: one.row })).toBe(1);
+    expect(gems.list().length).toBe(2);
   });
 
   it("leaves one just out of reach lying there", () => {
@@ -124,7 +162,7 @@ describe("Gems.update", () => {
     gems.spawn(KILL.col, KILL.row, flat(), KILLER);
     const rest = restingPlace();
     settle(gems, 2, { col: rest.col + PICKUP_RANGE + 0.1, row: rest.row });
-    expect(gems.list().length).toBe(GEMS_PER_KILL);
+    expect(gems.list().length).toBe(1);
     expect(gems.collected).toBe(0);
   });
 
@@ -134,7 +172,7 @@ describe("Gems.update", () => {
     const gems = new Gems();
     gems.spawn(KILL.col, KILL.row, flat(), KILLER);
     expect(settle(gems, 2, KILLER)).toBe(0);
-    expect(gems.list().length).toBe(GEMS_PER_KILL);
+    expect(gems.list().length).toBe(1);
   });
 
   it("throws further than the hero can reach, so there is always a walk", () => {
@@ -159,7 +197,7 @@ describe("Gems.update", () => {
     settle(gems, 2, rest);
     gems.spawn(KILL.col, KILL.row, flat(), KILLER);
     settle(gems, 2, rest);
-    expect(gems.collected).toBe(GEMS_PER_KILL * 2);
+    expect(gems.collected).toBe(2);
     gems.reset();
     expect(gems.collected).toBe(0);
     expect(gems.list().length).toBe(0);

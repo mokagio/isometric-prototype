@@ -226,7 +226,8 @@ async function main(): Promise<void> {
       hero.update(dt, input, world);
       monsters.update(dt, hero, world);
       if (swing.update(dt)) {
-        for (const felled of monsters.attackAt(hero.col, hero.row)) gems.spawn(felled.col, felled.row, terrain, hero);
+        for (const felled of monsters.attackAt(hero.col, hero.row))
+          gems.spawn(felled.col, felled.row, terrain, hero, felled.hpMax);
       }
       const banked = gems.update(dt, hero);
       if (banked > 0) {

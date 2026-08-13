@@ -78,10 +78,12 @@ Re-run it if the pack is ever updated — the cut is deterministic, so an unchan
 
 ## What a kill is worth
 
-`gems.ts` is Peaceful Plains' experience: a blue gem per monster felled, popped out of the body and left lying until the hero walks over it.
+`gems.ts` is Peaceful Plains' experience: a blue gem per *heart* the felled monster had, popped out of the body and left lying until the hero walks over it.
+A creature is worth what it cost to bring down, so the ladder's tougher waves pay for themselves and the grind never outruns the fight.
 It is Whispering Woods' logs in the other game's units — cells, and `z` in the elevation levels the hero's own jump uses, falling under the same gravity so a drop reads like anything else in the air.
 `attackAt` hands back what it felled so the drop starts where the blow caught the monster rather than where the knockback throws the body, and a gem in flight cannot be swept up: snatching one mid-hop looks like it was never dropped.
 It is thrown out along the bearing *away from whoever struck it*, `THROW` further than `PICKUP_RANGE` reaches, so a kill is always worth a short walk rather than landing in the lap of the hero who earned it — `gems.test.ts` pins that pair too.
+Several fan out across `SPREAD` around that bearing, each finding its own landing, so a three-heart creature leaves three things to walk over instead of one pile; the fan stays under a half-turn so no gem in it comes down behind the hero.
 Where it comes down is settled at the throw rather than found on impact, and walked back in toward the body until it clears water, lava and any terrace of a different height: a gem that had to be jumped for, or fished out of a river, would stall a ladder that gems gate.
 
 The gem is one 10px tile cut out of the Sunnyside 16px tileset (cell 55, 26 — the blue ore nugget), trimmed to its own content so it stands on the bottom of its frame, as `stump.png` and `log.png` are cut.
@@ -96,6 +98,7 @@ It draws at 3x rather than the world's 2x, since a 10px sprite beside a 96px til
 | gems | 6 | 8 | 8 | 10 | 10 | 12 |
 | hearts | 1 | 1 | 2 | 2 | 3 | 3 |
 
+Since a kill pays a gem per heart, the gem target is really a count of *blows to land* — which is what keeps a rung with a tougher creature from being cleared in half the kills.
 A formula rather than a table, so it never runs out of rungs, and `Progress` is where a run sits on it — the target resets each level and the surplus carries, so picking two up at once on 5 of 6 starts the next level on 1.
 The hero's own hearts are untouched by any of it: there is no refill, so a long run is a war of attrition.
 

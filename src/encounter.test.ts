@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Gems, type Terrain } from "./gems";
 import { Hero } from "./hero";
 import { Lives } from "./lives";
 import {
@@ -153,5 +154,30 @@ describe("fighting off an incoming monster", () => {
     // Otherwise the kill resolves a further ATTACK_DURATION - ATTACK_HIT_AT late,
     // eating most of the margin the reach above buys.
     expect(ATTACK_HIT_AT).toBeLessThan(ATTACK_DURATION);
+  });
+});
+
+describe("what a kill pays out", () => {
+  const FLAT_GROUND: Terrain = { heightAt: () => 0, barred: () => false };
+
+  /** Fells one monster of `hp` hearts and hands back the gems it left. */
+  const loot = (hp: number): number => {
+    const field = new MonsterField("/");
+    pending.forEach((i) => i.onload?.());
+    field.setLevel(hp, 0);
+
+    const hero = new Hero(ORIGIN, ORIGIN, FLAT);
+    const gems = new Gems();
+    loneMonster(field, hero, MELEE / 2);
+
+    // Struck where it stands: this is about the payout, not the fight.
+    for (let blow = 0; blow < hp; blow++)
+      for (const felled of field.attackAt(hero.col, hero.row))
+        gems.spawn(felled.col, felled.row, FLAT_GROUND, hero, felled.hpMax);
+    return gems.list().length;
+  };
+
+  it("drops a gem for every heart the creature had", () => {
+    for (let hp = 1; hp <= 5; hp++) expect({ hp, gems: loot(hp) }).toEqual({ hp, gems: hp });
   });
 });
