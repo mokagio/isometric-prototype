@@ -6,6 +6,13 @@ A new game is an entry in `games.ts` plus its own page and Rollup input.
 Only Peaceful Plains is isometric: Whispering Woods is drawn straight down the screen, and shares the input, sprite, loop, and viewport plumbing but none of `iso.ts`.
 Blockpocalypse and Amelia's Dungeon share none of it — see below.
 
+## Art that cannot be redistributed
+
+`public/oboro/` is gitignored, and the repo is public.
+The oboropixel pack is licensed for use and modification but not for redistribution, so its sheets are carried out of band rather than tracked: Peaceful Plains' slime, its soldier hero skin, and Amelia's mage all draw out of that folder, and a clone without it runs with those sprites missing and nothing else wrong.
+Anything else vendored from that pack belongs in there too, which is the whole of the rule — the licence attaches to the pack, not to whichever game reached for it.
+`CREDITS.md` carries the same note for a reader who never opens `.gitignore`.
+
 ## Commands
 
 - `npm run dev` — Vite dev server, bound to `host: true` so a phone on the LAN can play it.

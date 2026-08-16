@@ -77,6 +77,7 @@ Sheets load through `assets.ts`'s `assetUrl`, which prefixes `import.meta.env.BA
 The site deploys to a GitHub *project* page served from `/<repo>/`, so a root-absolute path 404s in production.
 
 Any new art goes in the playground's `CREDITS.md` and `credits.html`, which `credits.test.ts` holds to each other.
+Anything from the oboropixel pack goes under `public/oboro/`, which is gitignored — the licence forbids redistribution and the repo is public.
 
 ## UI chrome
 

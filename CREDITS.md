@@ -11,3 +11,11 @@
 - [DungeonTileset II](https://0x72.itch.io/dungeontileset-ii) — CC0, Amelia's Dungeon: the dungeon itself, its chest, and the weapons
 - [Dungeon Asset Pack](https://pixel-poem.itch.io/dungeon-assetpuck) — Amelia's Dungeon enemies: the skeletons and the vampire
 - [three.js](https://threejs.org/) — MIT, the only runtime dependency, and only Blockpocalypse uses it
+
+## Redistribution
+
+The oboropixel pack is licensed for use and modification, personal or
+commercial, but **not** for redistribution or resale.
+`public/oboro/` is therefore gitignored rather than tracked: the sheets are
+vendored so the games can run, not so the pack can be lifted back out of them.
+Anything else drawn from that pack belongs in there too.

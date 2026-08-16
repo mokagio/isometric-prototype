@@ -2,3 +2,8 @@ node_modules
 dist
 src/*.js
 *.swp
+
+# The oboropixel pack is licensed for use but not redistribution, and this repo
+# is public. The sheets have to be on disk for the games to draw, so they are
+# carried out of band — see the Redistribution note in `CREDITS.md`.
+public/oboro/
