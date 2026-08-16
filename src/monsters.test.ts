@@ -331,14 +331,15 @@ describe("MonsterField giving up", () => {
   } as unknown as World;
 
   /** Run a field for `secs` against the moat, with the whole wave parked south of it. */
-  function marooned(secs: number): { field: MonsterField; mon: Monster } {
+  function marooned(secs: number): { field: MonsterField; mon: Monster; wave: Set<Monster> } {
     const field = loaded();
     const wave = field.list();
     // All of them, or the ones left on open ground would keep the field busy and
     // the "next wave arrives" case would never be reached.
     wave.forEach((m, i) => park(m, HERO.col + i * SEPARATION * 2, HERO.row + 8));
+    const parked = new Set(wave);
     for (let i = 0; i < secs / DT; i++) field.update(DT, HERO, MOAT);
-    return { field, mon: wave[0]! };
+    return { field, mon: wave[0]!, wave: parked };
   }
 
   it("keeps trying for a while before it does", () => {
@@ -356,9 +357,13 @@ describe("MonsterField giving up", () => {
   });
 
   it("clears the way for the next wave, so the ladder cannot stall", () => {
-    const { field } = marooned(GIVE_UP * 2 + FADE + WAVE_BREAK + 2);
-    // The marooned one is gone and a fresh wave has walked in behind it.
+    // Give up, fade, wait out the calm — and stop there. Left running another
+    // GIVE_UP, a replacement that happens to spawn beyond the moat gives up in
+    // its turn, which is this same rule working rather than the field stalling.
+    const { field, wave } = marooned(GIVE_UP + FADE + WAVE_BREAK + 2);
+    // The marooned ones are gone and a fresh wave has walked in behind them.
     expect(field.list().length).toBe(WAVE_SIZE);
+    expect(field.list().some((m) => wave.has(m))).toBe(false);
     expect(field.list().every((m) => !m.dying)).toBe(true);
   });
 
