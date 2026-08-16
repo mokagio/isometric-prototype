@@ -14,8 +14,12 @@
 
 ## Redistribution
 
-The oboropixel pack is licensed for use and modification, personal or
-commercial, but **not** for redistribution or resale.
-`public/oboro/` is therefore gitignored rather than tracked: the sheets are
-vendored so the games can run, not so the pack can be lifted back out of them.
-Anything else drawn from that pack belongs in there too.
+`public/oboro/` holds oboropixel art from two packs and is gitignored rather
+than tracked.
+Amelia's mage comes from the paid pack, which is licensed for use and
+modification, personal or commercial, but **not** for redistribution or resale.
+The slime and the soldier hero skin come from the free Characters Animations
+pack and carry no such restriction; the folder is ignored whole so the rule is
+about a directory rather than about a character.
+The sheets are vendored so the games can run, not so a pack can be lifted back
+out of them.

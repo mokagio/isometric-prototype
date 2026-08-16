@@ -9,9 +9,14 @@ Blockpocalypse and Amelia's Dungeon share none of it — see below.
 ## Art that cannot be redistributed
 
 `public/oboro/` is gitignored, and the repo is public.
-The oboropixel pack is licensed for use and modification but not for redistribution, so its sheets are carried out of band rather than tracked: Peaceful Plains' slime, its soldier hero skin, and Amelia's mage all draw out of that folder, and a clone without it runs with those sprites missing and nothing else wrong.
-Anything else vendored from that pack belongs in there too, which is the whole of the rule — the licence attaches to the pack, not to whichever game reached for it.
-`CREDITS.md` carries the same note for a reader who never opens `.gitignore`.
+Two oboropixel packs sit in that folder and they are not the same: Peaceful Plains' slime and its soldier hero skin come from the free Characters Animations pack, and Amelia's mage comes from the paid one.
+Only the paid pack is the problem — licensed for use and modification but not for redistribution — so it is the mage the ignore rule is really for.
+The whole folder goes rather than the mage alone, so the rule is one line about a directory instead of a judgement per character; what that costs is a clone running with all three sprites missing and nothing else wrong.
+Anything vendored from either pack belongs in there too.
+
+**Slime and soldier being in this repo's published history is settled and is not a problem**: the free pack is a free download, so there is nothing to purge.
+Do not reopen it.
+`CREDITS.md` carries the licence half of this for a reader who never opens `.gitignore`.
 
 ## Commands
 
