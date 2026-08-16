@@ -1,10 +1,10 @@
 # Games Playground
 
 A browser games prototype: TypeScript, Vite, no framework, and one runtime dependency that only Blockpocalypse uses.
-Nine pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), Peaceful Plains (`game.html`, entry `main.ts`), Whispering Woods (`woods.html`, entry `woods/main.ts`), Blockpocalypse (`blockpocalypse.html`, entry `blockpocalypse/main.ts`), a world editor for the Plains (`editor.html`), an island editor for the Woods (`woodsEditor.html`, entry `woods/editor/main.ts`), a coastline editor (`outline.html`), the asset library (`library.html`, entry `sunnyside/catalogPage.ts`), and credits (`credits.html`).
+Eleven pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), Peaceful Plains (`game.html`, entry `main.ts`), Whispering Woods (`woods.html`, entry `woods/main.ts`), Blockpocalypse (`blockpocalypse.html`, entry `blockpocalypse/main.ts`), Amelia's Dungeon (`dungeon.html`, entry `dungeon/main.ts`), a world editor for the Plains (`editor.html`), an island editor for the Woods (`woodsEditor.html`, entry `woods/editor/main.ts`), a coastline editor (`outline.html`), the dungeon builder (`dungeonEditor.html`, entry `dungeon/editor/main.ts`), the asset library (`library.html`, entry `sunnyside/catalogPage.ts`), and credits (`credits.html`).
 A new game is an entry in `games.ts` plus its own page and Rollup input.
 Only Peaceful Plains is isometric: Whispering Woods is drawn straight down the screen, and shares the input, sprite, loop, and viewport plumbing but none of `iso.ts`.
-Blockpocalypse shares none of it — see below.
+Blockpocalypse and Amelia's Dungeon share none of it — see below.
 
 ## Commands
 
@@ -145,6 +145,22 @@ Four things the port changed, and nothing else did:
 `ASSETS.md` is the whole story: what an asset is, how to add one, what the pack's own GameMaker project tells you (and the two things it says that are wrong), and why autotiled paths are deferred.
 `draw.ts` is the one painter; the island editor and Whispering Woods both go through it, so a cell someone paints is the cell they later walk on.
 `library.html` shows the lot, drawn by that same painter off the same manifest — which makes it the answer to "does everything in there actually draw" as well as somewhere to go looking. It is reached from the editor's sidebar, and `catalog.ts` holds the grouping and the search so both can be tested without a document.
+
+## Amelia's Dungeon
+
+`src/dungeon/` is a top-down dungeon crawler ported whole from its own repo: find the chest, clear the dungeon, drop into a harder one, and the score is how deep you got.
+It is orthogonal rather than isometric, and brought its own projection, renderer, hero skins, input, stick and menu, so it shares no game code with the rest of the playground.
+`src/dungeon/CLAUDE.md` is its own documentation and stayed with the code; read that before touching anything inside the folder.
+
+What the port changed, and nothing else did:
+
+- **A subfolder, not the shared `src/`.** It brought a `main.ts`, `hero.ts`, `renderer.ts`, `input.ts`, `stick.ts`, `ui.ts` and half a dozen more under names the playground already used for something else.
+- **Its editor reaches back out for the furniture it arrived with.** `editorUi.ts`, `painter.ts`, `panPad.ts`, `history.ts` and `files.ts` came from this repo in the first place and were still byte-identical, so the copies are gone and `src/dungeon/editor/` imports the originals — which is the "a fourth editor should be reaching for these" rule collecting on itself.
+- **`assetUrl` names the whole path under `public/`.** The game no longer owns a folder there: its dungeon art is `dungeon/`, but Amelia herself is `rpg_hero/` and `oboro/mage/`, sitting with the sheets Peaceful Plains already draws from rather than vendored a second time.
+- **The overlays measure from `--ww-inset-*`.** The shared head makes every page `viewport-fit=cover`, which the game's own pages were not, so its flat `--ad-inset: 16px` would have put the stick under the home indicator.
+- **The menu carries the way home, and fullscreen.** It has its own `createMenu` rather than the shared one, so "All Games" and the `fullscreen.ts` item are wired into that copy.
+
+Its `ad-` class names, its `ad:` storage keys and its `<style>` blocks stayed as they were — the builder's block is `chrome.css`'s own `.ed-*` furniture recoloured off the tileset, and loads after it, so it wins every tie.
 
 ## Islands
 

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Dungeon Builder | Games Playground</title>
+    <!-- The `.ed-*` rules below are `chrome.css`'s own furniture recoloured off
+         the tileset; this block loads after it, so it wins every tie. -->
+    <style>
+      :root {
+        --ad-dark: #14100f;
+        --ad-stone: #34292a;
+        --ad-stone-lit: #483b3a;
+        --ad-edge: #775c55;
+        --ad-text: #d3bfa9;
+        --ad-dim: #aa8d7a;
+        --ad-gold: #facb3e;
+      }
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--ad-dark);
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      #editor { display: flex; height: 100%; position: relative; }
+      /* Widened by the cutout as well as padded by it, so a landscape notch
+         costs the controls nothing rather than squeezing them. */
+      #sidebar {
+        width: calc(210px + env(safe-area-inset-left, 0px));
+        flex: 0 0 auto;
+        height: 100%;
+        box-sizing: border-box;
+        padding: calc(14px + env(safe-area-inset-top, 0px)) 14px
+          calc(24px + env(safe-area-inset-bottom, 0px))
+          calc(14px + env(safe-area-inset-left, 0px));
+        overflow-y: auto;
+        background: var(--ad-stone);
+        border-right: 3px solid var(--ad-edge);
+        color: var(--ad-text);
+        user-select: none;
+      }
+      #board-canvas {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: block;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        cursor: crosshair;
+        touch-action: none;
+      }
+
+      .ed-back {
+        display: inline-block;
+        margin-bottom: 12px;
+        color: var(--ad-dim);
+        text-decoration: none;
+        font-size: 15px;
+      }
+      .ed-back:hover { color: var(--ad-text); }
+
+      .ed-heading {
+        margin: 14px 0 8px;
+        color: var(--ad-dim);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .ed-row { display: flex; gap: 6px; }
+      .ed-btn {
+        flex: 1;
+        padding: 9px 0;
+        font: inherit;
+        font-size: 15px;
+        color: var(--ad-text);
+        background: var(--ad-stone-lit);
+        border: 2px solid var(--ad-edge);
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .ed-btn:hover { border-color: var(--ad-dim); }
+      .ed-btn.active { background: var(--ad-gold); color: #241a08; border-color: var(--ad-gold); }
+      .ed-wide { display: block; width: 100%; margin-top: 6px; }
+      .ed-primary { background: var(--ad-gold); color: #241a08; border-color: var(--ad-gold); }
+
+      .ed-hint {
+        margin-top: 16px;
+        color: var(--ad-dim);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      /* What the lifted sidebar widgets in `editorUi.ts` and `panPad.ts` build
+         against, recoloured off the tileset the way the rest of the chrome is. */
+      .ed-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+      .ed-tab {
+        padding: 5px 8px;
+        font: inherit;
+        font-size: 12px;
+        color: var(--ad-dim);
+        background: var(--ad-stone-lit);
+        border: 2px solid var(--ad-edge);
+        border-radius: 7px;
+        cursor: pointer;
+      }
+      .ed-tab:hover { border-color: var(--ad-dim); }
+      .ed-tab.active { background: var(--ad-gold); color: #241a08; border-color: var(--ad-gold); }
+
+      .ed-palette { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+      .ed-swatch {
+        padding: 3px;
+        background: var(--ad-stone-lit);
+        border: 2px solid var(--ad-edge);
+        border-radius: 8px;
+        cursor: pointer;
+        line-height: 0;
+      }
+      .ed-swatch canvas { width: 100%; height: auto; image-rendering: pixelated; }
+      .ed-swatch:hover { border-color: var(--ad-dim); }
+      .ed-swatch.selected { border-color: var(--ad-gold); background: #46351f; }
+
+      .ed-tools { display: flex; gap: 6px; }
+      .ed-tool {
+        flex: 1;
+        padding: 9px 0;
+        font: inherit;
+        font-size: 15px;
+        color: var(--ad-text);
+        background: var(--ad-stone-lit);
+        border: 2px solid var(--ad-edge);
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .ed-tool:hover { border-color: var(--ad-dim); }
+      .ed-tool.active { background: var(--ad-gold); color: #241a08; border-color: var(--ad-gold); }
+      /* Undo, redo and the zoom all run out of somewhere to go. */
+      .ed-tool:disabled { opacity: 0.4; cursor: default; }
+      .ed-tool:disabled:hover { border-color: var(--ad-edge); }
+
+      .ed-map { display: flex; flex-direction: column; gap: 6px; }
+      .ed-action {
+        padding: 10px 0;
+        font: inherit;
+        font-size: 15px;
+        color: var(--ad-text);
+        background: var(--ad-stone-lit);
+        border: 2px solid var(--ad-edge);
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .ed-action:hover { border-color: var(--ad-dim); }
+      .ed-action-go { background: var(--ad-gold); color: #241a08; border-color: var(--ad-gold); }
+
+      .ed-links { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+      .ed-links .ed-back { margin-bottom: 0; }
+
+      /* Which cell, and whether anybody has ruled on it. */
+      .ed-where {
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 11px;
+        color: var(--ad-text);
+      }
+      .ed-stack-empty { color: var(--ad-dim); }
+      .ed-stack-auto { color: var(--ad-dim); }
+      .ed-stack-stale { color: #d1495b; }
+
+      /* The tiles on a cell, one per row: a stack of two is the ordinary case,
+         and a picture of the result does not say which tiles made it. */
+      .ed-stack {
+        margin: 6px 0;
+        padding: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        background: var(--ad-dark);
+        border: 2px solid var(--ad-edge);
+        border-radius: 8px;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 11px;
+        color: var(--ad-text);
+      }
+      .ed-stack-row { display: flex; align-items: center; gap: 4px; }
+      .ed-stack-name {
+        flex: 1;
+        min-width: 0;
+        /* Only where a tile name genuinely will not fit, rather than mid-word. */
+        overflow-wrap: anywhere;
+      }
+      .ed-stack-drop {
+        flex: 0 0 auto;
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        font: inherit;
+        line-height: 1;
+        color: var(--ad-dim);
+        background: var(--ad-stone-lit);
+        border: 1px solid var(--ad-edge);
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .ed-stack-drop:hover { color: var(--ad-text); border-color: var(--ad-dim); }
+
+      /* Pan pad: a compass of arrows over the bottom-right of the board. */
+      .ed-pan {
+        position: absolute;
+        right: var(--ww-inset-right);
+        bottom: var(--ww-inset-bottom);
+        display: grid;
+        grid-template-areas: ". up ." "left . right" ". down .";
+        gap: 4px;
+        opacity: 0.75;
+      }
+      .ed-pan:hover { opacity: 1; }
+      .ed-pan-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 14px;
+        color: var(--ad-text);
+        background: rgba(52, 41, 42, 0.9);
+        border: 2px solid var(--ad-edge);
+        border-radius: 10px;
+        cursor: pointer;
+        touch-action: none;
+      }
+      .ed-pan-btn:hover { border-color: var(--ad-dim); }
+      .ed-pan-btn:active { background: var(--ad-gold); color: #241a08; }
+      .ed-pan-btn:disabled { opacity: 0.3; cursor: default; }
+      .ed-pan-btn:disabled:hover { border-color: var(--ad-edge); }
+      .ed-pan-up { grid-area: up; }
+      .ed-pan-left { grid-area: left; }
+      .ed-pan-right { grid-area: right; }
+      .ed-pan-down { grid-area: down; }
+    </style>
+  </head>
+  <body>
+    <div id="editor">
+      <aside id="sidebar"></aside>
+      <canvas id="board-canvas"></canvas>
+    </div>
+    <script type="module" src="/src/dungeon/editor/main.ts"></script>
+  </body>
+</html>

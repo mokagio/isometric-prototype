@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Amelia's Dungeon | Games Playground</title>
+    <style>
+      :root {
+        /* The face is `chrome.css`'s; this is the stack the dungeon's own
+           chrome names it by. */
+        --ad-pixel: "Press Start 2P", "Courier New", monospace;
+        --ad-btn: 54px; /* menu and action buttons, borders included */
+        --ad-stick: 144px;
+        /* Sampled from the tileset so the chrome sits in the same dungeon. */
+        --ad-dark: #14100f;
+        --ad-stone: #34292a;
+        --ad-stone-lit: #483b3a;
+        --ad-edge: #775c55;
+        --ad-text: #d3bfa9;
+        --ad-dim: #aa8d7a;
+        --ad-gold: #facb3e;
+        --ad-green: #4ba747;
+      }
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--ad-dark);
+        /* Suppress the flash the UA paints over a tapped element. */
+        -webkit-tap-highlight-color: transparent;
+      }
+      canvas {
+        display: block;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+
+      .ad-btn {
+        box-sizing: border-box;
+        width: var(--ad-btn);
+        height: var(--ad-btn);
+        display: grid;
+        place-items: center;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 22px;
+        color: var(--ad-text);
+        background: var(--ad-stone);
+        border: 3px solid var(--ad-edge);
+        border-radius: 10px;
+        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+        cursor: pointer;
+        /* A long press on iOS otherwise selects the glyph and raises the loupe. */
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      @media (hover: hover) {
+        .ad-btn:hover { background: var(--ad-stone-lit); }
+      }
+      .ad-btn:active {
+        transform: translateY(2px);
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+      }
+
+      .ad-menu {
+        position: fixed;
+        top: var(--ww-inset-top);
+        right: var(--ww-inset-right);
+        /* Over the stick and action pad, which `main.ts` appends later: in
+           landscape on a short screen the open panel reaches down across them. */
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        font-family: Georgia, "Times New Roman", serif;
+        user-select: none;
+      }
+      .ad-menu-panel {
+        margin-top: 8px;
+        min-width: 190px;
+        padding: 6px;
+        background: var(--ad-stone);
+        border: 3px solid var(--ad-edge);
+        border-radius: 10px;
+        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.45);
+      }
+      .ad-menu-title {
+        padding: 6px 10px 8px;
+        color: var(--ad-dim);
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .ad-menu-item {
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        padding: 10px 12px;
+        text-align: left;
+        font: inherit;
+        font-size: 16px;
+        color: var(--ad-text);
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      /* Touch taps leave :hover stuck on the item, so keep it to pointer devices. */
+      @media (hover: hover) {
+        .ad-menu-item:hover { background: var(--ad-stone-lit); }
+      }
+
+      .ad-mode-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        cursor: pointer;
+      }
+      .ad-mode-label { font-size: 15px; color: var(--ad-dim); }
+      .ad-mode-label.active { color: var(--ad-text); }
+      /* Steps through a list on tap, so the value carries the highlight. */
+      .ad-mode-value { font-size: 15px; color: var(--ad-gold); }
+      .ad-switch {
+        position: relative;
+        flex: 0 0 auto;
+        width: 44px;
+        height: 26px;
+        border-radius: 13px;
+        background: var(--ad-edge);
+        transition: background 0.15s;
+      }
+      .ad-switch.on { background: var(--ad-green); }
+      .ad-knob {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--ad-text);
+        transition: transform 0.15s;
+      }
+      .ad-switch.on .ad-knob { transform: translateX(18px); }
+
+      .ad-bar {
+        position: fixed;
+        top: var(--ww-inset-top);
+        left: var(--ww-inset-left);
+        /* Wrap rather than run under the menu button once the row outgrows the
+           screen, so raising MAX_LIVES stays a one-line change. */
+        max-width: calc(
+          100% - var(--ad-btn) - var(--ww-inset-left) - var(--ww-inset-right) - var(--ww-gap)
+        );
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 12px;
+        pointer-events: none;
+        user-select: none;
+        /* The row sits over whatever the camera scrolls under it, so it needs an
+           outline to stay legible on lit stone as well as in the dark. */
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+      }
+      .ad-hearts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+        font-size: 20px;
+        line-height: 1;
+      }
+      .ad-heart-lost {
+        filter: grayscale(1) brightness(0.45);
+        opacity: 0.6;
+      }
+      /* Press Start 2P sets a wide em, so it reads bigger than the point size
+         suggests next to the emoji it is counting. */
+      .ad-score {
+        font-family: var(--ad-pixel);
+        font-size: 14px;
+        color: var(--ad-text);
+      }
+
+      /* One panel serves both the cleared banner and the game-over sign. */
+      .ad-sign {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-family: Georgia, "Times New Roman", serif;
+        user-select: none;
+      }
+      /* `display: grid` above outranks the UA's `[hidden]` rule, so restate it. */
+      .ad-sign[hidden] { display: none; }
+      /* The cleared banner is a beat, not a stop, so it dims less and lets no clicks through. */
+      .ad-gameover { background: rgba(10, 8, 8, 0.66); }
+      .ad-cleared { background: rgba(10, 8, 8, 0.4); pointer-events: none; }
+      .ad-sign-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding: 28px 40px;
+        background: var(--ad-stone);
+        border: 3px solid var(--ad-edge);
+        border-radius: 14px;
+        box-shadow: 0 6px 0 rgba(0, 0, 0, 0.45);
+      }
+      .ad-sign-title {
+        color: var(--ad-text);
+        font-size: 34px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      /* The clear is the beat the pixel type is for; the game-over sign stays on
+         the serif, where the wording carries it. */
+      .ad-cleared .ad-sign-title {
+        color: var(--ad-gold);
+        font-family: var(--ad-pixel);
+        font-size: 24px;
+        text-transform: none;
+      }
+      .ad-sign-detail { color: var(--ad-gold); font-size: 18px; }
+      .ad-cleared .ad-sign-detail { color: var(--ad-text); }
+      /* Widened out of the shared button's fixed square. */
+      .ad-sign-btn {
+        width: auto;
+        height: auto;
+        padding: 12px 30px;
+        font-size: 20px;
+      }
+
+      /* The knob mirrored under the other thumb: `.ad-btn` already sizes it the
+         same, and centring it in a well-sized square puts it the same distance
+         out of its corner as the knob sits from the opposite one. */
+      .ad-pad {
+        position: fixed;
+        right: calc(var(--ww-inset-right) + (var(--ad-stick) - var(--ad-btn)) / 2);
+        bottom: calc(var(--ww-inset-bottom) + (var(--ad-stick) - var(--ad-btn)) / 2);
+        touch-action: none;
+      }
+      .ad-pad-icon {
+        /* Tipped the way she holds it, and left crisp at whatever size it lands. */
+        transform: rotate(28deg);
+        image-rendering: pixelated;
+        pointer-events: none;
+      }
+
+      /* Sized border-box so the knob's travel (RADIUS in `stick.ts`) can be
+         checked against the well's half-width without unpacking the borders. */
+      .ad-stick {
+        position: fixed;
+        left: var(--ww-inset-left);
+        bottom: var(--ww-inset-bottom);
+        box-sizing: border-box;
+        width: var(--ad-stick);
+        height: var(--ad-stick);
+        display: grid;
+        place-items: center;
+        touch-action: none;
+        cursor: grab;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      /* The well is drawn on pseudo-elements, not on `.ad-stick` itself: a clip
+         on the element would crop the square knob where it overhangs the rim at
+         the diagonals. Both shapes are set in `stick.ts`. */
+      .ad-stick::before,
+      .ad-stick::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+      }
+      .ad-stick::before {
+        clip-path: var(--ad-stick-clip);
+        background: rgba(20, 16, 15, 0.55);
+      }
+      .ad-stick::after {
+        clip-path: var(--ad-stick-ring);
+        background: var(--ad-edge);
+      }
+      .ad-stick:active { cursor: grabbing; }
+      .ad-stick-knob {
+        /* The rim is `::after`, which paints after every real child, so without
+           the z-index it covers the knob wherever the two meet at full
+           deflection. `position: relative` alone does not beat a later sibling. */
+        position: relative;
+        z-index: 1;
+        box-sizing: border-box;
+        width: var(--ad-btn);
+        height: var(--ad-btn);
+        background: var(--ad-stone);
+        border: 3px solid var(--ad-edge);
+        border-radius: 10px;
+        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <script type="module" src="/src/dungeon/main.ts"></script>
+  </body>
+</html>
