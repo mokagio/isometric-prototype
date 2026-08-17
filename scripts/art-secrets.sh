@@ -89,19 +89,39 @@ decrypt() {
   done
 }
 
-keygen() {
-  # Checked here as well as by age, which refuses to overwrite but says so as an
-  # unexpected error with a bug-report URL. Losing this key would leave every
-  # committed .age file undecryptable, so the refusal is the point.
-  [[ -f $DEFAULT_IDENTITY ]] &&
-    die "a key is already at $DEFAULT_IDENTITY — replacing it makes the committed .age files unreadable"
+# The public half, taken back off the key rather than asked for: it is derivable,
+# so making someone copy it across is a step that exists only to be forgotten.
+add_recipient() {
+  local recipient
+  recipient=$(age-keygen -y "$DEFAULT_IDENTITY")
+  if grep -qxF "$recipient" "$RECIPIENTS" 2>/dev/null; then
+    echo "$RECIPIENTS already lists this key"
+    return
+  fi
+  # A file that does not end in a newline would otherwise take the key onto the
+  # end of its last comment, where nothing will ever read it.
+  if [[ -s $RECIPIENTS ]] && [[ -n $(tail -c1 "$RECIPIENTS") ]]; then
+    printf '\n' >>"$RECIPIENTS"
+  fi
+  printf '%s\n' "$recipient" >>"$RECIPIENTS"
+  echo "added $recipient to $RECIPIENTS"
+}
 
-  mkdir -p "$(dirname "$DEFAULT_IDENTITY")"
-  chmod 700 "$(dirname "$DEFAULT_IDENTITY")"
-  age-keygen -o "$DEFAULT_IDENTITY"
-  chmod 600 "$DEFAULT_IDENTITY"
+keygen() {
+  if [[ -f $DEFAULT_IDENTITY ]]; then
+    # Never replaced: every committed .age file is encrypted to it. Re-running
+    # is how you repair a recipients file, so this is a note rather than an error.
+    echo "keeping the key already at $DEFAULT_IDENTITY"
+  else
+    mkdir -p "$(dirname "$DEFAULT_IDENTITY")"
+    chmod 700 "$(dirname "$DEFAULT_IDENTITY")"
+    age-keygen -o "$DEFAULT_IDENTITY"
+    chmod 600 "$DEFAULT_IDENTITY"
+  fi
+
+  add_recipient
   echo
-  echo "Next: put the age1… line above into $RECIPIENTS, then"
+  echo "Next:"
   echo "  npm run art:encrypt"
   echo "  gh secret set AGE_KEY < $DEFAULT_IDENTITY"
 }

@@ -106,14 +106,48 @@ const hasAge = (): boolean => {
 };
 
 describe.runIf(hasAge())("art-secrets round trip", () => {
+  const recipients = (): string => readFileSync(join(sandbox, "age-recipients.txt"), "utf8");
+
   const keygen = (): string => {
-    const { status, stderr } = run(["keygen"]);
+    const { status, stdout, stderr } = run(["keygen"]);
     expect(status, stderr).toBe(0);
-    const recipient = /age1[a-z0-9]+/.exec(stderr)?.[0];
-    expect(recipient, stderr).toBeTruthy();
-    writeFileSync(join(sandbox, "age-recipients.txt"), `# comment\n${recipient}\n`);
+    const recipient = /age1[a-z0-9]+/.exec(stdout)?.[0];
+    expect(recipient, stdout + stderr).toBeTruthy();
     return recipient!;
   };
+
+  it("adds its own public key to the recipients, so encrypt just works after it", () => {
+    // The step that used to be a copy-paste, and so the step that got skipped.
+    const recipient = keygen();
+    expect(recipients()).toContain(recipient);
+    expect(run(["encrypt"]).status).toBe(0);
+  });
+
+  it("repairs a recipients file that lost the key, without making a new one", () => {
+    keygen();
+    writeFileSync(join(sandbox, "age-recipients.txt"), "# only comments again\n");
+    const identity = readFileSync(join(sandbox, ".age/isometric-prototype.txt"), "utf8");
+
+    const { status, stdout } = run(["keygen"]);
+    expect(status).toBe(0);
+    expect(stdout).toContain("keeping the key");
+    expect(readFileSync(join(sandbox, ".age/isometric-prototype.txt"), "utf8")).toBe(identity);
+    expect(run(["encrypt"]).status).toBe(0);
+  });
+
+  it("does not list the same key twice when re-run", () => {
+    const recipient = keygen();
+    run(["keygen"]);
+    expect(recipients().split(recipient).length - 1).toBe(1);
+  });
+
+  it("appends to a recipients file with no trailing newline", () => {
+    writeFileSync(join(sandbox, "age-recipients.txt"), "# no newline at the end");
+    const recipient = keygen();
+    // Not glued onto the end of the comment, where nothing would read it.
+    expect(recipients()).toMatch(new RegExp(`^${recipient}$`, "m"));
+    expect(run(["encrypt"]).status).toBe(0);
+  });
 
   it("encrypts to the recipient and decrypts back to the same bytes", () => {
     keygen();
@@ -140,10 +174,8 @@ describe.runIf(hasAge())("art-secrets round trip", () => {
 
   it("will not replace a key the committed ciphertext is encrypted to", () => {
     keygen();
-    const { status, stderr } = run(["keygen"]);
-    expect(status).toBe(1);
-    expect(stderr).toContain("already at");
-    // age says this too, but as an unexpected error pointing at its bug tracker.
-    expect(stderr).not.toContain("report");
+    const identity = readFileSync(join(sandbox, ".age/isometric-prototype.txt"), "utf8");
+    run(["keygen"]);
+    expect(readFileSync(join(sandbox, ".age/isometric-prototype.txt"), "utf8")).toBe(identity);
   });
 });
