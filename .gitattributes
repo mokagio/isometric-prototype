@@ -1,0 +1,3 @@
+# Ciphertext. Without this git normalises line endings inside it and tries to
+# show a text diff of the result.
+*.age binary

@@ -27,6 +27,20 @@ jobs:
 
       - run: npm ci
 
+      # The paid pack is committed as ciphertext, so it has to be opened before
+      # the build copies `public/` across. A fork has no key: it still deploys,
+      # with Amelia drawn from one of the skins that travel in the clear.
+      - name: Decrypt the art that cannot be committed in the clear
+        run: |
+          if [ -z "${AGE_KEY:-}" ]; then
+            echo "No AGE_KEY set — building without the encrypted art."
+            exit 0
+          fi
+          sudo apt-get update && sudo apt-get install -y age
+          scripts/art-secrets.sh decrypt
+        env:
+          AGE_KEY: ${{ secrets.AGE_KEY }}
+
       # A project page is served from /<repo>/, so asset URLs need that prefix.
       - run: npm run build -- --base=/${GITHUB_REPOSITORY#*/}/
 

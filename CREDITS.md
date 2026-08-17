@@ -14,12 +14,22 @@
 
 ## Redistribution
 
-`public/oboro/` holds oboropixel art from two packs and is gitignored rather
-than tracked.
-Amelia's mage comes from the paid pack, which is licensed for use and
-modification, personal or commercial, but **not** for redistribution or resale.
+`public/oboro/` holds oboropixel art from two packs.
 The slime and the soldier hero skin come from the free Characters Animations
-pack and carry no such restriction; the folder is ignored whole so the rule is
-about a directory rather than about a character.
-The sheets are vendored so the games can run, not so a pack can be lifted back
-out of them.
+pack and are committed like any other art here.
+Amelia's mage comes from the paid pack, which is licensed for use and
+modification, personal or commercial, but **not** for redistribution or resale,
+so those four sheets are committed **encrypted** — `public/oboro/mage/*.png.age`
+— and the plaintext is gitignored.
+
+What that draws the line around is the repository, not the running game.
+Shipping the game is the licensed use, and no browser game can withhold its
+pixels from the player's machine; what a licence like this is about is a public
+tree of tidily-named sheets that lift straight back out as a pack.
+So the deployed site serves the mage and the repo does not carry her in the
+clear.
+
+`scripts/art-secrets.sh` goes both ways, `age-recipients.txt` says who can open
+it, and the deploy decrypts with the `AGE_KEY` secret.
+Working on this after a fresh clone means `AGE_KEY=… scripts/art-secrets.sh
+decrypt`; without it the game still runs, just without that one skin.

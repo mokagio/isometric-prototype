@@ -8,11 +8,17 @@ Blockpocalypse and Amelia's Dungeon share none of it — see below.
 
 ## Art that cannot be redistributed
 
-`public/oboro/` is gitignored, and the repo is public.
-Two oboropixel packs sit in that folder and they are not the same: Peaceful Plains' slime and its soldier hero skin come from the free Characters Animations pack, and Amelia's mage comes from the paid one.
-Only the paid pack is the problem — licensed for use and modification but not for redistribution — so it is the mage the ignore rule is really for.
-The whole folder goes rather than the mage alone, so the rule is one line about a directory instead of a judgement per character; what that costs is a clone running with all three sprites missing and nothing else wrong.
-Anything vendored from either pack belongs in there too.
+Two oboropixel packs sit in `public/oboro/` and they are not the same: Peaceful Plains' slime and its soldier hero skin come from the free Characters Animations pack, and Amelia's mage comes from the paid one.
+Only the paid pack restricts redistribution, so only the mage is encrypted — `public/oboro/mage/*.png.age` is committed and the plaintext beside it is gitignored.
+Everything else is committed in the clear.
+
+What the line is drawn around is the repository, not the running game: shipping the game is the licensed use and a browser cannot be sent a sprite it is not allowed to hold, so the deployed site serves the mage and only the tree stays free of her.
+That is the distinction to keep hold of before proposing anything here — a public tree of tidily-named sheets lifts back out as a pack, and a game does not.
+
+`scripts/art-secrets.sh encrypt|decrypt` is both directions, and the deploy calls the decrypt half, so the loop cannot drift from what CI runs.
+`age-recipients.txt` holds public keys and belongs in the repo; the secret key is the `AGE_KEY` Actions secret and lives nowhere else.
+Re-run `encrypt` after touching a mage sheet or adding a recipient, and note `.gitattributes` marks `*.age binary` or git normalises line endings inside the ciphertext.
+A clone with no key still builds and still plays — that one skin is simply missing — which is what keeps a fork from being broken by a secret it cannot have.
 
 **Slime and soldier being in this repo's published history is settled and is not a problem**: the free pack is a free download, so there is nothing to purge.
 Do not reopen it.

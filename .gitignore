@@ -3,7 +3,8 @@ dist
 src/*.js
 *.swp
 
-# The oboropixel pack is licensed for use but not redistribution, and this repo
-# is public. The sheets have to be on disk for the games to draw, so they are
-# carried out of band — see the Redistribution note in `CREDITS.md`.
-public/oboro/
+# Amelia's mage is the one paid pack here, and this repo is public. The sheets
+# travel as ciphertext instead: `scripts/encrypt-art.sh` writes the `.age`
+# files, and the deploy decrypts them. See the Redistribution note in
+# `CREDITS.md`. Everything else under `public/oboro/` is the free pack.
+public/oboro/mage/*.png

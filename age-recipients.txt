@@ -1,0 +1,5 @@
+# Who can decrypt the art in `public/oboro/mage/`. These are public keys and
+# belong in the repo; the matching secret keys do not. Add a line per machine or
+# person, then re-run `scripts/art-secrets.sh encrypt`.
+#
+# Make one with: age-keygen -o ~/.config/age/isometric-prototype.txt
