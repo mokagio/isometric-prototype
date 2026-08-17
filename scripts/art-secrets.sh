@@ -7,7 +7,7 @@ set -euo pipefail
 # in the deploy workflow, so the two cannot drift apart.
 #
 #   keygen   — once per machine. Won't overwrite a key that already exists.
-#   encrypt  — after changing a sheet. Needs age-recipients.txt.
+#   encrypt  — after changing a sheet.
 #   decrypt  — after a fresh clone, and in CI. Needs a secret key, from
 #              AGE_IDENTITY_FILE (a path), AGE_KEY (the key itself), or the
 #              default path below.
@@ -18,7 +18,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ART_DIR=public/oboro/mage
-RECIPIENTS=age-recipients.txt
 # age has no default key location and never goes looking, so this is the
 # project's own pick rather than a convention. Having one is what keeps a fresh
 # clone from needing an env var it has no way to know about.
@@ -30,20 +29,13 @@ die() {
 }
 
 encrypt() {
-  local args=() plain=() f key
-  [[ -f $RECIPIENTS ]] || die "$RECIPIENTS is missing"
-
-  # Read here rather than in a function feeding a pipe or a process
-  # substitution: those run in a subshell, where `die` would exit the subshell
-  # and leave this one carrying on without any recipients.
-  # `|| [[ -n $key ]]` catches a file whose last line has no newline.
-  while IFS= read -r key || [[ -n $key ]]; do
-    case $key in
-      age1*) args+=(-r "$key") ;;
-    esac
-  done <"$RECIPIENTS"
-  [[ ${#args[@]} -gt 0 ]] ||
-    die "no age1… recipient in $RECIPIENTS — run 'npm run art:keygen' and add the age1… line it prints"
+  local plain=() f recipient
+  # Taken off the key rather than kept in a file of its own: encrypting needs
+  # the identity anyway, so a second copy of its public half would only be
+  # something to fall out of step. Add `-r` per key here if a second person
+  # ever needs to decrypt.
+  [[ -f $DEFAULT_IDENTITY ]] || die "no key at $DEFAULT_IDENTITY — run 'npm run art:keygen'"
+  recipient=$(age-keygen -y "$DEFAULT_IDENTITY")
 
   shopt -s nullglob
   plain=("$ART_DIR"/*.png)
@@ -51,7 +43,7 @@ encrypt() {
   [[ ${#plain[@]} -gt 0 ]] || die "no PNGs in $ART_DIR — nothing to encrypt"
 
   for f in "${plain[@]}"; do
-    age "${args[@]}" -o "$f.age" "$f"
+    age -r "$recipient" -o "$f.age" "$f"
     echo "encrypted $f"
   done
 }
@@ -89,28 +81,9 @@ decrypt() {
   done
 }
 
-# The public half, taken back off the key rather than asked for: it is derivable,
-# so making someone copy it across is a step that exists only to be forgotten.
-add_recipient() {
-  local recipient
-  recipient=$(age-keygen -y "$DEFAULT_IDENTITY")
-  if grep -qxF "$recipient" "$RECIPIENTS" 2>/dev/null; then
-    echo "$RECIPIENTS already lists this key"
-    return
-  fi
-  # A file that does not end in a newline would otherwise take the key onto the
-  # end of its last comment, where nothing will ever read it.
-  if [[ -s $RECIPIENTS ]] && [[ -n $(tail -c1 "$RECIPIENTS") ]]; then
-    printf '\n' >>"$RECIPIENTS"
-  fi
-  printf '%s\n' "$recipient" >>"$RECIPIENTS"
-  echo "added $recipient to $RECIPIENTS"
-}
-
 keygen() {
   if [[ -f $DEFAULT_IDENTITY ]]; then
-    # Never replaced: every committed .age file is encrypted to it. Re-running
-    # is how you repair a recipients file, so this is a note rather than an error.
+    # Never replaced: every committed .age file is encrypted to it.
     echo "keeping the key already at $DEFAULT_IDENTITY"
   else
     mkdir -p "$(dirname "$DEFAULT_IDENTITY")"
@@ -119,7 +92,6 @@ keygen() {
     chmod 600 "$DEFAULT_IDENTITY"
   fi
 
-  add_recipient
   echo
   echo "Next:"
   echo "  npm run art:encrypt"

@@ -50,7 +50,6 @@ beforeEach(() => {
   for (const [i, sheet] of SHEETS.entries()) {
     writeFileSync(join(sandbox, ART, sheet), `not really a png ${i}`);
   }
-  writeFileSync(join(sandbox, "age-recipients.txt"), "# only comments, as it ships\n");
 });
 
 afterEach(() => rmSync(sandbox, { recursive: true, force: true }));
@@ -61,22 +60,13 @@ describe("art-secrets refusals", () => {
     expect(run([]).stderr).toContain("usage:");
   });
 
-  it("stops when no recipient has been added yet", () => {
-    // The regression: it printed this, then carried on into an `age` call with
-    // no recipients at all.
+  it("stops when there is no key to encrypt to", () => {
+    // Once printed its complaint from a subshell and carried on regardless,
+    // reaching `age` with no recipient at all.
     const { status, stderr } = run(["encrypt"]);
     expect(status).toBe(1);
-    expect(stderr).toContain("no age1… recipient");
+    expect(stderr).toContain("art:keygen");
     expect(stderr).not.toMatch(/unbound variable|line \d+/);
-  });
-
-  it("does not treat the file's own explanation as a key", () => {
-    // Every line of the shipped file starts with `#`, and one of them says
-    // age1… in prose. Commented-out keys must not count.
-    writeFileSync(join(sandbox, "age-recipients.txt"), "# age1notarealkey\n#age1alsonot\n");
-    const { status, stderr } = run(["encrypt"]);
-    expect(status).toBe(1);
-    expect(stderr).toContain("no age1… recipient");
   });
 
   it("stops when there is nothing to decrypt", () => {
@@ -106,46 +96,15 @@ const hasAge = (): boolean => {
 };
 
 describe.runIf(hasAge())("art-secrets round trip", () => {
-  const recipients = (): string => readFileSync(join(sandbox, "age-recipients.txt"), "utf8");
+  const IDENTITY = ".age/isometric-prototype.txt";
 
-  const keygen = (): string => {
-    const { status, stdout, stderr } = run(["keygen"]);
+  const keygen = (): void => {
+    const { status, stderr } = run(["keygen"]);
     expect(status, stderr).toBe(0);
-    const recipient = /age1[a-z0-9]+/.exec(stdout)?.[0];
-    expect(recipient, stdout + stderr).toBeTruthy();
-    return recipient!;
   };
 
-  it("adds its own public key to the recipients, so encrypt just works after it", () => {
-    // The step that used to be a copy-paste, and so the step that got skipped.
-    const recipient = keygen();
-    expect(recipients()).toContain(recipient);
-    expect(run(["encrypt"]).status).toBe(0);
-  });
-
-  it("repairs a recipients file that lost the key, without making a new one", () => {
+  it("leaves nothing to do between making a key and using it", () => {
     keygen();
-    writeFileSync(join(sandbox, "age-recipients.txt"), "# only comments again\n");
-    const identity = readFileSync(join(sandbox, ".age/isometric-prototype.txt"), "utf8");
-
-    const { status, stdout } = run(["keygen"]);
-    expect(status).toBe(0);
-    expect(stdout).toContain("keeping the key");
-    expect(readFileSync(join(sandbox, ".age/isometric-prototype.txt"), "utf8")).toBe(identity);
-    expect(run(["encrypt"]).status).toBe(0);
-  });
-
-  it("does not list the same key twice when re-run", () => {
-    const recipient = keygen();
-    run(["keygen"]);
-    expect(recipients().split(recipient).length - 1).toBe(1);
-  });
-
-  it("appends to a recipients file with no trailing newline", () => {
-    writeFileSync(join(sandbox, "age-recipients.txt"), "# no newline at the end");
-    const recipient = keygen();
-    // Not glued onto the end of the comment, where nothing would read it.
-    expect(recipients()).toMatch(new RegExp(`^${recipient}$`, "m"));
     expect(run(["encrypt"]).status).toBe(0);
   });
 
@@ -165,7 +124,7 @@ describe.runIf(hasAge())("art-secrets round trip", () => {
   it("takes the key as material, which is the only shape CI can pass", () => {
     keygen();
     run(["encrypt"]);
-    const identity = readFileSync(join(sandbox, ".age/isometric-prototype.txt"), "utf8");
+    const identity = readFileSync(join(sandbox, IDENTITY), "utf8");
     for (const s of SHEETS) rmSync(join(sandbox, ART, s));
     rmSync(join(sandbox, ".age"), { recursive: true });
 
@@ -174,8 +133,8 @@ describe.runIf(hasAge())("art-secrets round trip", () => {
 
   it("will not replace a key the committed ciphertext is encrypted to", () => {
     keygen();
-    const identity = readFileSync(join(sandbox, ".age/isometric-prototype.txt"), "utf8");
+    const identity = readFileSync(join(sandbox, IDENTITY), "utf8");
     run(["keygen"]);
-    expect(readFileSync(join(sandbox, ".age/isometric-prototype.txt"), "utf8")).toBe(identity);
+    expect(readFileSync(join(sandbox, IDENTITY), "utf8")).toBe(identity);
   });
 });
