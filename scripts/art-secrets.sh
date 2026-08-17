@@ -29,24 +29,21 @@ die() {
   exit 1
 }
 
-# Only the lines that are keys: the file is mostly the comment explaining itself.
-recipient_args() {
-  local key found=0
-  while IFS= read -r key; do
+encrypt() {
+  local args=() plain=() f key
+  [[ -f $RECIPIENTS ]] || die "$RECIPIENTS is missing"
+
+  # Read here rather than in a function feeding a pipe or a process
+  # substitution: those run in a subshell, where `die` would exit the subshell
+  # and leave this one carrying on without any recipients.
+  # `|| [[ -n $key ]]` catches a file whose last line has no newline.
+  while IFS= read -r key || [[ -n $key ]]; do
     case $key in
-      age1*)
-        printf '%s\n' -r "$key"
-        found=1
-        ;;
+      age1*) args+=(-r "$key") ;;
     esac
   done <"$RECIPIENTS"
-  [[ $found -eq 1 ]] || die "no age1… recipient in $RECIPIENTS — run age-keygen and add its public line"
-}
-
-encrypt() {
-  local args=() plain=() f
-  [[ -f $RECIPIENTS ]] || die "$RECIPIENTS is missing"
-  while IFS= read -r a; do args+=("$a"); done < <(recipient_args)
+  [[ ${#args[@]} -gt 0 ]] ||
+    die "no age1… recipient in $RECIPIENTS — run 'npm run art:keygen' and add the age1… line it prints"
 
   shopt -s nullglob
   plain=("$ART_DIR"/*.png)
