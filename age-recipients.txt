@@ -3,14 +3,13 @@
 # person, then re-run `scripts/art-secrets.sh encrypt`.
 #
 # age has no default key location and never goes looking, so where the secret
-# half lives is a choice rather than a convention to find. Here it is one file
-# per project under ~/.age/, which is the shape the rest of this machine's
-# secret tooling already uses, and which nothing publishes:
+# half lives is this project's choice: ~/.age/isometric-prototype.txt, which
+# `npm run art:keygen` makes and which the other two commands then find on
+# their own.
 #
-#   mkdir -p ~/.age && chmod 700 ~/.age
-#   age-keygen -o ~/.age/isometric-prototype.txt   # prints the age1… line to add below
-#
-#   AGE_IDENTITY_FILE=~/.age/isometric-prototype.txt scripts/art-secrets.sh decrypt
+#   npm run art:keygen     # once — refuses to replace a key already there
+#   npm run art:encrypt    # after changing a sheet
+#   npm run art:decrypt    # after a fresh clone
 #
 # CI gets the same key as the AGE_KEY secret, set once:
 #

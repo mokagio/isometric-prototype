@@ -15,10 +15,11 @@ Everything else is committed in the clear.
 What the line is drawn around is the repository, not the running game: shipping the game is the licensed use and a browser cannot be sent a sprite it is not allowed to hold, so the deployed site serves the mage and only the tree stays free of her.
 That is the distinction to keep hold of before proposing anything here — a public tree of tidily-named sheets lifts back out as a pack, and a game does not.
 
-`scripts/art-secrets.sh encrypt|decrypt` is both directions, and the deploy calls the decrypt half, so the loop cannot drift from what CI runs.
+`npm run art:keygen|art:encrypt|art:decrypt` is the whole interface, over `scripts/art-secrets.sh`, and the deploy calls `art:decrypt` rather than a copy of it, so CI cannot drift from what runs locally.
 `age-recipients.txt` holds public keys and belongs in the repo; the secret half is the `AGE_KEY` Actions secret in CI, and `~/.age/isometric-prototype.txt` locally.
-age has no default key location and never goes looking, so that path is a choice rather than a convention — `age-recipients.txt` records it, and `~/.config` was rejected because parts of it are symlinks published out of `~/.dotfiles`.
-The script takes either: `AGE_IDENTITY_FILE` for a path, `AGE_KEY` for the key itself, which is what lets CI pass a secret that was never a file.
+age has no default key location and never goes looking, so that path is this project's pick rather than a convention — the script holds it, which is what lets a fresh clone decrypt with no environment at all.
+`AGE_KEY` overrides it when set, since CI's key arrives as material rather than a file and must not lose to whatever a developer happens to have on disk.
+`~/.config` was rejected for the key: parts of it are symlinks published out of `~/.dotfiles`.
 Re-run `encrypt` after touching a mage sheet or adding a recipient, and note `.gitattributes` marks `*.age binary` or git normalises line endings inside the ciphertext.
 A clone with no key still builds and still plays — that one skin is simply missing — which is what keeps a fork from being broken by a secret it cannot have.
 

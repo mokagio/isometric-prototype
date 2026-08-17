@@ -37,7 +37,7 @@ jobs:
             exit 0
           fi
           sudo apt-get update && sudo apt-get install -y age
-          scripts/art-secrets.sh decrypt
+          npm run art:decrypt
         env:
           AGE_KEY: ${{ secrets.AGE_KEY }}
 
