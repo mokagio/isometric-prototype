@@ -16,7 +16,8 @@ What the line is drawn around is the repository, not the running game: shipping 
 That is the distinction to keep hold of before proposing anything here — a public tree of tidily-named sheets lifts back out as a pack, and a game does not.
 
 `scripts/art-secrets.sh encrypt|decrypt` is both directions, and the deploy calls the decrypt half, so the loop cannot drift from what CI runs.
-`age-recipients.txt` holds public keys and belongs in the repo; the secret key is the `AGE_KEY` Actions secret and lives nowhere else.
+`age-recipients.txt` holds public keys and belongs in the repo; the secret half is the `AGE_KEY` Actions secret, and a copy in 1Password for encrypting locally.
+`AGE_KEY` is the key *material*, not a path — age has no default key location and never goes looking — so nothing has to sit on a disk, and `~/.config` in particular is the wrong home for it here: parts of it are symlinks published out of `~/.dotfiles`.
 Re-run `encrypt` after touching a mage sheet or adding a recipient, and note `.gitattributes` marks `*.age binary` or git normalises line endings inside the ciphertext.
 A clone with no key still builds and still plays — that one skin is simply missing — which is what keeps a fork from being broken by a secret it cannot have.
 

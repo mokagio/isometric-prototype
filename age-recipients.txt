@@ -2,4 +2,12 @@
 # belong in the repo; the matching secret keys do not. Add a line per machine or
 # person, then re-run `scripts/art-secrets.sh encrypt`.
 #
-# Make one with: age-keygen -o ~/.config/age/isometric-prototype.txt
+# Make one with `age-keygen`, which prints the pair to stdout. age looks for a
+# key in no particular place — it has no default and never searches — so the
+# secret half can go straight into 1Password and never touch the disk:
+#
+#   age-keygen | op item create --category "Secure Note" \
+#     --title "isometric-prototype age" notesPlain=-
+#
+#   AGE_KEY="$(op read 'op://Private/isometric-prototype age/notesPlain')" \
+#     scripts/art-secrets.sh decrypt
