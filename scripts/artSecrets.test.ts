@@ -1,5 +1,14 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -39,6 +48,7 @@ function run(
 }
 
 const ART = "public/oboro/mage";
+const CIPHER = "art-secrets/oboro/mage";
 const SHEETS = ["attack.png", "death.png", "idle.png", "walk.png"];
 
 beforeEach(() => {
@@ -76,7 +86,8 @@ describe("art-secrets refusals", () => {
   });
 
   it("says where it looked for a key, so a fresh clone knows what to run", () => {
-    writeFileSync(join(sandbox, ART, "idle.png.age"), "ciphertext");
+    mkdirSync(join(sandbox, CIPHER), { recursive: true });
+    writeFileSync(join(sandbox, CIPHER, "idle.png.age"), "ciphertext");
     const { status, stderr } = run(["decrypt"]);
     expect(status).toBe(1);
     expect(stderr).toContain(".age/isometric-prototype.txt");
@@ -106,6 +117,13 @@ describe.runIf(hasAge())("art-secrets round trip", () => {
   it("leaves nothing to do between making a key and using it", () => {
     keygen();
     expect(run(["encrypt"]).status).toBe(0);
+  });
+
+  it("keeps the ciphertext out of public/, which the build copies wholesale", () => {
+    keygen();
+    run(["encrypt"]);
+    expect(readdirSync(join(sandbox, CIPHER)).sort()).toEqual(SHEETS.map((s) => `${s}.age`).sort());
+    expect(readdirSync(join(sandbox, ART)).some((f) => f.endsWith(".age"))).toBe(false);
   });
 
   it("encrypts to the recipient and decrypts back to the same bytes", () => {

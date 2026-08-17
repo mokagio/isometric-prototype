@@ -8,9 +8,11 @@ Blockpocalypse and Amelia's Dungeon share none of it — see below.
 
 ## Art that cannot be redistributed
 
-Two oboropixel packs sit in `public/oboro/` and they are not the same: Peaceful Plains' slime and its soldier hero skin come from the free Characters Animations pack, and Amelia's mage comes from the paid one.
-Only the paid pack restricts redistribution, so only the mage is encrypted — `public/oboro/mage/*.png.age` is committed and the plaintext beside it is gitignored.
-Everything else is committed in the clear.
+Nearly every pack credited here forbids redistributing or reselling the art — the free ones as plainly as the paid one, 0x72's CC0 tileset aside — so "which packs restrict redistribution" is not the question that decides anything. Checked against the itch pages on 2026-08-17; do not re-derive it from whether something cost money.
+
+The question that does decide is harm. Amelia's mage is from oboropixel's **paid** pack and is the only art here that is not also a free download, so a copy in a public repo stands in for a payment rather than for a free click.
+Those four sheets alone are encrypted: `art-secrets/oboro/mage/*.png.age` is committed and the plaintext under `public/oboro/mage/` is gitignored.
+The ciphertext sits outside `public/` because Vite copies that directory wholesale into `dist`, and the deploy has no use for an encrypted copy of art it is already serving.
 
 What the line is drawn around is the repository, not the running game: shipping the game is the licensed use and a browser cannot be sent a sprite it is not allowed to hold, so the deployed site serves the mage and only the tree stays free of her.
 That is the distinction to keep hold of before proposing anything here — a public tree of tidily-named sheets lifts back out as a pack, and a game does not.

@@ -17,7 +17,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# Plaintext where the game loads it from; ciphertext outside `public/`, which
+# Vite copies wholesale — the encrypted copy is source, and serving it to
+# players alongside the art it hides would be pure weight.
 ART_DIR=public/oboro/mage
+CIPHER_DIR=art-secrets/oboro/mage
 # age has no default key location and never goes looking, so this is the
 # project's own pick rather than a convention. Having one is what keeps a fresh
 # clone from needing an env var it has no way to know about.
@@ -42,8 +46,9 @@ encrypt() {
   shopt -u nullglob
   [[ ${#plain[@]} -gt 0 ]] || die "no PNGs in $ART_DIR — nothing to encrypt"
 
+  mkdir -p "$CIPHER_DIR"
   for f in "${plain[@]}"; do
-    age -r "$recipient" -o "$f.age" "$f"
+    age -r "$recipient" -o "$CIPHER_DIR/$(basename "$f").age" "$f"
     echo "encrypted $f"
   done
 }
@@ -54,11 +59,11 @@ TMP_IDENTITY=
 trap 'rm -f "${TMP_IDENTITY:-}"' EXIT
 
 decrypt() {
-  local cipher=() f identity
+  local cipher=() f out identity
   shopt -s nullglob
-  cipher=("$ART_DIR"/*.png.age)
+  cipher=("$CIPHER_DIR"/*.png.age)
   shopt -u nullglob
-  [[ ${#cipher[@]} -gt 0 ]] || die "no .age files in $ART_DIR — nothing to decrypt"
+  [[ ${#cipher[@]} -gt 0 ]] || die "nothing encrypted in $CIPHER_DIR — nothing to decrypt"
 
   # AGE_KEY first: CI sets it, and a developer's own key file sitting at the
   # default path should not quietly win over the key the workflow was handed.
@@ -75,9 +80,11 @@ decrypt() {
     die "no key: expected $DEFAULT_IDENTITY, or set AGE_KEY. Run 'npm run art:keygen' to make one."
   fi
 
+  mkdir -p "$ART_DIR"
   for f in "${cipher[@]}"; do
-    age -d -i "$identity" -o "${f%.age}" "$f"
-    echo "decrypted ${f%.age}"
+    out=$ART_DIR/$(basename "${f%.age}")
+    age -d -i "$identity" -o "$out" "$f"
+    echo "decrypted $out"
   done
 }
 

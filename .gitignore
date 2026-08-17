@@ -3,8 +3,8 @@ dist
 src/*.js
 *.swp
 
-# Amelia's mage is the one paid pack here, and this repo is public. The sheets
-# travel as ciphertext instead: `scripts/encrypt-art.sh` writes the `.age`
-# files, and the deploy decrypts them. See the Redistribution note in
-# `CREDITS.md`. Everything else under `public/oboro/` is the free pack.
+# Amelia's mage is the only art here behind a paywall, and this repo is public.
+# It travels as ciphertext in `art-secrets/` instead — outside `public/`, which
+# Vite copies wholesale — and `npm run art:decrypt` puts it back here. See the
+# Redistribution note in `CREDITS.md`.
 public/oboro/mage/*.png

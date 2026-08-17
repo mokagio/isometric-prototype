@@ -14,20 +14,26 @@
 
 ## Redistribution
 
-`public/oboro/` holds oboropixel art from two packs.
-The slime and the soldier hero skin come from the free Characters Animations
-pack and are committed like any other art here.
-Amelia's mage comes from the paid pack, which is licensed for use and
-modification, personal or commercial, but **not** for redistribution or resale,
-so those four sheets are committed **encrypted** — `public/oboro/mage/*.png.age`
-— and the plaintext is gitignored.
+Almost every pack above allows free and commercial use and modification, and
+forbids redistributing or reselling the art itself.
+0x72's tileset is the exception, being CC0.
+Paid or free makes no difference to that clause: the name-your-own-price packs
+say it as plainly as the bought one.
 
-What that draws the line around is the repository, not the running game.
+What it draws a line around is the repository, not the running game.
 Shipping the game is the licensed use, and no browser game can withhold its
-pixels from the player's machine; what a licence like this is about is a public
-tree of tidily-named sheets that lift straight back out as a pack.
-So the deployed site serves the mage and the repo does not carry her in the
-clear.
+pixels from the player's machine; what these terms are about is a tree of
+tidily-named sheets that lift straight back out as a pack.
+
+One pack is treated differently, and on harm rather than on terms.
+Amelia's mage is from oboropixel's **paid** pack — the only art here that is not
+also a free download — so a copy sitting in a public repo stands in for a
+payment, where a copy of anything else stands in for a free click.
+Those four sheets are committed encrypted, as `art-secrets/oboro/mage/*.png.age`,
+and their plaintext under `public/` is gitignored.
+The ciphertext is kept out of `public/` because Vite copies that directory
+wholesale, and serving players the encrypted copy of the art they are already
+being shown is pure weight.
 
 `npm run art:keygen`, `art:encrypt` and `art:decrypt` are the whole of it, and
 the deploy runs the last of those with the `AGE_KEY` secret.
