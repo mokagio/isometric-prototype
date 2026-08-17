@@ -16,8 +16,8 @@ What the line is drawn around is the repository, not the running game: shipping 
 That is the distinction to keep hold of before proposing anything here — a public tree of tidily-named sheets lifts back out as a pack, and a game does not.
 
 `npm run art:keygen|art:encrypt|art:decrypt` is the whole interface, over `scripts/art-secrets.sh`, and the deploy calls `art:decrypt` rather than a copy of it, so CI cannot drift from what runs locally.
-`age-recipients.txt` holds public keys and belongs in the repo; `art:keygen` writes to it rather than printing a line to copy across, and re-running it is how a recipients file that lost a key gets repaired.
-The secret half is the `AGE_KEY` Actions secret in CI, and `~/.age/isometric-prototype.txt` locally.
+The key is `~/.age/isometric-prototype.txt` locally and the `AGE_KEY` Actions secret in CI, and there is no recipients file: `encrypt` derives the public half off the identity it needs anyway, so nothing has to be kept in step by hand.
+A second person needing to decrypt is where that stops paying, and the `-r` line in `encrypt` is where it would be undone.
 age has no default key location and never goes looking, so that path is this project's pick rather than a convention — the script holds it, which is what lets a fresh clone decrypt with no environment at all.
 `AGE_KEY` overrides it when set, since CI's key arrives as material rather than a file and must not lose to whatever a developer happens to have on disk.
 `~/.config` was rejected for the key: parts of it are symlinks published out of `~/.dotfiles`.

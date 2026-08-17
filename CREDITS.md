@@ -29,7 +29,7 @@ tree of tidily-named sheets that lift straight back out as a pack.
 So the deployed site serves the mage and the repo does not carry her in the
 clear.
 
-`scripts/art-secrets.sh` goes both ways, `age-recipients.txt` says who can open
-it, and the deploy decrypts with the `AGE_KEY` secret.
-Working on this after a fresh clone means `AGE_KEY=… scripts/art-secrets.sh
-decrypt`; without it the game still runs, just without that one skin.
+`npm run art:keygen`, `art:encrypt` and `art:decrypt` are the whole of it, and
+the deploy runs the last of those with the `AGE_KEY` secret.
+A clone without the key still builds and still plays, just without that one
+skin.
