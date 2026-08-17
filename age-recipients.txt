@@ -2,12 +2,16 @@
 # belong in the repo; the matching secret keys do not. Add a line per machine or
 # person, then re-run `scripts/art-secrets.sh encrypt`.
 #
-# Make one with `age-keygen`, which prints the pair to stdout. age looks for a
-# key in no particular place — it has no default and never searches — so the
-# secret half can go straight into 1Password and never touch the disk:
+# age has no default key location and never goes looking, so where the secret
+# half lives is a choice rather than a convention to find. Here it is one file
+# per project under ~/.age/, which is the shape the rest of this machine's
+# secret tooling already uses, and which nothing publishes:
 #
-#   age-keygen | op item create --category "Secure Note" \
-#     --title "isometric-prototype age" notesPlain=-
+#   mkdir -p ~/.age && chmod 700 ~/.age
+#   age-keygen -o ~/.age/isometric-prototype.txt   # prints the age1… line to add below
 #
-#   AGE_KEY="$(op read 'op://Private/isometric-prototype age/notesPlain')" \
-#     scripts/art-secrets.sh decrypt
+#   AGE_IDENTITY_FILE=~/.age/isometric-prototype.txt scripts/art-secrets.sh decrypt
+#
+# CI gets the same key as the AGE_KEY secret, set once:
+#
+#   gh secret set AGE_KEY < ~/.age/isometric-prototype.txt
