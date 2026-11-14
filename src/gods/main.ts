@@ -370,6 +370,7 @@ function dropCoins(x: number, z: number, n: number): void {
 let shake = 0;
 let stop = 0; // hit-stop: the world holds still for a beat when a blow lands
 let camYaw = START.yaw;
+let devZoom = 1;
 let lastDrag = -10;
 let clock = 0;
 let leftTown = false;
@@ -775,8 +776,8 @@ function draw(dt: number): void {
 
   // Camera: behind the hero, pulled back and up in the arena so the god fits in frame.
   const fighting = ares !== null && ares.a.state !== "dead";
-  const back = fighting ? CAM_DIST + 2.5 : CAM_DIST;
-  const up = fighting ? CAM_HEIGHT + 1.6 : CAM_HEIGHT;
+  const back = (fighting ? CAM_DIST + 2.5 : CAM_DIST) * devZoom;
+  const up = LOOK_HEIGHT + ((fighting ? CAM_HEIGHT + 1.6 : CAM_HEIGHT) - LOOK_HEIGHT) * devZoom;
   const tx = hero.x;
   const tz = hero.z;
   let cx = tx - Math.sin(camYaw) * back;
@@ -826,6 +827,20 @@ if (import.meta.env.DEV) {
         hero.z = z;
         hero.yaw = yaw;
         camYaw = yaw;
+      },
+      info: () => {
+        let meshes = 0;
+        scene.traverse((o) => {
+          if ((o as THREE.Mesh).isMesh && o.visible) meshes++;
+        });
+        let sceneryMeshes = 0;
+        scenery.root.traverse((o) => {
+          if ((o as THREE.Mesh).isMesh) sceneryMeshes++;
+        });
+        return { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, meshes, sceneryMeshes, hero: heroFig.root.children.length };
+      },
+      zoom(k: number) {
+        devZoom = k;
       },
       give(n: number) {
         save.coins += n;
