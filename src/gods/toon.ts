@@ -56,14 +56,3 @@ export function toon(color: number, opts: ToonOptions = {}): THREE.MeshToonMater
   m.customProgramCacheKey = () => "gods-toon";
   return m;
 }
-
-/** One shared material per colour, for scenery that never flashes or fades. */
-const shared = new Map<number, THREE.MeshToonMaterial>();
-export function toonShared(color: number): THREE.MeshToonMaterial {
-  let m = shared.get(color);
-  if (!m) {
-    m = toon(color);
-    shared.set(color, m);
-  }
-  return m;
-}

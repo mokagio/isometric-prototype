@@ -1,19 +1,23 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { toonShared } from "./toon";
+import { toon } from "./toon";
+
+/** Map tiles, in metres: what is off screen or outside the sun's shadow box is skipped a tile at a time. */
+const TILE = 60;
 
 /**
- * Scenery that never moves, merged into one mesh per colour. A colosseum is
- * hundreds of boxes, and a phone draws one big mesh far faster than hundreds
- * of small ones.
+ * Scenery that never moves, merged into one vertex-coloured mesh per map
+ * tile. A colosseum is hundreds of shapes in dozens of colours, and a phone
+ * draws a few big meshes far faster than hundreds of small ones.
  */
 export class Batch {
-  private parts = new Map<number, THREE.BufferGeometry[]>();
+  private parts = new Map<string, THREE.BufferGeometry[]>();
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly e = new THREE.Euler();
   private readonly s = new THREE.Vector3();
   private readonly p = new THREE.Vector3();
+  private readonly c = new THREE.Color();
 
   add(
     geometry: THREE.BufferGeometry,
@@ -23,9 +27,15 @@ export class Batch {
     scale: number | { x: number; y: number; z: number } = 1,
   ): void {
     // Merging needs every piece to carry the same attributes, so strip to
-    // position and normal, unindexed.
+    // position and normal, unindexed, and paint the colour on.
     let g = geometry.index ? geometry.toNonIndexed() : geometry.clone();
     for (const name of Object.keys(g.attributes)) if (name !== "position" && name !== "normal") g.deleteAttribute(name);
+    this.c.setHex(color);
+    const n = g.attributes.position!.count;
+    const colors = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) colors.set([this.c.r, this.c.g, this.c.b], i * 3);
+    g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
     this.e.set(rot.x ?? 0, rot.y ?? 0, rot.z ?? 0);
     this.q.setFromEuler(this.e);
     if (typeof scale === "number") this.s.set(scale, scale, scale);
@@ -33,18 +43,24 @@ export class Batch {
     this.p.set(at.x, at.y, at.z);
     this.m.compose(this.p, this.q, this.s);
     g = g.applyMatrix4(this.m);
-    const list = this.parts.get(color) ?? [];
+    const key = `${Math.floor(at.x / TILE)}|${Math.floor(at.z / TILE)}`;
+    const list = this.parts.get(key) ?? [];
     list.push(g);
-    this.parts.set(color, list);
+    this.parts.set(key, list);
   }
 
-  build(): THREE.Group {
+  build(opts: { fog?: boolean; shadows?: boolean } = {}): THREE.Group {
+    const material = toon(0xffffff);
+    material.vertexColors = true;
+    material.fog = opts.fog ?? true;
     const group = new THREE.Group();
-    for (const [color, list] of this.parts) {
+    for (const list of this.parts.values()) {
       const merged = mergeGeometries(list);
       if (!merged) continue;
-      const mesh = new THREE.Mesh(merged, toonShared(color));
+      const mesh = new THREE.Mesh(merged, material);
       mesh.matrixAutoUpdate = false;
+      mesh.castShadow = opts.shadows ?? true;
+      mesh.receiveShadow = opts.shadows ?? true;
       group.add(mesh);
       for (const g of list) g.dispose();
     }
