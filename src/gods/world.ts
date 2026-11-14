@@ -39,15 +39,85 @@ export const ROAD_END = COLOSSEUM.z + ARENA_R + WALL_THICK;
 
 export const BOUNDS: Box = { x0: -62, z0: -192, x1: 62, z1: 42 };
 
+/** The fishing village, east of the city on the coast, round Poseidon's colosseum. */
+export const VILLAGE: Circle = { x: 122, z: -40, r: 30 };
+/** Poseidon's colosseum, at the heart of the village. Its gate faces west, down the road. */
+export const SEA_ARENA = { x: 122, z: -40, r: 16, thick: 3.5, yaw: -Math.PI / 2 };
+/** Past this the land shelves into the sea. */
+export const SHORE_X = 162;
+/** The road east branches off the road to Ares here and runs straight to Poseidon's gate. */
+export const EAST_ROAD_Z = VILLAGE.z;
+export const EAST_ROAD_END = SEA_ARENA.x - SEA_ARENA.r - SEA_ARENA.thick;
+/** Wooden piers out into the sea: where each one runs, and how far. */
+export const PIERS: readonly number[] = [-60, -40, -20];
+export const PIER_HALF = 1.3;
+export const PIER_LENGTH = 18;
+export const LIGHTHOUSE = { x: SHORE_X + PIER_LENGTH + 3, z: -40, r: 2.4 };
+/** Stone islands in Poseidon's arena: the only dry footing when he floods it. */
+export const ISLAND_H = 0.8;
+export const SEA_ISLANDS: readonly Circle[] = [0, 1, 2, 3].map((k) => {
+  const a = Math.PI / 4 + (k * Math.PI) / 2;
+  return { x: SEA_ARENA.x + Math.sin(a) * (SEA_ARENA.r - 5), z: SEA_ARENA.z + Math.cos(a) * (SEA_ARENA.r - 5), r: 1.9 };
+});
+
+export function onIsland(x: number, z: number): boolean {
+  return SEA_ISLANDS.some((c) => dist(x, z, c.x, c.z) < c.r);
+}
+
+/** The statue of Poseidon, outside his gate. */
+export const SEA_STATUE = { x: EAST_ROAD_END - 5, z: VILLAGE.z + 7 };
+
+/** Everywhere the hero can walk: the meadow, the road east, the village, and out along the piers. */
+export const REGIONS: readonly Box[] = [
+  BOUNDS,
+  { x0: BOUNDS.x1 - 2, z0: EAST_ROAD_Z - 8, x1: VILLAGE.x - VILLAGE.r + 4, z1: EAST_ROAD_Z + 8 },
+  { x0: VILLAGE.x - VILLAGE.r - 2, z0: VILLAGE.z - 34, x1: SHORE_X, z1: VILLAGE.z + 34 },
+  ...PIERS.map((z) => ({ x0: SHORE_X - 2, z0: z - PIER_HALF, x1: SHORE_X + PIER_LENGTH, z1: z + PIER_HALF })),
+  { x0: LIGHTHOUSE.x - 3.4, z0: LIGHTHOUSE.z - 3.4, x1: LIGHTHOUSE.x + 3.4, z1: LIGHTHOUSE.z + 3.4 },
+];
+
+export function inRegions(x: number, z: number): boolean {
+  return REGIONS.some((b) => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1);
+}
+
+/** How far `(x, z)` is from anywhere walkable: 0 inside. */
+export function outside(x: number, z: number): number {
+  let best = Infinity;
+  for (const b of REGIONS) {
+    const dx = Math.max(b.x0 - x, 0, x - b.x1);
+    const dz = Math.max(b.z0 - z, 0, z - b.z1);
+    best = Math.min(best, Math.hypot(dx, dz));
+  }
+  return best;
+}
+
+/** Pull a body of radius `r` back onto the nearest walkable ground. */
+function clampToRegions(x: number, z: number, r: number): { x: number; z: number } {
+  let best = { x, z };
+  let bestD = Infinity;
+  for (const b of REGIONS) {
+    const cx = Math.min(b.x1 - r, Math.max(b.x0 + r, x));
+    const cz = Math.min(b.z1 - r, Math.max(b.z0 + r, z));
+    const d = Math.hypot(cx - x, cz - z);
+    if (d === 0) return { x, z };
+    if (d < bestD) {
+      bestD = d;
+      best = { x: cx, z: cz };
+    }
+  }
+  return best;
+}
+
 export interface Camp {
   x: number;
   z: number;
   count: number;
 }
 
-/** Bandit camps along the road: one, then the rest in threes. */
+/** Bandit camps along the roads: one, then the rest in threes, and one on the way to the sea. */
 export const CAMPS: readonly Camp[] = [
-  { x: -4, z: -46, count: 2 },
+  { x: -4, z: -50, count: 2 },
+  { x: 48, z: EAST_ROAD_Z + 9, count: 2 },
   { x: 6, z: -68, count: 3 },
   { x: -6, z: -90, count: 3 },
   { x: 4, z: -110, count: 3 },
@@ -100,8 +170,40 @@ export function hash(x: number, z: number, salt = 0): number {
 }
 
 export function nearRoad(x: number, z: number, margin: number): boolean {
-  return z < ROAD_START + margin && z > ROAD_END - margin && Math.abs(x) < ROAD_HALF + margin;
+  if (z < ROAD_START + margin && z > ROAD_END - margin && Math.abs(x) < ROAD_HALF + margin) return true;
+  return Math.abs(z - EAST_ROAD_Z) < ROAD_HALF + margin && x > -margin && x < EAST_ROAD_END + margin;
 }
+
+export function inVillage(x: number, z: number, within = VILLAGE.r): boolean {
+  return dist(x, z, VILLAGE.x, VILLAGE.z) < within;
+}
+
+/** Fishermen's huts in a ring round the colosseum, leaving the west open for the road and the east for the docks. */
+export function huts(): House[] {
+  const out: House[] = [];
+  const angles = [0, 28, 56, 124, 152, 180, 208, 236, 304, 332];
+  angles.forEach((deg, i) => {
+    const a = (deg * Math.PI) / 180;
+    const r = 24 + (i % 2) * 2.5;
+    const x = Math.round(VILLAGE.x + Math.sin(a) * r);
+    const z = Math.round(VILLAGE.z + Math.cos(a) * r);
+    const back = Math.atan2(VILLAGE.x - x, VILLAGE.z - z);
+    const yaw = Math.round(back / (Math.PI / 2)) * (Math.PI / 2);
+    const across = Math.abs(Math.sin(yaw)) > 0.5;
+    const w = 4.6;
+    const d = 4;
+    out.push({ x, z, w: across ? d : w, d: across ? w : d, yaw, dome: false });
+  });
+  return out;
+}
+
+/** Fishermen about the village and the docks: where each stands and which way they face. */
+export const FISHERS: ReadonlyArray<{ x: number; z: number; yaw: number }> = [
+  { x: SHORE_X + 6, z: PIERS[0]! + 0.4, yaw: Math.PI / 2 },
+  { x: SHORE_X + 11, z: PIERS[2]! - 0.3, yaw: 0 },
+  { x: SHORE_X - 7, z: VILLAGE.z + 5, yaw: Math.PI / 2 },
+  { x: SEA_ARENA.x + SEA_ARENA.r + SEA_ARENA.thick + 2.7, z: VILLAGE.z - 8, yaw: Math.PI / 2 },
+];
 
 export function nearColosseum(x: number, z: number, margin: number): boolean {
   return dist(x, z, COLOSSEUM.x, COLOSSEUM.z) < ARENA_R + WALL_THICK + margin;
@@ -113,21 +215,23 @@ export interface Tree {
   size: number;
 }
 
-/** Trees on a jittered grid, kept off the road, out of town and clear of the colosseum. */
+/** Trees on a jittered grid, kept off the roads, out of town, clear of the colosseums and back from the beach. */
 export function trees(): Tree[] {
   const out: Tree[] = [];
   const step = 7;
   for (let gz = BOUNDS.z0 - 40; gz <= BOUNDS.z1 + 40; gz += step) {
-    for (let gx = BOUNDS.x0 - 40; gx <= BOUNDS.x1 + 40; gx += step) {
+    for (let gx = BOUNDS.x0 - 40; gx <= SHORE_X - 14; gx += step) {
       const keep = hash(gx, gz, 1);
       const x = gx + (hash(gx, gz, 2) - 0.5) * step * 0.8;
       const z = gz + (hash(gx, gz, 3) - 0.5) * step * 0.8;
-      const inside = x > BOUNDS.x0 && x < BOUNDS.x1 && z > BOUNDS.z0 && z < BOUNDS.z1;
+      if (x > SHORE_X - 16) continue;
+      const inside = inRegions(x, z);
       // Thick forest past the edge of the world, open meadow with copses inside it.
       if (keep > (inside ? 0.28 : 0.75)) continue;
       if (dist(x, z, CITY.x, CITY.z) < CITY.r + 6) continue;
       if (nearRoad(x, z, 5)) continue;
       if (nearColosseum(x, z, 8)) continue;
+      if (inVillage(x, z, VILLAGE.r + 5)) continue;
       if (CAMPS.some((c) => dist(x, z, c.x, c.z) < 9)) continue;
       out.push({ x, z, size: 0.8 + hash(gx, gz, 4) * 0.7 });
     }
@@ -138,29 +242,57 @@ export function trees(): Tree[] {
 export const TRUNK_R = 0.5;
 
 export function layoutWorld(): World {
-  const boxes: Box[] = houses().map((h) => ({ x0: h.x - h.w / 2, z0: h.z - h.d / 2, x1: h.x + h.w / 2, z1: h.z + h.d / 2 }));
+  const boxes: Box[] = [...houses(), ...huts()].map((h) => ({ x0: h.x - h.w / 2, z0: h.z - h.d / 2, x1: h.x + h.w / 2, z1: h.z + h.d / 2 }));
   // The forge and counter, with the smith behind them.
   boxes.push({ x0: BLACKSMITH.x - 0.5, z0: BLACKSMITH.z - 3, x1: BLACKSMITH.x + 3.5, z1: BLACKSMITH.z + 3 });
   const circles: Circle[] = [
     FOUNTAIN,
     { x: -4.5, z: CITY_GATE_Z, r: 1 },
     { x: 4.5, z: CITY_GATE_Z, r: 1 },
+    { x: LIGHTHOUSE.x, z: LIGHTHOUSE.z, r: LIGHTHOUSE.r },
+    { x: SEA_STATUE.x, z: SEA_STATUE.z, r: 1.4 },
     ...trees()
-      .filter((t) => t.x > BOUNDS.x0 - 2 && t.x < BOUNDS.x1 + 2 && t.z > BOUNDS.z0 - 2 && t.z < BOUNDS.z1 + 2)
+      .filter((t) => outside(t.x, t.z) < 2)
       .map((t) => ({ x: t.x, z: t.z, r: TRUNK_R * t.size })),
   ];
   return { circles, boxes };
 }
 
-/** Whether `(x, z)` is in the colosseum's gateway, where the wall has its gap. */
-export function inGateway(x: number, z: number): boolean {
-  return Math.abs(x - COLOSSEUM.x) < GATE_HALF && z > COLOSSEUM.z;
+export interface Ring {
+  x: number;
+  z: number;
+  r: number;
+  thick: number;
+  /** Which way the gate faces. */
+  yaw: number;
+}
+
+export const ARES_RING: Ring = { ...COLOSSEUM, r: ARENA_R, thick: WALL_THICK, yaw: 0 };
+
+/** Whether `(x, z)` is in a colosseum's gateway, where the wall has its gap. */
+export function inGateway(x: number, z: number, ring: Ring = ARES_RING): boolean {
+  const dx = x - ring.x;
+  const dz = z - ring.z;
+  const across = dx * Math.cos(ring.yaw) - dz * Math.sin(ring.yaw);
+  const along = dx * Math.sin(ring.yaw) + dz * Math.cos(ring.yaw);
+  return Math.abs(across) < GATE_HALF && along > 0;
+}
+
+/** Keep a body of radius `r` on one side of a colosseum's wall, or let it through the open gate. */
+function wall(ring: Ring, x: number, z: number, r: number, closed: boolean): { x: number; z: number } {
+  const dc = dist(x, z, ring.x, ring.z);
+  const inner = ring.r - r;
+  const outer = ring.r + ring.thick + r;
+  if (dc > inner && dc < outer && dc > 1e-6 && (closed || !inGateway(x, z, ring))) {
+    const to = dc < ring.r + ring.thick / 2 ? inner : outer;
+    return { x: ring.x + ((x - ring.x) / dc) * to, z: ring.z + ((z - ring.z) / dc) * to };
+  }
+  return { x, z };
 }
 
 /** Slide a body of radius `r` back out of whatever it walked into. */
-export function pushOut(world: World, x: number, z: number, r: number, gateClosed: boolean): { x: number; z: number } {
-  x = Math.min(BOUNDS.x1 - r, Math.max(BOUNDS.x0 + r, x));
-  z = Math.min(BOUNDS.z1 - r, Math.max(BOUNDS.z0 + r, z));
+export function pushOut(world: World, x: number, z: number, r: number, gateClosed: boolean, seaGateClosed = false): { x: number; z: number } {
+  ({ x, z } = clampToRegions(x, z, r));
 
   for (const c of world.circles) {
     const d = dist(x, z, c.x, c.z);
@@ -185,14 +317,8 @@ export function pushOut(world: World, x: number, z: number, r: number, gateClose
     else z = b.z1 + r;
   }
 
-  const dc = dist(x, z, COLOSSEUM.x, COLOSSEUM.z);
-  const inner = ARENA_R - r;
-  const outer = ARENA_R + WALL_THICK + r;
-  if (dc > inner && dc < outer && dc > 1e-6 && (gateClosed || !inGateway(x, z))) {
-    const to = dc < ARENA_R + WALL_THICK / 2 ? inner : outer;
-    x = COLOSSEUM.x + ((x - COLOSSEUM.x) / dc) * to;
-    z = COLOSSEUM.z + ((z - COLOSSEUM.z) / dc) * to;
-  }
+  ({ x, z } = wall(ARES_RING, x, z, r, gateClosed));
+  ({ x, z } = wall(SEA_ARENA, x, z, r, seaGateClosed));
   return { x, z };
 }
 
@@ -202,4 +328,8 @@ export function inCity(x: number, z: number): boolean {
 
 export function inArena(x: number, z: number, within = ARENA_R): boolean {
   return dist(x, z, COLOSSEUM.x, COLOSSEUM.z) < within;
+}
+
+export function inSeaArena(x: number, z: number, within = SEA_ARENA.r): boolean {
+  return dist(x, z, SEA_ARENA.x, SEA_ARENA.z) < within;
 }

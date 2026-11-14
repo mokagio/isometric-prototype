@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Batch } from "./batch";
 import { dist } from "./bearing";
-import { ARES_BUILD, buildFigure, HERO_BUILD, poseFigure, wearKit, type Build } from "./figure";
+import { ARES_BUILD, buildFigure, HERO_BUILD, POSEIDON_BUILD, poseFigure, wearKit, type Build } from "./figure";
 import { godKit } from "./armor";
 import { toon } from "./toon";
 import {
@@ -13,9 +13,25 @@ import {
   CITY,
   CITY_GATE_Z,
   COLOSSEUM,
+  EAST_ROAD_END,
+  EAST_ROAD_Z,
   GATE_HALF,
   hash,
   houses,
+  huts,
+  inRegions,
+  inVillage,
+  ISLAND_H,
+  SEA_ISLANDS,
+  LIGHTHOUSE,
+  outside,
+  PIER_HALF,
+  PIER_LENGTH,
+  PIERS,
+  SEA_ARENA,
+  SEA_STATUE,
+  SHORE_X,
+  VILLAGE,
   nearColosseum,
   nearRoad,
   PLAZA_R,
@@ -189,6 +205,11 @@ export interface Scenery {
   clouds: THREE.Group;
   grass: THREE.ShaderMaterial;
   water: THREE.Mesh;
+  sea: THREE.ShaderMaterial;
+  /** Poseidon's portcullis: up is open. */
+  seaGate: THREE.Group;
+  /** The water he floods his arena with, raised by the fight. */
+  flood: THREE.Mesh;
 }
 
 export function buildScenery(): Scenery {
@@ -205,14 +226,21 @@ export function buildScenery(): Scenery {
   city(batch);
   road(batch);
   forest(batch);
-  colosseum(batch);
+  colosseum(batch, ARES_LOOK);
+  eastRoad(batch);
+  village(batch);
+  colosseum(batch, SEA_LOOK);
   root.add(batch.build());
+  const sea = seaPlane();
+  root.add(sea);
   root.add(mountains());
 
   // The hero of the city, in marble, sword raised over the fountain.
   root.add(statue(HERO_BUILD, 0xeee9dd, { x: 0, y: 1.55, z: 0 }, Math.PI, 0.95));
   // Ares in bronze, outside his own gate.
   root.add(statue(ARES_BUILD, 0x9c6a3a, { x: COLOSSEUM.x + GATE_HALF + 7, y: 1.6, z: COLOSSEUM.z + ARENA_R + WALL_THICK + 4 }, 0.4, 1.6));
+  // Poseidon in green bronze outside his, trident raised to the road.
+  root.add(statue(POSEIDON_BUILD, 0x5fa59a, { x: SEA_STATUE.x, y: 1.6, z: SEA_STATUE.z }, -Math.PI / 2 - 0.4, 1.6));
 
   const flames: THREE.Mesh[] = [];
   // The forge glows at the blacksmith's.
@@ -229,12 +257,24 @@ export function buildScenery(): Scenery {
   root.add(water);
 
   for (const f of colosseumFlameSpots()) flames.push(flame(root, f.x, f.y, f.z, 0.7));
+  // Poseidon's braziers burn sea-green, and the lighthouse keeps its fire lit.
+  for (const f of flameSpots(SEA_LOOK)) flames.push(flame(root, f.x, f.y, f.z, 0.7, 0x2fd6c8, 0xc8fff6));
+  flames.push(flame(root, LIGHTHOUSE.x, LIGHTHOUSE_TOP + 0.2, LIGHTHOUSE.z, 1.1));
 
-  const gate = portcullis();
+  const gate = portcullis(ARES_LOOK);
   root.add(gate);
+  const seaGate = portcullis(SEA_LOOK);
+  root.add(seaGate);
+  const flood = new THREE.Mesh(
+    new THREE.CylinderGeometry(SEA_ARENA.r + 0.2, SEA_ARENA.r + 0.2, 0.08, 56),
+    new THREE.MeshBasicMaterial({ color: 0x2f9fd8, transparent: true, opacity: 0.78 }),
+  );
+  flood.position.set(SEA_ARENA.x, 0, SEA_ARENA.z);
+  flood.visible = false;
+  root.add(flood);
   const clouds = cloudLayer();
   root.add(clouds);
-  return { root, gate, flames, clouds, grass: grass.material, water };
+  return { root, gate, flames, clouds, grass: grass.material, water, sea: sea.material as THREE.ShaderMaterial, seaGate, flood };
 }
 
 /** A figure cast in one material, struck in a pose and set on a plinth. */
@@ -268,7 +308,7 @@ function flowers(): THREE.InstancedMesh {
   const spots: Array<{ x: number; z: number; c: number }> = [];
   const colors = [0xffffff, 0xffe066, 0xe8463c, 0xb48ae0, 0xffffff, 0xffe066];
   for (let z = BOUNDS.z0; z < BOUNDS.z1; z += 2.3) {
-    for (let x = BOUNDS.x0; x < BOUNDS.x1; x += 2.3) {
+    for (let x = BOUNDS.x0; x < SHORE_X; x += 2.3) {
       const ix = Math.round(x * 7);
       const iz = Math.round(z * 7);
       // Patches rather than an even sprinkle.
@@ -276,6 +316,7 @@ function flowers(): THREE.InstancedMesh {
       const px = x + (hash(ix, iz, 42) - 0.5) * 2;
       const pz = z + (hash(ix, iz, 43) - 0.5) * 2;
       if (dist(px, pz, CITY.x, CITY.z) < CITY.r || nearRoad(px, pz, 0.5) || nearColosseum(px, pz, 1)) continue;
+      if (!inRegions(px, pz) || inVillage(px, pz) || px > SHORE_X - 16) continue;
       spots.push({ x: px, z: pz, c: colors[Math.floor(hash(Math.floor(x / 14), Math.floor(z / 14), 44) * colors.length)]! });
     }
   }
@@ -579,112 +620,465 @@ function oak(b: Batch, x: number, z: number, s: number, turn: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// The colosseum: an arcade of two storeys outside, tiers of seats inside, a
-// podium wall round the sand, and Ares's red hung everywhere.
+// A colosseum: an arcade of two storeys outside, tiers of seats inside, a
+// podium wall round the sand, and its god's colours hung everywhere. Drawn
+// with the gate toward +z, then stood where it belongs and turned to face its road.
 
-const SEGMENTS = 44;
 const WALL_H = 10.5;
 const PODIUM = 2.6;
 const TIERS = 5;
 
-function colosseum(b: Batch): void {
-  const { x: cx, z: cz } = COLOSSEUM;
-  const outer = ARENA_R + WALL_THICK;
-  const span = ((2 * Math.PI * outer) / SEGMENTS) * 1.005;
+interface ArenaLook {
+  x: number;
+  z: number;
+  r: number;
+  thick: number;
+  /** Which way the gate faces. */
+  yaw: number;
+  stone: number;
+  light: number;
+  dark: number;
+  arch: number;
+  seats: number;
+  seatsShade: number;
+  floor: number;
+  rake: number;
+  banner: number;
+  accent: number;
+  device: "spear" | "trident";
+}
+
+const ARES_LOOK: ArenaLook = {
+  ...COLOSSEUM,
+  r: ARENA_R,
+  thick: WALL_THICK,
+  yaw: 0,
+  stone: C.sandstone,
+  light: C.sandstoneLight,
+  dark: C.sandstoneDark,
+  arch: C.arch,
+  seats: C.marble,
+  seatsShade: C.marbleShade,
+  floor: C.arena,
+  rake: 0xcfae78,
+  banner: C.banner,
+  accent: C.gold,
+  device: "spear",
+};
+
+const SEA_LOOK: ArenaLook = {
+  ...SEA_ARENA,
+  stone: 0xd2e0de,
+  light: 0xeef5f3,
+  dark: 0x8fb0b6,
+  arch: 0x1c3442,
+  seats: 0xf4f7f5,
+  seatsShade: 0xd2dedd,
+  floor: 0xeadcb0,
+  rake: 0x7fb8c8,
+  banner: 0x1f4f9a,
+  accent: 0x3fc6c0,
+  device: "trident",
+};
+
+/** A spot in a colosseum's own frame, out in the world. */
+function arenaToWorld(L: ArenaLook, lx: number, lz: number): { x: number; z: number } {
+  const c = Math.cos(L.yaw);
+  const s = Math.sin(L.yaw);
+  return { x: L.x + c * lx + s * lz, z: L.z - s * lx + c * lz };
+}
+
+/** Braziers in the colosseum's own frame: six round the floor and a pair outside the gate. */
+function brazierSpots(L: ArenaLook): Array<{ x: number; z: number }> {
+  const out: Array<{ x: number; z: number }> = [];
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+    out.push({ x: Math.sin(a) * (L.r - 3), z: Math.cos(a) * (L.r - 3) });
+  }
+  const gz = L.r + L.thick + 1.5;
+  out.push({ x: -GATE_HALF - 2.5, z: gz }, { x: GATE_HALF + 2.5, z: gz });
+  return out;
+}
+
+/** A trident standing on its butt at the origin of `at`, facing +z. */
+function tridentDevice(b: Batch, color: number, at: { x: number; y: number; z: number }, size: number): void {
+  b.add(G.box, color, { x: at.x, y: at.y, z: at.z }, {}, { x: 0.1 * size, y: 1.5 * size, z: 0.04 });
+  b.add(G.box, color, { x: at.x, y: at.y + 0.45 * size, z: at.z }, {}, { x: 0.7 * size, y: 0.1 * size, z: 0.04 });
+  for (const x of [-0.3, 0, 0.3]) {
+    const h = x === 0 ? 0.55 : 0.4;
+    b.add(G.box, color, { x: at.x + x * size, y: at.y + (0.5 + h / 2) * size, z: at.z }, {}, { x: 0.08 * size, y: h * size, z: 0.04 });
+    b.add(G.pyramid, color, { x: at.x + x * size, y: at.y + (0.5 + h + 0.08) * size, z: at.z }, { y: Math.PI / 4 }, { x: 0.12 * size, y: 0.18 * size, z: 0.04 });
+  }
+}
+
+function colosseum(b: Batch, L: ArenaLook): void {
+  b.setFrame(L.x, L.z, L.yaw);
+  const R = L.r;
+  const T = L.thick;
+  const segments = Math.max(28, Math.round((44 * R) / 20));
+  const outer = R + T;
+  const span = ((2 * Math.PI * outer) / segments) * 1.005;
   const facade = arcade(span, WALL_H, [
     { x: 0, w: span * 0.56, bottom: 0, top: 4.4 },
     { x: 0, w: span * 0.5, bottom: 5.4, top: 9.0 },
   ], 0.5);
-  const innerSpan = ((2 * Math.PI * ARENA_R) / SEGMENTS) * 1.01;
+  const innerSpan = ((2 * Math.PI * R) / segments) * 1.01;
 
-  b.add(G.cyl, C.arena, { x: cx, y: 0.03, z: cz }, {}, { x: ARENA_R + 0.5, y: 0.06, z: ARENA_R + 0.5 });
+  b.add(G.cyl, L.floor, { x: 0, y: 0.03, z: 0 }, {}, { x: R + 0.5, y: 0.06, z: R + 0.5 });
   // Rake marks in the sand.
-  for (let r = 4; r < ARENA_R - 1; r += 3.2) {
-    b.add(new THREE.TorusGeometry(1, 0.012, 3, 64), 0xcfae78, { x: cx, y: 0.065, z: cz }, { x: Math.PI / 2 }, { x: r, y: r, z: 1 });
+  for (let r = 4; r < R - 1; r += 3.2) {
+    b.add(new THREE.TorusGeometry(1, L.device === "trident" ? 0.05 : 0.012, 3, 64), L.rake, { x: 0, y: 0.065, z: 0 }, { x: Math.PI / 2 }, { x: r, y: r, z: 1 });
   }
 
-  for (let i = 0; i < SEGMENTS; i++) {
-    const a = (i / SEGMENTS) * Math.PI * 2;
+  for (let i = 0; i < segments; i++) {
+    const a = (i / segments) * Math.PI * 2;
     const sx = Math.sin(a);
     const sz = Math.cos(a);
-    // The gate faces +z, down the road.
-    if (Math.abs(sx * (ARENA_R + WALL_THICK / 2)) < GATE_HALF + span / 2 && sz > 0) continue;
-    const at = (r: number, y: number): { x: number; y: number; z: number } => ({ x: cx + sx * r, y, z: cz + sz * r });
-    const shade = i % 2 ? C.sandstone : C.sandstoneLight;
+    if (Math.abs(sx * (R + T / 2)) < GATE_HALF + span / 2 && sz > 0) continue;
+    const at = (r: number, y: number): { x: number; y: number; z: number } => ({ x: sx * r, y, z: sz * r });
+    const shade = i % 2 ? L.stone : L.light;
 
     // Outside: the arcade, with half-columns between the arches and a cornice per storey.
     b.add(facade, shade, at(outer - 0.25, 0), { y: a });
-    b.add(G.box, C.arch, at(outer - 0.9, WALL_H / 2), { y: a }, { x: span, y: WALL_H, z: 0.3 });
-    b.add(G.cyl, C.sandstoneDark, at(outer + 0.05, 4.9), { y: a }, { x: span * 1.0, y: 0.3, z: 0.25 });
-    b.add(G.box, C.sandstoneDark, at(outer + 0.02, 4.85), { y: a }, { x: span, y: 0.35, z: 0.4 });
-    b.add(G.box, C.sandstoneDark, at(outer + 0.02, WALL_H), { y: a }, { x: span, y: 0.4, z: 0.5 });
-    const edge = a + Math.PI / SEGMENTS;
-    const ex = cx + Math.sin(edge) * (outer + 0.1);
-    const ez = cz + Math.cos(edge) * (outer + 0.1);
-    b.add(G.fluted, C.sandstoneLight, { x: ex, y: 2.2, z: ez }, {}, { x: 0.28, y: 4.4, z: 0.28 });
-    b.add(G.fluted, C.sandstoneLight, { x: ex, y: 7.2, z: ez }, {}, { x: 0.25, y: 3.6, z: 0.25 });
+    b.add(G.box, L.arch, at(outer - 0.9, WALL_H / 2), { y: a }, { x: span, y: WALL_H, z: 0.3 });
+    b.add(G.cyl, L.dark, at(outer + 0.05, 4.9), { y: a }, { x: span * 1.0, y: 0.3, z: 0.25 });
+    b.add(G.box, L.dark, at(outer + 0.02, 4.85), { y: a }, { x: span, y: 0.35, z: 0.4 });
+    b.add(G.box, L.dark, at(outer + 0.02, WALL_H), { y: a }, { x: span, y: 0.4, z: 0.5 });
+    const edge = a + Math.PI / segments;
+    const ex = Math.sin(edge) * (outer + 0.1);
+    const ez = Math.cos(edge) * (outer + 0.1);
+    b.add(G.fluted, L.light, { x: ex, y: 2.2, z: ez }, {}, { x: 0.28, y: 4.4, z: 0.28 });
+    b.add(G.fluted, L.light, { x: ex, y: 7.2, z: ez }, {}, { x: 0.25, y: 3.6, z: 0.25 });
     // Every other bay carries a mast for an awning, with a pennant.
     if (i % 2 === 0) {
       b.add(G.cyl8, C.wood, at(outer - 0.2, WALL_H + 1.6), {}, { x: 0.07, y: 3.2, z: 0.07 });
-      b.add(G.box, C.banner, at(outer - 0.2, WALL_H + 2.6), { y: a + Math.PI / 2 }, { x: 0.9, y: 0.5, z: 0.03 });
+      b.add(G.box, L.banner, at(outer - 0.2, WALL_H + 2.6), { y: a + Math.PI / 2 }, { x: 0.9, y: 0.5, z: 0.03 });
     }
 
     // Inside: a podium wall round the sand, and tiers rising back to the arcade.
-    b.add(G.box, C.sandstoneLight, at(ARENA_R + 0.3, PODIUM / 2), { y: a }, { x: innerSpan, y: PODIUM, z: 0.6 });
-    b.add(G.box, C.marble, at(ARENA_R + 0.25, PODIUM + 0.1), { y: a }, { x: innerSpan, y: 0.2, z: 0.75 });
-    const depth = (WALL_THICK - 1.0) / TIERS;
+    b.add(G.box, L.light, at(R + 0.3, PODIUM / 2), { y: a }, { x: innerSpan, y: PODIUM, z: 0.6 });
+    b.add(G.box, L.seats, at(R + 0.25, PODIUM + 0.1), { y: a }, { x: innerSpan, y: 0.2, z: 0.75 });
+    const depth = (T - 1.0) / TIERS;
     for (let t = 0; t < TIERS; t++) {
-      const r0 = ARENA_R + 0.6 + t * depth;
+      const r0 = R + 0.6 + t * depth;
       const y = PODIUM + (t + 1) * ((WALL_H - PODIUM - 0.6) / TIERS);
       const midR = (r0 + outer - 0.9) / 2;
-      const arc = ((2 * Math.PI * midR) / SEGMENTS) * 1.02;
-      b.add(G.box, t % 2 ? C.marbleShade : C.marble, at(midR, y / 2), { y: a }, { x: arc, y, z: outer - 0.9 - r0 });
+      const arc = ((2 * Math.PI * midR) / segments) * 1.02;
+      b.add(G.box, t % 2 ? L.seatsShade : L.seats, at(midR, y / 2), { y: a }, { x: arc, y, z: outer - 0.9 - r0 });
     }
-    // Ares's colours: a red hanging with a gold boss on every fourth bay of the podium.
+    // The god's colours: a hanging with a boss on every fourth bay of the podium.
     if (i % 4 === 2) {
-      b.add(G.box, C.banner, at(ARENA_R - 0.02, PODIUM / 2 + 0.2), { y: a }, { x: innerSpan * 0.55, y: PODIUM - 0.2, z: 0.05 });
-      b.add(G.cyl, C.gold, at(ARENA_R - 0.06, PODIUM / 2 + 0.4), { y: a, x: Math.PI / 2 }, { x: 0.32, y: 0.04, z: 0.32 });
-      b.add(G.box, C.gold, at(ARENA_R - 0.05, 0.38), { y: a }, { x: innerSpan * 0.55, y: 0.1, z: 0.06 });
+      b.add(G.box, L.banner, at(R - 0.02, PODIUM / 2 + 0.2), { y: a }, { x: innerSpan * 0.55, y: PODIUM - 0.2, z: 0.05 });
+      b.add(G.cyl, L.accent, at(R - 0.06, PODIUM / 2 + 0.4), { y: a, x: Math.PI / 2 }, { x: 0.32, y: 0.04, z: 0.32 });
+      b.add(G.box, L.accent, at(R - 0.05, 0.38), { y: a }, { x: innerSpan * 0.55, y: 0.1, z: 0.06 });
     }
   }
 
-  // The gate: an arch flanked by towers, Ares's banners either side.
-  const gz = cz + ARENA_R + WALL_THICK / 2;
-  const gateWall = arcade(GATE_HALF * 2 + 3.2, WALL_H + 1.5, [{ x: 0, w: GATE_HALF * 2, bottom: 0, top: 6 + GATE_HALF }], WALL_THICK + 0.6);
-  b.add(gateWall, C.sandstoneLight, { x: cx, y: 0, z: gz });
-  b.add(G.box, C.gold, { x: cx, y: 6.1 + GATE_HALF, z: gz + WALL_THICK / 2 + 0.32 }, {}, { x: 0.7, y: 0.9, z: 0.1 });
+  // The gate: an arch flanked by towers, the god's banners either side.
+  const gz = R + T / 2;
+  const gateWall = arcade(GATE_HALF * 2 + 3.2, WALL_H + 1.5, [{ x: 0, w: GATE_HALF * 2, bottom: 0, top: 6 + GATE_HALF }], T + 0.6);
+  b.add(gateWall, L.light, { x: 0, y: 0, z: gz });
+  b.add(G.box, L.accent, { x: 0, y: 6.1 + GATE_HALF, z: gz + T / 2 + 0.32 }, {}, { x: 0.7, y: 0.9, z: 0.1 });
   for (const side of [-1, 1]) {
-    const tx = cx + side * (GATE_HALF + 2.4);
-    b.add(G.box, C.sandstoneDark, { x: tx, y: (WALL_H + 3) / 2, z: gz }, {}, { x: 2.4, y: WALL_H + 3, z: WALL_THICK + 1.6 });
-    b.add(G.box, C.sandstone, { x: tx, y: WALL_H + 3.2, z: gz }, {}, { x: 2.8, y: 0.4, z: WALL_THICK + 2 });
-    for (let m = -1; m <= 1; m++) b.add(G.box, C.sandstoneDark, { x: tx + m * 0.9, y: WALL_H + 3.75, z: gz + WALL_THICK / 2 + 0.6 }, {}, { x: 0.5, y: 0.7, z: 0.5 });
-    b.add(G.box, C.banner, { x: tx, y: 6.8, z: gz + WALL_THICK / 2 + 0.85 }, {}, { x: 1.7, y: 6.4, z: 0.06 });
-    b.add(G.box, C.gold, { x: tx, y: 9.8, z: gz + WALL_THICK / 2 + 0.88 }, {}, { x: 1.7, y: 0.18, z: 0.08 });
-    // A gold spear-and-shield device on each banner.
-    b.add(G.cyl, C.gold, { x: tx, y: 7.6, z: gz + WALL_THICK / 2 + 0.9 }, { x: Math.PI / 2 }, { x: 0.5, y: 0.05, z: 0.5 });
-    b.add(G.box, C.banner, { x: tx, y: 7.6, z: gz + WALL_THICK / 2 + 0.94 }, { z: Math.PI / 4 }, { x: 0.1, y: 1.3, z: 0.04 });
-    b.add(prism(1.7, 0.6, 0.06), C.banner, { x: tx, y: 3.6, z: gz + WALL_THICK / 2 + 0.85 }, { z: Math.PI });
+    const tx = side * (GATE_HALF + 2.4);
+    const front = gz + T / 2;
+    b.add(G.box, L.dark, { x: tx, y: (WALL_H + 3) / 2, z: gz }, {}, { x: 2.4, y: WALL_H + 3, z: T + 1.6 });
+    b.add(G.box, L.stone, { x: tx, y: WALL_H + 3.2, z: gz }, {}, { x: 2.8, y: 0.4, z: T + 2 });
+    for (let m = -1; m <= 1; m++) b.add(G.box, L.dark, { x: tx + m * 0.9, y: WALL_H + 3.75, z: front + 0.6 }, {}, { x: 0.5, y: 0.7, z: 0.5 });
+    b.add(G.box, L.banner, { x: tx, y: 6.8, z: front + 0.85 }, {}, { x: 1.7, y: 6.4, z: 0.06 });
+    b.add(G.box, L.accent, { x: tx, y: 9.8, z: front + 0.88 }, {}, { x: 1.7, y: 0.18, z: 0.08 });
+    if (L.device === "spear") {
+      // A gold spear-and-shield device on each banner.
+      b.add(G.cyl, L.accent, { x: tx, y: 7.6, z: front + 0.9 }, { x: Math.PI / 2 }, { x: 0.5, y: 0.05, z: 0.5 });
+      b.add(G.box, L.banner, { x: tx, y: 7.6, z: front + 0.94 }, { z: Math.PI / 4 }, { x: 0.1, y: 1.3, z: 0.04 });
+    } else {
+      tridentDevice(b, L.accent, { x: tx, y: 7.2, z: front + 0.92 }, 1.3);
+      // Waves along the foot of the banner.
+      for (let w = -1; w <= 1; w++) b.add(G.halfDisc, L.accent, { x: tx + w * 0.55, y: 4.6, z: front + 0.9 }, { x: Math.PI / 2 }, { x: 0.27, y: 0.04, z: 0.27 });
+    }
+    b.add(prism(1.7, 0.6, 0.06), L.banner, { x: tx, y: 3.6, z: front + 0.85 }, { z: Math.PI });
   }
 
-  // Braziers round the floor: tripod legs and a bowl.
-  for (const f of colosseumFlameSpots()) {
+  // Braziers: tripod legs and a bowl.
+  for (const f of brazierSpots(L)) {
     for (let l = 0; l < 3; l++) {
       const a = (l / 3) * Math.PI * 2;
       b.add(G.cyl8, C.iron, { x: f.x + Math.sin(a) * 0.25, y: 0.8, z: f.z + Math.cos(a) * 0.25 }, { x: Math.cos(a) * 0.2, z: -Math.sin(a) * 0.2 }, { x: 0.05, y: 1.7, z: 0.05 });
     }
     b.add(G.dome, C.iron, { x: f.x, y: 1.95, z: f.z }, { x: Math.PI }, { x: 0.6, y: 0.35, z: 0.6 });
-    b.add(G.cyl, 0xb88a2e, { x: f.x, y: 1.95, z: f.z }, {}, { x: 0.62, y: 0.06, z: 0.62 });
+    b.add(G.cyl, L.device === "spear" ? 0xb88a2e : L.accent, { x: f.x, y: 1.95, z: f.z }, {}, { x: 0.62, y: 0.06, z: 0.62 });
   }
-  // Spears stuck in the sand, and a fallen shield or two.
+  // Spears stuck in the sand and a fallen shield or two for Ares; tridents and seashells for Poseidon.
   for (let i = 0; i < 10; i++) {
     const a = hash(i, 3, 21) * Math.PI * 2;
-    const r = 6 + hash(i, 4, 21) * 10;
-    const x = cx + Math.sin(a) * r;
-    const z = cz + Math.cos(a) * r;
-    b.add(G.cyl8, C.wood, { x, y: 0.9, z }, { x: 0.25, z: 0.2 }, { x: 0.035, y: 2, z: 0.035 });
-    b.add(G.cone, C.iron, { x: x + 0.05, y: 1.95, z: z + 0.22 }, { x: 0.25, z: 0.2 }, { x: 0.07, y: 0.32, z: 0.07 });
-    if (i % 3 === 0) b.add(G.cyl, 0xc8913a, { x: x + 1.2, y: 0.08, z: z - 0.6 }, { x: 0.12, z: 0.1 }, { x: 0.4, y: 0.06, z: 0.4 });
+    const r = R * 0.3 + hash(i, 4, 21) * R * 0.5;
+    const x = Math.sin(a) * r;
+    const z = Math.cos(a) * r;
+    if (L.device === "spear") {
+      b.add(G.cyl8, C.wood, { x, y: 0.9, z }, { x: 0.25, z: 0.2 }, { x: 0.035, y: 2, z: 0.035 });
+      b.add(G.cone, C.iron, { x: x + 0.05, y: 1.95, z: z + 0.22 }, { x: 0.25, z: 0.2 }, { x: 0.07, y: 0.32, z: 0.07 });
+      if (i % 3 === 0) b.add(G.cyl, 0xc8913a, { x: x + 1.2, y: 0.08, z: z - 0.6 }, { x: 0.12, z: 0.1 }, { x: 0.4, y: 0.06, z: 0.4 });
+    } else {
+      b.add(G.dome, i % 2 ? 0xf6c6c0 : 0xfff4e6, { x, y: 0.05, z }, { y: a }, { x: 0.22, y: 0.12, z: 0.28 });
+      b.add(G.dome, 0xf2a9a0, { x: x + 1.4, y: 0.05, z: z - 0.8 }, { y: -a }, { x: 0.16, y: 0.1, z: 0.2 });
+    }
   }
+  if (L.device === "trident") {
+    // A blue mosaic star of waves in the middle of the sand.
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      b.add(G.box, 0x2f7fb8, { x: Math.sin(a) * 2.2, y: 0.07, z: Math.cos(a) * 2.2 }, { y: a }, { x: 0.5, y: 0.02, z: 3.2 });
+    }
+    b.add(G.cyl, 0x3fc6c0, { x: 0, y: 0.075, z: 0 }, {}, { x: 1.4, y: 0.02, z: 1.4 });
+  }
+  b.setFrame();
+}
+
+/** Where a colosseum's braziers burn, out in the world. */
+function flameSpots(L: ArenaLook): Array<{ x: number; y: number; z: number }> {
+  return brazierSpots(L).map((p) => ({ ...arenaToWorld(L, p.x, p.z), y: 1.95 }));
+}
+
+export function colosseumFlameSpots(): Array<{ x: number; y: number; z: number }> {
+  return flameSpots(ARES_LOOK);
+}
+
+// ---------------------------------------------------------------------------
+// The road east and the fishing village
+
+function eastRoad(b: Batch): void {
+  const z = EAST_ROAD_Z;
+  const from = ROAD_HALF;
+  b.add(G.box, C.dirt, { x: (from + EAST_ROAD_END) / 2, y: 0.015, z }, {}, { x: EAST_ROAD_END - from, y: 0.03, z: ROAD_HALF * 2 + 0.6 });
+  // Worn flagstones, thinning toward the verges.
+  for (let x = from + 0.6; x < EAST_ROAD_END - 0.5; x += 1.25) {
+    for (let k = -2; k <= 2; k++) {
+      const ix = Math.round(x * 10);
+      if (hash(ix, k, 60) > 0.55 - Math.abs(k) * 0.12) continue;
+      const shade = [C.cobble, C.cobbleDark, C.cobbleWarm][Math.floor(hash(ix, k, 61) * 3)]!;
+      b.add(G.cobble, shade, { x: x + (hash(ix, k, 62) - 0.5) * 0.4, y: 0.04, z: z + k * 1.3 }, { y: hash(ix, k, 63) * 3 }, { x: 0.55, y: 0.06, z: 0.45 });
+    }
+  }
+  // Milestones, alternating sides.
+  for (let x = from + 14, i = 0; x < EAST_ROAD_END - 6; x += 16, i++) {
+    const side = i % 2 ? 1 : -1;
+    b.add(G.box, C.marbleShade, { x, y: 0.45, z: z + side * (ROAD_HALF + 0.9) }, {}, { x: 0.45, y: 0.9, z: 0.35 });
+    b.add(G.halfDisc, C.marbleShade, { x, y: 0.9, z: z + side * (ROAD_HALF + 0.9) }, { x: Math.PI / 2 }, { x: 0.225, y: 0.35, z: 0.225 });
+  }
+  // A signpost at the fork: red for Ares up the road, blue for Poseidon by the sea.
+  const sx = ROAD_HALF + 1.2;
+  const sz = z + ROAD_HALF + 1.2;
+  b.add(G.cyl8, C.wood, { x: sx, y: 1.3, z: sz }, {}, { x: 0.09, y: 2.6, z: 0.09 });
+  b.add(G.box, C.banner, { x: sx, y: 2.2, z: sz - 0.55 }, {}, { x: 0.08, y: 0.42, z: 1.1 });
+  b.add(G.pyramid, C.banner, { x: sx, y: 2.2, z: sz - 1.2 }, { x: -Math.PI / 2, y: Math.PI / 4 }, { x: 0.3, y: 0.3, z: 0.3 });
+  b.add(G.box, 0x2a6cb0, { x: sx + 0.55, y: 1.7, z: sz }, {}, { x: 1.1, y: 0.42, z: 0.08 });
+  b.add(G.pyramid, 0x2a6cb0, { x: sx + 1.2, y: 1.7, z: sz }, { z: -Math.PI / 2, y: Math.PI / 4 }, { x: 0.3, y: 0.3, z: 0.3 });
+  b.add(G.blob, C.rock, { x: sx, y: 0.1, z: sz }, {}, { x: 0.4, y: 0.25, z: 0.4 });
+}
+
+const HUT = { wall: 0xf6f3ec, blue: 0x2a6cb0, thatch: 0xc9a35a, thatchDark: 0xa8843f, net: 0x8a7656 };
+
+function fishHut(b: Batch, x: number, z: number, w: number, d: number, yaw: number): void {
+  const h = 2.7;
+  b.add(G.box, 0xd6d0c2, { x, y: 0.12, z }, {}, { x: w + 0.25, y: 0.24, z: d + 0.25 });
+  b.add(G.box, HUT.wall, { x, y: h / 2 + 0.12, z }, {}, { x: w, y: h, z: d });
+  // A steep thatched roof along the long side, with a ridge pole.
+  const along = w >= d;
+  const roofW = (along ? d : w) + 0.9;
+  const roofL = (along ? w : d) + 0.7;
+  const turn = along ? 0 : Math.PI / 2;
+  b.add(prism(roofW, 1.6, roofL), HUT.thatch, { x, y: h + 0.1, z }, { y: turn + Math.PI / 2 });
+  b.add(prism(roofW * 0.55, 0.9, roofL + 0.02), HUT.thatchDark, { x, y: h + 0.78, z }, { y: turn + Math.PI / 2 });
+  b.add(G.cyl8, C.wood, { x, y: h + 1.72, z }, { z: Math.PI / 2, y: turn }, { x: 0.08, y: roofL + 0.3, z: 0.08 });
+  // The front: a blue door and shutters, a net hung to dry, a lobster pot and oars.
+  const fx = Math.sin(yaw);
+  const fz = Math.cos(yaw);
+  const half = Math.abs(fx) > 0.5 ? w / 2 : d / 2;
+  const ax = Math.abs(fz);
+  const az = Math.abs(fx);
+  const at = (side: number, y: number, out = 0.02): { x: number; y: number; z: number } => ({
+    x: x + fx * (half + out) + ax * side,
+    y,
+    z: z + fz * (half + out) + az * side,
+  });
+  b.add(G.box, HUT.blue, at(-0.6, 1.05, 0.05), { y: yaw }, { x: 0.95, y: 1.8, z: 0.08 });
+  b.add(G.box, C.window, at(1.1, 1.75, 0.04), { y: yaw }, { x: 0.6, y: 0.6, z: 0.06 });
+  b.add(G.box, HUT.blue, at(0.68, 1.75, 0.08), { y: yaw }, { x: 0.26, y: 0.66, z: 0.06 });
+  b.add(G.box, HUT.blue, at(1.52, 1.75, 0.08), { y: yaw }, { x: 0.26, y: 0.66, z: 0.06 });
+  b.add(G.box, HUT.net, at(1.1, 0.75, 0.1), { y: yaw, x: 0.08 }, { x: 1.3, y: 0.9, z: 0.03 });
+  for (let k = 0; k < 4; k++) b.add(G.blob, k % 2 ? 0xf08a3a : 0xffffff, at(0.6 + k * 0.33, 1.22, 0.14), {}, 0.07);
+  b.add(G.cyl8, 0x9a7448, at(-1.6, 0.3, 0.6), {}, { x: 0.32, y: 0.6, z: 0.32 });
+  b.add(G.cyl8, 0x6e5232, at(-1.6, 0.62, 0.6), {}, { x: 0.22, y: 0.05, z: 0.22 });
+  b.add(G.cyl8, C.wood, at(1.9, 1.0, 0.25), { y: yaw, z: 0.25 }, { x: 0.045, y: 2.1, z: 0.045 });
+  b.add(G.box, C.wood, at(2.12, 0.15, 0.25), { y: yaw, z: 0.25 }, { x: 0.18, y: 0.5, z: 0.04 });
+}
+
+/** A Greek fishing boat: a round hull, a painted rail, and an eye on the bow to find the way home. */
+function boat(b: Batch, x: number, y: number, z: number, yaw: number, hull: number, rail: number, mast: boolean): void {
+  b.add(G.cyl, hull, { x, y, z }, { y: yaw, z: Math.PI / 2 }, { x: 0.75, y: 4.2, z: 0.75 });
+  b.add(G.cone, hull, { x: x + Math.cos(yaw) * 2.45, y, z: z - Math.sin(yaw) * 2.45 }, { y: yaw, z: -Math.PI / 2 }, { x: 0.75, y: 0.7, z: 0.75 });
+  b.add(G.box, 0x5a3a22, { x, y: y + 0.68, z }, { y: yaw }, { x: 4.0, y: 0.06, z: 1.25 });
+  b.add(G.box, rail, { x, y: y + 0.74, z }, { y: yaw }, { x: 4.3, y: 0.1, z: 1.55 });
+  for (const side of [-1, 1]) {
+    const ex = x + Math.cos(yaw) * 2.1 + Math.sin(yaw) * side * 0.62;
+    const ez = z - Math.sin(yaw) * 2.1 + Math.cos(yaw) * side * 0.62;
+    b.add(G.blob, 0xffffff, { x: ex, y: y + 0.42, z: ez }, {}, 0.13);
+    b.add(G.blob, 0x1b1b2a, { x: ex + Math.sin(yaw) * side * 0.06, y: y + 0.42, z: ez + Math.cos(yaw) * side * 0.06 }, {}, 0.07);
+  }
+  b.add(G.box, C.wood, { x, y: y + 0.8, z }, { y: yaw + 0.3 }, { x: 0.12, y: 0.06, z: 2.4 });
+  if (mast) {
+    b.add(G.cyl8, C.wood, { x, y: y + 2.4, z }, {}, { x: 0.07, y: 3.4, z: 0.07 });
+    b.add(G.cyl8, C.wood, { x, y: y + 3.6, z }, { y: yaw, z: Math.PI / 2 }, { x: 0.05, y: 2.6, z: 0.05 });
+    b.add(G.box, 0xf4ead2, { x, y: y + 3.4, z }, { y: yaw, z: 0.06 }, { x: 2.3, y: 0.35, z: 0.05 });
+  }
+}
+
+export const LIGHTHOUSE_TOP = 13;
+
+function village(b: Batch): void {
+  for (const h of huts()) fishHut(b, h.x, h.z, h.w, h.d, h.yaw);
+
+  // Stone islands in Poseidon's arena, to stand on when the sea comes in.
+  for (const c of SEA_ISLANDS) {
+    b.add(G.cyl, 0x9fb4b8, { x: c.x, y: ISLAND_H / 2, z: c.z }, {}, { x: c.r, y: ISLAND_H, z: c.r });
+    b.add(G.cyl, 0xeef5f3, { x: c.x, y: ISLAND_H + 0.04, z: c.z }, {}, { x: c.r + 0.1, y: 0.1, z: c.r + 0.1 });
+    for (let k = 0; k < 5; k++) {
+      const a = (k / 5) * Math.PI * 2;
+      b.add(G.rock, 0x8fa4a8, { x: c.x + Math.sin(a) * c.r, y: 0.15, z: c.z + Math.cos(a) * c.r }, { y: a }, 0.35);
+    }
+  }
+
+  // A sandy lane from Poseidon's colosseum down to the docks.
+  const laneFrom = SEA_ARENA.x + SEA_ARENA.r + SEA_ARENA.thick;
+  b.add(G.box, 0xdcc48e, { x: (laneFrom + SHORE_X) / 2, y: 0.02, z: VILLAGE.z }, {}, { x: SHORE_X - laneFrom, y: 0.03, z: 5 });
+
+  // Piers: planks on posts, with bollards and a coil of rope.
+  for (const pz of PIERS) {
+    for (let x = SHORE_X - 2; x < SHORE_X + PIER_LENGTH; x += 0.5) {
+      const shade = hash(Math.round(x * 2), pz, 64) > 0.5 ? 0x9a6a3e : 0x86592f;
+      b.add(G.box, shade, { x: x + 0.25, y: 0.08, z: pz }, { x: (hash(Math.round(x * 2), pz, 65) - 0.5) * 0.04 }, { x: 0.46, y: 0.08, z: PIER_HALF * 2 });
+    }
+    for (let x = SHORE_X; x <= SHORE_X + PIER_LENGTH; x += 3) {
+      for (const side of [-1, 1]) {
+        b.add(G.cyl8, 0x5a3a22, { x, y: -0.6, z: pz + side * (PIER_HALF + 0.1) }, {}, { x: 0.14, y: 1.8, z: 0.14 });
+      }
+      b.add(G.cyl8, 0x4a3020, { x, y: 0.3, z: pz + PIER_HALF - 0.15 }, {}, { x: 0.12, y: 0.4, z: 0.12 });
+    }
+    b.add(new THREE.TorusGeometry(0.22, 0.06, 6, 12), 0xd8c49a, { x: SHORE_X + 8, y: 0.16, z: pz - 0.7 }, { x: Math.PI / 2 }, 1);
+    // A boat tied up alongside.
+    boat(b, SHORE_X + 9, -0.25, pz + PIER_HALF + 1.6, 0, hash(pz, 1, 66) > 0.5 ? 0x2a6cb0 : 0xc8463a, 0xf4ead2, true);
+  }
+
+  // Boats pulled up on the beach, a net rack and fish drying in the sun.
+  const beached = [
+    { z: -52, yaw: 0.25, hull: 0xf4ead2, rail: 0x2a6cb0 },
+    { z: -30, yaw: -0.2, hull: 0x2f8f8a, rail: 0xe8b83e },
+    { z: -12, yaw: 0.1, hull: 0xc8463a, rail: 0xf4ead2 },
+    { z: -68, yaw: -0.3, hull: 0x2a6cb0, rail: 0xf4ead2 },
+  ];
+  for (const s of beached) boat(b, SHORE_X - 4, 0.05, s.z, s.yaw, s.hull, s.rail, false);
+  for (const rz of [-46, -24, -6]) {
+    const rx = SHORE_X - 10;
+    for (const side of [-1.5, 1.5]) b.add(G.cyl8, C.wood, { x: rx, y: 1.1, z: rz + side }, {}, { x: 0.07, y: 2.2, z: 0.07 });
+    b.add(G.cyl8, C.wood, { x: rx, y: 2.15, z: rz }, { x: Math.PI / 2 }, { x: 0.05, y: 3.2, z: 0.05 });
+    b.add(G.box, HUT.net, { x: rx, y: 1.45, z: rz }, {}, { x: 0.03, y: 1.3, z: 2.9 });
+    for (let k = 0; k < 6; k++) b.add(G.blob, k % 2 ? 0xf08a3a : 0xffffff, { x: rx + 0.04, y: 0.82, z: rz - 1.25 + k * 0.5 }, {}, 0.08);
+  }
+  for (const rz of [-36, -16]) {
+    const rx = SHORE_X - 15;
+    for (const side of [-1.3, 1.3]) b.add(G.cyl8, C.wood, { x: rx, y: 0.9, z: rz + side }, {}, { x: 0.06, y: 1.8, z: 0.06 });
+    b.add(G.cyl8, C.wood, { x: rx, y: 1.75, z: rz }, { x: Math.PI / 2 }, { x: 0.04, y: 2.8, z: 0.04 });
+    for (let k = 0; k < 7; k++) {
+      b.add(G.blob, 0xb8c8d2, { x: rx, y: 1.45, z: rz - 1.05 + k * 0.35 }, {}, { x: 0.03, y: 0.24, z: 0.08 });
+      b.add(G.cone, 0x8a9aa6, { x: rx, y: 1.17, z: rz - 1.05 + k * 0.35 }, { x: Math.PI }, { x: 0.06, y: 0.1, z: 0.02 });
+    }
+  }
+
+  // The fish market by the colosseum: a striped awning over the day's catch.
+  const mx = SEA_ARENA.x + SEA_ARENA.r + SEA_ARENA.thick + 4;
+  const mz = VILLAGE.z - 8;
+  b.add(G.box, C.wood, { x: mx, y: 0.5, z: mz }, {}, { x: 1.3, y: 1.0, z: 3.2 });
+  for (const dz of [-1.6, 1.6]) for (const dx of [-0.7, 0.7]) b.add(G.cyl8, C.wood, { x: mx + dx, y: 1.3, z: mz + dz }, {}, { x: 0.06, y: 2.6, z: 0.06 });
+  for (let i = 0; i < 5; i++) b.add(G.box, i % 2 ? 0xffffff : HUT.blue, { x: mx, y: 2.65, z: mz - 1.5 + i * 0.75 }, { z: 0.15 }, { x: 1.9, y: 0.08, z: 0.75 });
+  for (let i = 0; i < 9; i++) {
+    b.add(G.blob, i % 4 === 3 ? 0xe86a5a : 0xb8c8d2, { x: mx - 0.3 + (i % 3) * 0.3, y: 1.1, z: mz - 1.1 + Math.floor(i / 3) * 0.9 }, { y: 0.3 * i }, { x: 0.1, y: 0.07, z: 0.32 });
+  }
+  b.add(G.blob, 0x9a4ab8, { x: mx + 0.1, y: 1.12, z: mz + 1.3 }, {}, { x: 0.22, y: 0.18, z: 0.22 });
+
+  // Barrels, crates and amphorae about the docks.
+  for (let i = 0; i < 10; i++) {
+    const x = SHORE_X - 8 + hash(i, 1, 67) * 6;
+    const z = VILLAGE.z - 30 + hash(i, 2, 67) * 60;
+    if (PIERS.some((pz) => Math.abs(z - pz) < 3) || Math.abs(z - VILLAGE.z) < 4) continue;
+    const kind = i % 3;
+    if (kind === 0) {
+      b.add(G.cyl, 0x8a5a34, { x, y: 0.5, z }, {}, { x: 0.42, y: 1.0, z: 0.42 });
+      for (const y of [0.2, 0.8]) b.add(G.cyl, C.iron, { x, y, z }, {}, { x: 0.44, y: 0.06, z: 0.44 });
+    } else if (kind === 1) {
+      b.add(G.box, 0xa87a48, { x, y: 0.35, z }, { y: hash(i, 3, 67) }, { x: 0.8, y: 0.7, z: 0.8 });
+    } else {
+      b.add(AMPHORA, C.terracotta, { x, y: 0, z }, {}, 0.75);
+    }
+  }
+
+  // The lighthouse at the end of the middle pier: a tapering white tower banded in blue.
+  const { x: lx, z: lz } = LIGHTHOUSE;
+  b.add(G.cyl, C.rock, { x: lx, y: -0.9, z: lz }, {}, { x: 3.4, y: 2.2, z: 3.4 });
+  b.add(G.cyl, 0xd6d0c2, { x: lx, y: 0.2, z: lz }, {}, { x: 3.2, y: 0.1, z: 3.2 });
+  b.add(G.taper, HUT.wall, { x: lx, y: 5.6, z: lz }, {}, { x: 1.7, y: 11, z: 1.7 });
+  for (const y of [3, 7]) b.add(G.taper, HUT.blue, { x: lx, y, z: lz }, {}, { x: 2.0 - y * 0.07, y: 0.9, z: 2.0 - y * 0.07 });
+  b.add(G.cyl, C.marbleShade, { x: lx, y: 11.2, z: lz }, {}, { x: 1.6, y: 0.3, z: 1.6 });
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2;
+    b.add(G.cyl8, C.marble, { x: lx + Math.sin(a) * 1.0, y: 12.1, z: lz + Math.cos(a) * 1.0 }, {}, { x: 0.1, y: 1.6, z: 0.1 });
+  }
+  b.add(G.cone, HUT.blue, { x: lx, y: LIGHTHOUSE_TOP + 1.4, z: lz }, {}, { x: 1.5, y: 1.4, z: 1.5 });
+  b.add(G.dome, C.iron, { x: lx, y: LIGHTHOUSE_TOP, z: lz }, { x: Math.PI }, { x: 0.6, y: 0.35, z: 0.6 });
+  b.add(G.box, HUT.blue, { x: lx - 1.75, y: 1.2, z: lz }, {}, { x: 0.08, y: 2.0, z: 1.0 });
+}
+
+/** The sea: shallow turquoise at the beach going to deep blue, with glints that drift. */
+function seaPlane(): THREE.Mesh {
+  const material = new THREE.ShaderMaterial({
+    transparent: true,
+    uniforms: {
+      time: { value: 0 },
+      shore: { value: SHORE_X },
+      shallow: { value: new THREE.Color(0x5fd0d8) },
+      deep: { value: new THREE.Color(0x1f6fb8) },
+      fogColor: { value: new THREE.Color(HORIZON) },
+      fogNear: { value: 40 },
+      fogFar: { value: 200 },
+    },
+    vertexShader: `
+      varying vec3 vWorld; varying float vDepth;
+      void main() {
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        vWorld = w.xyz;
+        vec4 view = viewMatrix * w;
+        vDepth = -view.z;
+        gl_Position = projectionMatrix * view;
+      }`,
+    fragmentShader: `
+      uniform float time; uniform float shore; uniform vec3 shallow; uniform vec3 deep;
+      uniform vec3 fogColor; uniform float fogNear; uniform float fogFar;
+      varying vec3 vWorld; varying float vDepth;
+      void main() {
+        float out_ = vWorld.x - shore;
+        vec3 c = mix(shallow, deep, smoothstep(0.0, 28.0, out_));
+        // Foam where the waves break on the sand.
+        float foam = smoothstep(1.4, 0.0, out_ + sin(vWorld.z * 0.35 + time * 1.4) * 0.5 + 0.6);
+        float glint = step(0.92, sin(vWorld.x * 0.9 + time * 0.8) * sin(vWorld.z * 0.7 - time * 0.6));
+        c = mix(c, vec3(1.0), max(foam * 0.85, glint * 0.35));
+        gl_FragColor = vec4(mix(c, fogColor, smoothstep(fogNear, fogFar, vDepth)), 0.92);
+        #include <colorspace_fragment>
+      }`,
+  });
+  const g = new THREE.PlaneGeometry(500, 900, 1, 1);
+  g.rotateX(-Math.PI / 2);
+  const mesh = new THREE.Mesh(g, material);
+  mesh.position.set(SHORE_X - 2 + 250, -0.25, -75);
+  return mesh;
 }
 
 // ---------------------------------------------------------------------------
@@ -710,7 +1104,7 @@ function sky(): THREE.Mesh {
 /** The meadow, mottled by a value hash so it is never one flat green. */
 function ground(): THREE.Mesh {
   const size = 700;
-  const seg = 140;
+  const seg = 175;
   const g = new THREE.PlaneGeometry(size, size, seg, seg);
   g.rotateX(-Math.PI / 2);
   g.translate(0, 0, -75);
@@ -720,15 +1114,23 @@ function ground(): THREE.Mesh {
   const b = new THREE.Color(C.grass);
   const c = new THREE.Color(C.grassLight);
   const tmp = new THREE.Color();
+  const sand = new THREE.Color(0xe6d29a);
+  const sandWet = new THREE.Color(0xb8a77a);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const z = pos.getZ(i);
     const n = smoothNoise(x / 18, z / 18) * 0.7 + smoothNoise(x / 5, z / 5) * 0.3;
     tmp.copy(n < 0.5 ? a : b).lerp(n < 0.5 ? b : c, n < 0.5 ? n * 2 : (n - 0.5) * 2);
+    // Sand down to the sea, and a beaten-earth square round Poseidon's colosseum.
+    const beach = Math.min(1, Math.max(0, (x - (SHORE_X - 14)) / 6));
+    if (beach > 0) tmp.lerp(x > SHORE_X + 1 ? sandWet : sand, beach);
+    else if (inVillage(x, z, 21)) tmp.lerp(sand, 0.55);
     colors.set([tmp.r, tmp.g, tmp.b], i * 3);
-    // Rolling hills past the edge of the world; flat where anyone walks.
-    const out = Math.max(0, Math.max(BOUNDS.x0 - x, x - BOUNDS.x1, BOUNDS.z0 - z, z - BOUNDS.z1));
-    pos.setY(i, Math.min(out, 60) * 0.25 * smoothNoise(x / 30, z / 30));
+    // Rolling hills past the edge of the world, flat where anyone walks, easing down to the shore and under the sea.
+    const out = Math.min(outside(x, z), 60);
+    const coast = Math.min(1, Math.max(0, (SHORE_X - 4 - x) / 24));
+    const y = out * 0.25 * smoothNoise(x / 30, z / 30) * coast;
+    pos.setY(i, x > SHORE_X - 2 ? -Math.min(3, (x - SHORE_X + 2) * 0.3) : y);
   }
   g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   g.computeVertexNormals();
@@ -799,7 +1201,7 @@ function grassField(): { mesh: THREE.InstancedMesh; material: THREE.ShaderMateri
   const q = new THREE.Quaternion();
   const up = new THREE.Vector3(0, 1, 0);
   for (let z = BOUNDS.z0; z < BOUNDS.z1; z += 1.6) {
-    for (let x = BOUNDS.x0; x < BOUNDS.x1; x += 1.6) {
+    for (let x = BOUNDS.x0; x < SHORE_X; x += 1.6) {
       const ix = Math.round(x * 10);
       const iz = Math.round(z * 10);
       if (hash(ix, iz, 5) > 0.55) continue;
@@ -808,6 +1210,7 @@ function grassField(): { mesh: THREE.InstancedMesh; material: THREE.ShaderMateri
       if (dist(px, pz, CITY.x, CITY.z) < PLAZA_R + 1) continue;
       if (nearRoad(px, pz, 0.4)) continue;
       if (nearColosseum(px, pz, 0.5)) continue;
+      if (!inRegions(px, pz) || inVillage(px, pz, 21) || px > SHORE_X - 13) continue;
       const s = 0.7 + hash(ix, iz, 8) * 0.8;
       q.setFromAxisAngle(up, hash(ix, iz, 10) * Math.PI);
       m.compose(new THREE.Vector3(px, 0, pz), q, new THREE.Vector3(s, s, s));
@@ -828,6 +1231,7 @@ function mountains(): THREE.Group {
     const r = 250 + hash(i, 1, 20) * 60;
     const x = Math.sin(a) * r;
     const z = -75 + Math.cos(a) * r;
+    if (x > SHORE_X - 40) continue;
     const h = 45 + hash(i, 2, 20) * 50;
     const w = 60 + hash(i, 3, 20) * 50;
     b.add(G.cone, C.mountain, { x, y: h / 2 - 5, z }, { y: a }, { x: w, y: h, z: w });
@@ -837,24 +1241,12 @@ function mountains(): THREE.Group {
 }
 
 
-export function colosseumFlameSpots(): Array<{ x: number; y: number; z: number }> {
-  const out: Array<{ x: number; y: number; z: number }> = [];
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
-    out.push({ x: COLOSSEUM.x + Math.sin(a) * (ARENA_R - 3), y: 1.95, z: COLOSSEUM.z + Math.cos(a) * (ARENA_R - 3) });
-  }
-  // A pair outside the gate, to light the way in.
-  const gz = COLOSSEUM.z + ARENA_R + WALL_THICK + 1.5;
-  out.push({ x: COLOSSEUM.x - GATE_HALF - 2.5, y: 1.95, z: gz }, { x: COLOSSEUM.x + GATE_HALF + 2.5, y: 1.95, z: gz });
-  return out;
-}
-
 const flameGeo = new THREE.ConeGeometry(1, 1, 7);
-function flame(root: THREE.Group, x: number, y: number, z: number, size: number): THREE.Mesh {
-  const outer = new THREE.Mesh(flameGeo, new THREE.MeshBasicMaterial({ color: 0xff8a1e, transparent: true, opacity: 0.9 }));
+function flame(root: THREE.Group, x: number, y: number, z: number, size: number, color = 0xff8a1e, core = 0xffe066): THREE.Mesh {
+  const outer = new THREE.Mesh(flameGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }));
   outer.position.set(x, y + size * 0.6, z);
   outer.scale.set(size * 0.55, size * 1.3, size * 0.55);
-  const inner = new THREE.Mesh(flameGeo, new THREE.MeshBasicMaterial({ color: 0xffe066 }));
+  const inner = new THREE.Mesh(flameGeo, new THREE.MeshBasicMaterial({ color: core }));
   inner.scale.set(0.5, 0.6, 0.5);
   inner.position.y = -0.15;
   outer.add(inner);
@@ -863,24 +1255,31 @@ function flame(root: THREE.Group, x: number, y: number, z: number, size: number)
   return outer;
 }
 
-function portcullis(): THREE.Group {
+function portcullis(L: ArenaLook): THREE.Group {
   const g = new THREE.Group();
   const iron = new THREE.MeshToonMaterial({ color: C.iron });
-  const z = COLOSSEUM.z + ARENA_R + WALL_THICK / 2;
+  const z = L.r + L.thick / 2;
   for (let x = -GATE_HALF + 0.3; x <= GATE_HALF - 0.2; x += 0.75) {
     const bar = new THREE.Mesh(G.box, iron);
     bar.scale.set(0.14, 5.6, 0.14);
-    bar.position.set(COLOSSEUM.x + x, 2.8, z);
+    bar.position.set(x, 2.8, z);
     g.add(bar);
   }
   for (const y of [1.2, 3.0, 4.8]) {
     const bar = new THREE.Mesh(G.box, iron);
     bar.scale.set(GATE_HALF * 2, 0.14, 0.14);
-    bar.position.set(COLOSSEUM.x, y, z);
+    bar.position.set(0, y, z);
     g.add(bar);
   }
-  g.position.y = 6; // raised
-  return g;
+  // Stood in the gate's frame inside a group of its own, so `position.y` still raises and lowers it.
+  const frame = new THREE.Group();
+  frame.position.set(L.x, 0, L.z);
+  frame.rotation.y = L.yaw;
+  frame.add(g);
+  const lift = new THREE.Group();
+  lift.add(frame);
+  lift.position.y = 6; // raised
+  return lift;
 }
 
 function cloudLayer(): THREE.Group {

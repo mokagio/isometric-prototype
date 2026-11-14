@@ -26,7 +26,7 @@ export interface Build {
   /** How heavily built: 1 is the hero. */
   bulk: number;
   shield: { rim: number; face: number; emblem: number; sign: "star" | "lambda" | "spear" } | null;
-  weapon: "sword" | "hammer";
+  weapon: "sword" | "hammer" | "trident";
   blade: number;
   cape: number | null;
 }
@@ -121,10 +121,47 @@ export const SMITH_BUILD: Build = {
   cape: null,
 };
 
+export const POSEIDON_BUILD: Build = {
+  body: "flesh",
+  skin: 0x8fc4c0,
+  hair: 0xe8f2f2,
+  hairStyle: "long",
+  beard: 0xe8f2f2,
+  band: null,
+  tunic: 0x1f4f9a,
+  sandals: 0x2a3f5a,
+  eyes: 0x3fe0ff,
+  eyeGlow: true,
+  bulk: 1.25,
+  shield: null,
+  weapon: "trident",
+  blade: 0xe8b83e,
+  cape: 0x2a7fa8,
+};
+
+export const FISHER_BUILD: Build = {
+  body: "flesh",
+  skin: 0xc98a58,
+  hair: 0x4a3a2e,
+  hairStyle: "short",
+  beard: 0x6a5a4a,
+  band: null,
+  tunic: 0xe6dcc4,
+  sandals: 0x5a3a22,
+  eyes: 0x1b1b2a,
+  eyeGlow: false,
+  bulk: 1.05,
+  shield: null,
+  weapon: "trident",
+  blade: 0x9aa4ac,
+  cape: null,
+};
+
 /** The paint for each kit: the metal, its trim, and the crest. */
 export const KIT_PAINT: Record<Exclude<Kit, "none">, { metal: number; trim: number; crest: number }> = {
   bronze: { metal: 0xc8913a, trim: 0x8a5a22, crest: 0x2f6fb5 },
   ares: { metal: 0x8e1b16, trim: 0xe8b83e, crest: 0x1a0a08 },
+  poseidon: { metal: 0x2f9a92, trim: 0xe8b83e, crest: 0xf2f8f8 },
 };
 
 export interface Figure {
@@ -192,6 +229,7 @@ const HALF = new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2)
 const CYL = new THREE.CylinderGeometry(1, 1, 1, 16);
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const TORUS = new THREE.TorusGeometry(1, 0.12, 8, 24);
+const CONE = new THREE.ConeGeometry(1, 1, 8);
 
 /** A pleated skirt: a flared tube whose hem ripples into folds. */
 function pleats(top: number, bottom: number, height: number, folds: number): THREE.BufferGeometry {
@@ -506,6 +544,15 @@ export function buildFigure(b: Build): Figure {
     sword.add(part(BOX, mat(0xb88a2e), [0.18, 0.035, 0.05], [0, 0.09, 0]));
     sword.add(part(CYL, leather, [0.024, 0.15, 0.024], [0, 0.0, 0]));
     sword.add(part(SPHERE, mat(0xb88a2e), [0.035, 0.035, 0.035], [0, -0.09, 0]));
+  } else if (b.weapon === "trident") {
+    // A long shaft held near the middle, a crossbar and three barbed prongs.
+    const metal = mat(b.blade);
+    sword.add(part(CYL, mat(0x7a5232), [0.022, 1.9, 0.022], [0, 0.35, 0]));
+    sword.add(part(BOX, metal, [0.34, 0.04, 0.04], [0, 1.3, 0]));
+    for (const x of [-0.15, 0, 0.15]) {
+      sword.add(part(CYL, metal, [0.018, x === 0 ? 0.42 : 0.32, 0.018], [x, x === 0 ? 1.51 : 1.46, 0]));
+      sword.add(part(CONE, metal, [0.04, 0.12, 0.04], [x, x === 0 ? 1.77 : 1.67, 0]));
+    }
   } else {
     sword.add(part(CYL, leather, [0.025, 0.45, 0.025], [0, 0.15, 0]));
     sword.add(part(BOX, mat(b.blade), [0.2, 0.1, 0.1], [0, 0.38, 0]));
@@ -689,7 +736,7 @@ export function wearKit(fig: Figure, armor: Record<Slot, Kit>): void {
   for (const m of fig.hairline) m.visible = armor.helmet === "none";
   // One paint for the whole figure: the god's if any piece is the god's.
   const kits = Object.values(armor);
-  const kit: Kit = kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
+  const kit: Kit = kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
   if (kit !== "none") {
     const paint = KIT_PAINT[kit];
     fig.metal.color.setHex(paint.metal);

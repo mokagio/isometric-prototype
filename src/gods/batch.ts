@@ -18,6 +18,13 @@ export class Batch {
   private readonly s = new THREE.Vector3();
   private readonly p = new THREE.Vector3();
   private readonly c = new THREE.Color();
+  private frame: THREE.Matrix4 | null = null;
+  private readonly w = new THREE.Vector3();
+
+  /** Draw what follows as if `(x, z)` were the origin and +z pointed along `yaw`; no arguments goes back to world space. */
+  setFrame(x?: number, z?: number, yaw = 0): void {
+    this.frame = x === undefined || z === undefined ? null : new THREE.Matrix4().makeRotationY(yaw).setPosition(x, 0, z);
+  }
 
   add(
     geometry: THREE.BufferGeometry,
@@ -43,7 +50,12 @@ export class Batch {
     this.p.set(at.x, at.y, at.z);
     this.m.compose(this.p, this.q, this.s);
     g = g.applyMatrix4(this.m);
-    const key = `${Math.floor(at.x / TILE)}|${Math.floor(at.z / TILE)}`;
+    this.w.set(at.x, at.y, at.z);
+    if (this.frame) {
+      g = g.applyMatrix4(this.frame);
+      this.w.applyMatrix4(this.frame);
+    }
+    const key = `${Math.floor(this.w.x / TILE)}|${Math.floor(this.w.z / TILE)}`;
     const list = this.parts.get(key) ?? [];
     list.push(g);
     this.parts.set(key, list);

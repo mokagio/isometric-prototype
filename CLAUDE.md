@@ -204,6 +204,12 @@ Ares is beaten by not standing in front of him: his shield rings off frontal blo
 He calls in Spartans at each line in `SUMMON_AT`.
 A bandit knocked flat gets back up unless struck again while down; the camps restock whenever the hero is in the city, which also heals.
 
+The road forks just past the city: north to Ares, east to a fishing village on the coast with Poseidon's colosseum at its heart.
+The walkable world is `REGIONS` in `world.ts` — the meadow, the road east, the village and the piers — and everything past them is hills or sea, so a new place to go is a new box there.
+Both colosseums are drawn by one `colosseum()` from an `ArenaLook`, built facing +z and turned through `Batch.setFrame` to face its road; `pushOut` keeps each one's wall with its gate open or shut.
+Poseidon (`poseidon.ts`) parries from the front while he holds his trident, and the opening is the throw: block it or dodge it, and he is unarmed until it comes back.
+At each line in `FLOOD_AT` he floods the arena, nothing reaches him while the sea is up, and only the four `SEA_ISLANDS` keep the hero dry.
+
 On the dev server `window.gods` can read state, teleport the hero and add coins, so a recording can reach the colosseum without walking the road.
 Progress is under the `gods:save` storage key.
 

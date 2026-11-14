@@ -4,6 +4,16 @@ import {
   ARENA_R,
   BLACKSMITH,
   BOUNDS,
+  EAST_ROAD_END,
+  EAST_ROAD_Z,
+  huts,
+  onIsland,
+  PIER_LENGTH,
+  PIERS,
+  SEA_ARENA,
+  SEA_ISLANDS,
+  SHORE_X,
+  VILLAGE,
   CAMPS,
   CITY,
   COLOSSEUM,
@@ -62,5 +72,48 @@ describe("the world", () => {
     for (let z = -26; z > COLOSSEUM.z + ARENA_R + WALL_THICK; z -= 1) {
       expect(pushOut(world, 0, z, 0.45, false)).toEqual({ x: 0, z });
     }
+  });
+
+  it("walks the road east from the fork to Poseidon's gate", () => {
+    for (let x = 4; x < EAST_ROAD_END; x += 1) {
+      expect(pushOut(world, x, EAST_ROAD_Z, 0.45, false)).toEqual({ x, z: EAST_ROAD_Z });
+    }
+  });
+
+  it("walks out to the end of every pier, but not into the sea beside it", () => {
+    for (const z of PIERS) {
+      const end = { x: SHORE_X + PIER_LENGTH - 1, z };
+      expect(pushOut(world, end.x, end.z, 0.45, false)).toEqual(end);
+      expect(pushOut(world, end.x, z + 5, 0.45, false).z).toBeLessThan(z + 5);
+    }
+  });
+
+  it("stops at the water's edge", () => {
+    expect(pushOut(world, SHORE_X + 6, VILLAGE.z + 10, 0.45, false).x).toBeLessThanOrEqual(SHORE_X);
+  });
+
+  it("lets a body through Poseidon's open gate, and not the closed one", () => {
+    const gateway = { x: SEA_ARENA.x - SEA_ARENA.r - 1, z: SEA_ARENA.z };
+    expect(pushOut(world, gateway.x, gateway.z, 0.45, false, false)).toEqual(gateway);
+    expect(pushOut(world, gateway.x, gateway.z, 0.45, false, true)).not.toEqual(gateway);
+  });
+
+  it("stops a body at Poseidon's wall away from the gate", () => {
+    const p = pushOut(world, SEA_ARENA.x + SEA_ARENA.r + 0.5, SEA_ARENA.z, 0.45, false);
+    expect(dist(p.x, p.z, SEA_ARENA.x, SEA_ARENA.z)).toBeCloseTo(SEA_ARENA.r - 0.45);
+  });
+
+  it("keeps the flood islands inside Poseidon's arena", () => {
+    for (const c of SEA_ISLANDS) expect(dist(c.x, c.z, SEA_ARENA.x, SEA_ARENA.z) + c.r).toBeLessThan(SEA_ARENA.r);
+    expect(onIsland(SEA_ISLANDS[0]!.x, SEA_ISLANDS[0]!.z)).toBe(true);
+    expect(onIsland(SEA_ARENA.x, SEA_ARENA.z)).toBe(false);
+  });
+
+  it("keeps the huts and camps off the road east and clear of Poseidon's wall", () => {
+    for (const h of huts()) {
+      expect(Math.abs(h.z - EAST_ROAD_Z) > 4 || h.x > EAST_ROAD_END).toBe(true);
+      expect(dist(h.x, h.z, SEA_ARENA.x, SEA_ARENA.z) - Math.max(h.w, h.d) / 2).toBeGreaterThan(SEA_ARENA.r + SEA_ARENA.thick);
+    }
+    for (const c of CAMPS) expect(Math.abs(c.z - EAST_ROAD_Z)).toBeGreaterThan(6);
   });
 });

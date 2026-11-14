@@ -1,7 +1,17 @@
 import * as THREE from "three";
 import { createMenu } from "../ui";
 import { ARES_HP, BODY, guarding, makeAres, strikeAres, updateAres, type Ares } from "./ares";
-import { buy, damageTaken, godKit, shieldStops, swordPower } from "./armor";
+import {
+  BODY as SEA_BODY,
+  FLOOD_DAMAGE,
+  floodLevel,
+  makePoseidon,
+  POSEIDON_HP,
+  strikePoseidon,
+  updatePoseidon,
+  type Poseidon,
+} from "./poseidon";
+import { buy, damageTaken, godKit, shieldStops, swordPower, type Kit } from "./armor";
 import { dist, inArc, yawTo } from "./bearing";
 import { createControls } from "./controls";
 import {
@@ -13,6 +23,8 @@ import {
   KIT_PAINT,
   poseFigure,
   BANDIT_BUILD,
+  FISHER_BUILD,
+  POSEIDON_BUILD,
   SMITH_BUILD,
   SPARTAN_BUILD,
   wearKit,
@@ -58,11 +70,18 @@ import {
   CAMPS,
   COLOSSEUM,
   FIGHT_TRIGGER,
+  FISHERS,
   inArena,
   inCity,
+  inSeaArena,
+  inVillage,
+  ISLAND_H,
   layoutWorld,
+  onIsland,
   pushOut,
+  SEA_ARENA,
   SHOP_RANGE,
+  VILLAGE,
 } from "./world";
 
 const ARES_SCALE = 1.75;
@@ -228,6 +247,17 @@ smith.root.scale.setScalar(1.1);
 scene.add(smith.root);
 blob(1.3).position.set(smith.root.position.x, 0.07, smith.root.position.z);
 
+// Fishermen about the village, each leaning on a fishing spear.
+const fishers = FISHERS.map((f, i) => {
+  const fig = buildFigure(FISHER_BUILD);
+  fig.root.position.set(f.x, 0, f.z);
+  fig.root.rotation.y = f.yaw;
+  fig.walk = i * 1.7;
+  scene.add(fig.root);
+  blob(1.2).position.set(f.x, 0.07, f.z);
+  return fig;
+});
+
 interface Foe {
   g: Grunt;
   fig: Figure;
@@ -274,7 +304,78 @@ type Fight = "waiting" | "on" | "won";
 let fight: Fight = save.beaten.includes("ares") ? "won" : "waiting";
 let ares: { a: Ares; fig: Figure; shadow: THREE.Mesh; flash: number; stars: THREE.Group } | null = null;
 let gateClosed = false;
-let reward: { mesh: THREE.Group; x: number; z: number } | null = null;
+let reward: { mesh: THREE.Group; x: number; z: number; kit: GodKit } | null = null;
+type GodKit = Exclude<Kit, "none" | "bronze">;
+
+// Poseidon and his.
+const SEA_SCALE = 1.75;
+let seaFight: Fight = save.beaten.includes("poseidon") ? "won" : "waiting";
+let seaGateClosed = false;
+let poseidon: { p: Poseidon; fig: Figure; shadow: THREE.Mesh; flash: number; spear: THREE.Group } | null = null;
+let floodSting = 0;
+
+/** The thrown trident, flying on its own. */
+function thrownTrident(): THREE.Group {
+  const g = new THREE.Group();
+  const gold = toon(0xe8b83e, { emissive: 0x302008 });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.2, 8), toon(0x7a5232));
+  shaft.rotation.x = Math.PI / 2;
+  g.add(shaft);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.07, 0.07), gold);
+  bar.position.z = 1.6;
+  g.add(bar);
+  for (const x of [-0.26, 0, 0.26]) {
+    const prong = new THREE.Mesh(new THREE.ConeGeometry(0.07, x === 0 ? 0.9 : 0.7, 8), gold);
+    prong.rotation.x = Math.PI / 2;
+    prong.position.set(x, 0, 1.6 + (x === 0 ? 0.45 : 0.35));
+    g.add(prong);
+  }
+  g.visible = false;
+  scene.add(g);
+  return g;
+}
+
+function startSeaFight(): void {
+  seaFight = "on";
+  seaGateClosed = true;
+  const fig = buildFigure(POSEIDON_BUILD);
+  fig.root.scale.setScalar(SEA_SCALE);
+  scene.add(fig.root);
+  const yaw = SEA_ARENA.yaw + Math.PI;
+  const p = makePoseidon(SEA_ARENA.x + Math.sin(yaw) * 7, SEA_ARENA.z + Math.cos(yaw) * 7, SEA_ARENA.yaw);
+  poseidon = { p, fig, shadow: blob(2.4), flash: 0, spear: thrownTrident() };
+  hud.banner("POSEIDON", "God of the Sea");
+  hud.setBoss("Poseidon, God of the Sea", 1);
+  shake = 0.4;
+}
+
+function clearPoseidon(): void {
+  if (!poseidon) return;
+  scene.remove(poseidon.fig.root);
+  scene.remove(poseidon.shadow);
+  scene.remove(poseidon.spear);
+  poseidon = null;
+}
+
+function endSeaFight(): void {
+  clearPoseidon();
+  seaGateClosed = false;
+  scenery.flood.visible = false;
+  hud.setBoss(null, 0);
+}
+
+function poseidonFalls(): void {
+  if (!poseidon) return;
+  seaFight = "won";
+  hud.banner("Poseidon is beaten!", "Claim his armor", 3.5);
+  hud.setBoss(null, 0);
+  shake = 0.7;
+  stop = 0.25;
+  burst(poseidon.p.x, 2, poseidon.p.z, 0x6fe0ff, 40, 10, 1.6);
+  seaGateClosed = false;
+  scenery.flood.visible = false;
+  spawnReward(poseidon.p.x, poseidon.p.z, "poseidon");
+}
 
 function makeStars(): THREE.Group {
   const g = new THREE.Group();
@@ -313,9 +414,10 @@ function endFight(): void {
   for (const f of foes.filter((f) => f.camp === -1)) removeFoe(f);
   gateClosed = false;
   hud.setBoss(null, 0);
+  endSeaFight();
 }
 
-function spawnReward(x: number, z: number): void {
+function spawnReward(x: number, z: number, kit: GodKit): void {
   const g = new THREE.Group();
   const beam = new THREE.Mesh(
     new THREE.CylinderGeometry(1.1, 1.1, 30, 20, 1, true),
@@ -323,8 +425,8 @@ function spawnReward(x: number, z: number): void {
   );
   beam.position.y = 15;
   g.add(beam);
-  // The armour itself, floating in the light: Ares's helmet over his breastplate.
-  const paint = KIT_PAINT.ares;
+  // The armour itself, floating in the light: the god's helmet over his breastplate.
+  const paint = KIT_PAINT[kit];
   const armour = new THREE.Group();
   const metal = toon(paint.metal, { emissive: 0x401008 });
   const trim = toon(paint.trim, { emissive: 0x403010 });
@@ -341,7 +443,7 @@ function spawnReward(x: number, z: number): void {
   g.add(armour);
   g.position.set(x, 0, z);
   scene.add(g);
-  reward = { mesh: g, x, z };
+  reward = { mesh: g, x, z, kit };
 }
 
 // Loose coins.
@@ -374,6 +476,7 @@ let devZoom = 1;
 let lastDrag = -10;
 let clock = 0;
 let leftTown = false;
+let wasInVillage = false;
 let fallTimer = 0;
 const camPos = new THREE.Vector3();
 const camLook = new THREE.Vector3();
@@ -431,6 +534,23 @@ function swingLands(): void {
       if (result === "dead") aresFalls();
     }
   }
+  if (poseidon && underBlade(hero, poseidon.p.x, poseidon.p.z, SEA_BODY)) {
+    const p = poseidon.p;
+    const result = strikePoseidon(p, power, hero.x, hero.z);
+    if (result === "clang") {
+      // Turned aside by the trident, or by the sea itself while it is up.
+      burst(p.x + Math.sin(p.yaw) * 1.2, 1.8, p.z + Math.cos(p.yaw) * 1.2, p.state === "flood" ? 0x9fe8ff : 0xfff2a0, 14, 7);
+      shove(hero, p.x, p.z, 7);
+      stop = 0.07;
+      hitAny = true;
+    } else if (result !== "none") {
+      poseidon.flash = 1;
+      hitAny = true;
+      burst(p.x, 2.2, p.z, 0x6fe0ff, 14, 7);
+      hud.setBoss("Poseidon, God of the Sea", p.hp / POSEIDON_HP);
+      if (result === "dead") poseidonFalls();
+    }
+  }
   if (hitAny) {
     stop = Math.max(stop, 0.05);
     shake = Math.max(shake, 0.12);
@@ -450,21 +570,27 @@ function aresFalls(): void {
     f.g.t = 0;
   }
   gateClosed = false;
-  spawnReward(ares.a.x, ares.a.z);
+  spawnReward(ares.a.x, ares.a.z, "ares");
 }
 
 function claimReward(): void {
   if (!reward) return;
   scene.remove(reward.mesh);
   burst(reward.x, 1.5, reward.z, 0xffd860, 50, 9, 1.4);
+  const kit = reward.kit;
   reward = null;
-  save.armor = godKit("ares");
-  if (!save.beaten.includes("ares")) save.beaten.push("ares");
+  save.armor = godKit(kit);
+  if (!save.beaten.includes(kit)) save.beaten.push(kit);
   storeSave(save);
   wearKit(heroFig, save.armor);
   hud.setArmor(save.armor);
+  if (kit === "poseidon") {
+    hud.banner("Armor of Poseidon", "The toughest yet, and your sword hits twice as hard", 4);
+    clearPoseidon();
+    return;
+  }
   hud.banner("Armor of Ares", "Tougher, and your sword hits twice as hard", 4);
-  window.setTimeout(() => hud.banner("More gods await…", "Their colosseums are coming soon", 3.5), 4500);
+  if (seaFight !== "won") window.setTimeout(() => hud.banner("Poseidon awaits…", "Take the road east to the fishing village", 3.5), 4500);
   if (ares) {
     scene.remove(ares.fig.root);
     scene.remove(ares.shadow);
@@ -476,6 +602,7 @@ function claimReward(): void {
 function respawn(): void {
   endFight();
   if (fight === "on") fight = "waiting";
+  if (seaFight === "on") seaFight = "waiting";
   hero = makeHero(START.x, START.z, START.yaw);
   camYaw = START.yaw;
   leftTown = false;
@@ -524,14 +651,23 @@ function update(dt: number): void {
   const stick = controls.stick();
   const blocking = controls.blocking();
   const aresUp = ares && ares.a.state !== "dead";
+  const seaUp = poseidon && poseidon.p.state !== "dead";
   if (aresUp && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, ares!.a, dt);
+  else if (seaUp && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, poseidon!.p, dt);
   else if (!blocking && standing(hero)) camYaw = autoTurn(camYaw, stick.x, dt);
   const move = moveFromStick(stick.x, stick.y, camYaw);
+  // Wading through the flood is slow going.
+  const wading = poseidon !== null && floodLevel(poseidon.p) > 0.5 && !onIsland(hero.x, hero.z);
+  if (wading) {
+    move.x *= 0.6;
+    move.z *= 0.6;
+  }
 
   if (controls.takeAttack() && startSwing(hero)) {
     // Phones get help aiming: the swing turns to the nearest thing in front worth hitting.
     const targets: Array<{ x: number; z: number }> = foes.filter((f) => f.g.state !== "dead").map((f) => f.g);
     if (ares && ares.a.state !== "dead") targets.push(ares.a);
+    if (poseidon && poseidon.p.state !== "dead") targets.push(poseidon.p);
     let best: { x: number; z: number } | null = null;
     let bestD = SWING_REACH + 2;
     for (const t of targets) {
@@ -548,7 +684,7 @@ function update(dt: number): void {
   stop = Math.max(0, stop - dt);
 
   if (stepHero(hero, sim, { move, block: blocking })) swingLands();
-  const p = pushOut(world, hero.x, hero.z, RADIUS, gateClosed);
+  const p = pushOut(world, hero.x, hero.z, RADIUS, gateClosed, seaGateClosed);
   hero.x = p.x;
   hero.z = p.z;
 
@@ -558,7 +694,8 @@ function update(dt: number): void {
   }
 
   // The city mends you and restocks the road.
-  if (inCity(hero.x, hero.z) && standing(hero)) {
+  const inTown = inCity(hero.x, hero.z) || (inVillage(hero.x, hero.z) && !inSeaArena(hero.x, hero.z, SEA_ARENA.r + SEA_ARENA.thick + 1));
+  if (inTown && standing(hero)) {
     hero.hp = Math.min(MAX_HP, hero.hp + CITY_HEAL * dt);
     for (let i = 0; i < CAMPS.length; i++) stockCamp(i);
     if (leftTown) leftTown = false;
@@ -566,6 +703,9 @@ function update(dt: number): void {
     leftTown = true;
     if (fight !== "won") hud.banner("The Road to Ares", "His colosseum lies to the north", 2.4);
   }
+  const nowInVillage = inVillage(hero.x, hero.z);
+  if (nowInVillage && !wasInVillage) hud.banner("The Fishing Village", seaFight === "won" ? "Poseidon is beaten" : "Poseidon waits in his colosseum", 2.6);
+  wasInVillage = nowInVillage;
 
   // Grunts.
   for (const f of foes) {
@@ -638,6 +778,53 @@ function update(dt: number): void {
       }
     }
   }
+  // Poseidon.
+  if (seaFight === "waiting" && inSeaArena(hero.x, hero.z, SEA_ARENA.r - 5) && standing(hero)) startSeaFight();
+  if (poseidon) {
+    const p = poseidon.p;
+    const events = updatePoseidon(p, sim, { x: hero.x, z: hero.z, alive: standing(hero) }, { x: SEA_ARENA.x, z: SEA_ARENA.z, r: SEA_ARENA.r });
+    for (const e of events) {
+      if (e.kind === "blow") heroLoses(e);
+      else if (e.kind === "roar") shake = 0.35;
+      else if (e.kind === "throw") hud.banner("Look out!", "Block it, or get out of the way", 1.2);
+      else if (e.kind === "stuck") {
+        shake = 0.25;
+        burst(e.x, 1.2, e.z, 0xd2e0de, 14, 6);
+        hud.banner("He threw his trident!", "Hit him now!", 1.6);
+      } else if (e.kind === "flood") {
+        shake = 0.6;
+        hud.banner("The sea is coming!", "Get up on an island!", 2.2);
+      }
+    }
+    // Caught in the flood, off the islands: it stings, a little at a time.
+    const level = floodLevel(p);
+    if (level > 0.5 && standing(hero) && !onIsland(hero.x, hero.z) && inSeaArena(hero.x, hero.z)) {
+      floodSting += sim;
+      if (floodSting >= 0.5) {
+        floodSting = 0;
+        hero.hp = Math.max(0, hero.hp - damageTaken(FLOOD_DAMAGE * 0.5, save.armor));
+        heroFlash = 0.6;
+        burst(hero.x, 0.8, hero.z, 0x9fe8ff, 6, 4);
+        if (hero.hp === 0) {
+          hero.fallen = 0;
+          hero.swing = -1;
+          fallTimer = 0;
+          hud.banner("You fell!", "Back to town to heal up", 2.6);
+        }
+      }
+    } else floodSting = 0;
+    if (p.state !== "dead") {
+      const q = pushOut(world, p.x, p.z, SEA_BODY, gateClosed, true);
+      p.x = q.x;
+      p.z = q.z;
+      const d = dist(p.x, p.z, hero.x, hero.z);
+      const min = SEA_BODY + RADIUS;
+      if (d < min && d > 1e-4) {
+        hero.x = p.x + ((hero.x - p.x) / d) * min;
+        hero.z = p.z + ((hero.z - p.z) / d) * min;
+      }
+    }
+  }
   if (reward && dist(hero.x, hero.z, reward.x, reward.z) < 2.4) claimReward();
 
   // Coins hop out, settle, and fly to a hero who comes near.
@@ -682,12 +869,13 @@ function update(dt: number): void {
   hud.setHealth(Math.ceil(hero.hp));
   hud.setCompass(
     camYaw,
-    fight === "on"
+    fight === "on" || seaFight === "on"
       ? null
       : [
           { id: "colosseum", label: fight === "won" ? "Colosseum" : "Ares", yaw: yawTo(hero.x, hero.z, COLOSSEUM.x, COLOSSEUM.z) },
           { id: "city", label: "City", yaw: yawTo(hero.x, hero.z, 0, 0) },
-        ].filter((m) => m.id !== "city" || !inCity(hero.x, hero.z)),
+          { id: "village", label: seaFight === "won" ? "Village" : "Poseidon", yaw: yawTo(hero.x, hero.z, VILLAGE.x, VILLAGE.z) },
+        ].filter((m) => (m.id !== "city" || !inCity(hero.x, hero.z)) && (m.id !== "village" || !inVillage(hero.x, hero.z))),
   );
 }
 
@@ -702,7 +890,8 @@ function gruntSwing(g: Grunt): number {
 
 function draw(dt: number): void {
   // Hero.
-  heroFig.root.position.set(hero.x, 0, hero.z);
+  const heroY = onIsland(hero.x, hero.z) ? ISLAND_H : 0;
+  heroFig.root.position.set(hero.x, heroY, hero.z);
   heroFig.root.rotation.y = hero.yaw;
   poseFigure(heroFig, dt, {
     speed: hero.speed,
@@ -713,11 +902,12 @@ function draw(dt: number): void {
   flash(heroFig, heroFlash * 0.8, 0xff3020);
   // Blink while nothing can hurt you, the way every game says so.
   heroFig.root.visible = !(hero.hurt > 0.25 && standing(hero) && Math.floor(clock * 20) % 2 === 0);
-  heroShadow.position.set(hero.x, 0.07, hero.z);
+  heroShadow.position.set(hero.x, heroY + 0.07, hero.z);
 
   // The smith hammers on.
   const hammer = (clock * 1.3) % 1;
   poseFigure(smith, dt, { swing: hammer });
+  for (const f of fishers) poseFigure(f, dt, {});
 
   for (const f of foes) {
     const g = f.g;
@@ -765,6 +955,43 @@ function draw(dt: number): void {
     if (a.state === "charge" && Math.random() < 0.6) burst(a.x, 0.2, a.z, 0xd2b48c, 1, 3, 1.2);
   }
 
+  if (poseidon) {
+    const p = poseidon.p;
+    const fig = poseidon.fig;
+    fig.root.position.set(p.x, 0, p.z);
+    fig.root.rotation.y = p.yaw;
+    let swing = -1;
+    if (p.state === "windup") swing = 0.38 * Math.min(1, p.t / 0.7);
+    else if (p.state === "jab") swing = 0.38 + 0.24 * Math.min(1, p.t / 0.2);
+    else if (p.state === "recover") swing = 0.62 + 0.38 * Math.min(1, p.t / 0.4);
+    poseFigure(fig, dt, {
+      speed: p.moving ? 2.4 : 0,
+      swing,
+      raise: p.state === "flood" || p.state === "aim" ? 1 : 0,
+      fallen: p.state === "dead" ? p.t : -1,
+    });
+    fig.sword.visible = p.spear === null;
+    if (p.state === "aim") flash(fig, 0.4 + 0.4 * Math.sin(clock * 24), 0x2fd6ff);
+    else if (p.state === "windup") flash(fig, 0.2 + 0.2 * Math.sin(clock * 30), 0xffaa40);
+    else flash(fig, poseidon.flash, 0xffffff);
+    poseidon.flash = Math.max(0, poseidon.flash - dt * 6);
+    poseidon.shadow.position.set(p.x, 0.07, p.z);
+    const spear = poseidon.spear;
+    spear.visible = p.spear !== null;
+    if (p.spear) {
+      spear.position.set(p.spear.x, p.spear.flying ? 2.2 : 1.4, p.spear.z);
+      spear.rotation.set(p.spear.flying ? 0 : -0.5, p.spear.yaw, 0);
+    }
+    const level = floodLevel(p);
+    scenery.flood.visible = level > 0;
+    scenery.flood.position.y = level * 0.65;
+    if (level > 0.3 && Math.random() < 0.3) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.random() * SEA_ARENA.r;
+      burst(SEA_ARENA.x + Math.sin(a) * r, level * 0.65, SEA_ARENA.z + Math.cos(a) * r, 0xe8fbff, 1, 2, 0.8);
+    }
+  }
+
   if (reward) {
     reward.mesh.children[1]!.rotation.y = clock * 1.5;
     reward.mesh.children[1]!.position.y = 1.2 + Math.sin(clock * 2) * 0.2;
@@ -779,6 +1006,8 @@ function draw(dt: number): void {
     f.scale.set(s * 0.55, s * 1.3 * flick, s * 0.55);
   }
   scenery.grass.uniforms.time!.value = clock;
+  scenery.sea.uniforms.time!.value = clock;
+  scenery.seaGate.position.y += ((seaGateClosed ? 0 : 6) - scenery.seaGate.position.y) * Math.min(1, dt * (seaGateClosed ? 10 : 2));
   for (const c of scenery.clouds.children) {
     c.position.x += dt * 2;
     if (c.position.x > 260) c.position.x -= 520;
@@ -786,7 +1015,7 @@ function draw(dt: number): void {
   updateSparks(dt);
 
   // Camera: behind the hero, pulled back and up in the arena so the god fits in frame.
-  const fighting = ares !== null && ares.a.state !== "dead";
+  const fighting = (ares !== null && ares.a.state !== "dead") || (poseidon !== null && poseidon.p.state !== "dead");
   const back = (fighting ? CAM_DIST + 2.5 : CAM_DIST) * devZoom;
   const up = LOOK_HEIGHT + ((fighting ? CAM_HEIGHT + 1.6 : CAM_HEIGHT) - LOOK_HEIGHT) * devZoom;
   const tx = hero.x;
@@ -794,7 +1023,14 @@ function draw(dt: number): void {
   let cx = tx - Math.sin(camYaw) * back;
   let cz = tz - Math.cos(camYaw) * back;
   // Inside the colosseum the camera stays inside the wall.
-  if (inArena(hero.x, hero.z)) {
+  if (inSeaArena(hero.x, hero.z)) {
+    const d = dist(cx, cz, SEA_ARENA.x, SEA_ARENA.z);
+    const limit = SEA_ARENA.r - 0.8;
+    if (d > limit) {
+      cx = SEA_ARENA.x + ((cx - SEA_ARENA.x) / d) * limit;
+      cz = SEA_ARENA.z + ((cz - SEA_ARENA.z) / d) * limit;
+    }
+  } else if (inArena(hero.x, hero.z)) {
     const d = dist(cx, cz, COLOSSEUM.x, COLOSSEUM.z);
     const limit = ARENA_R - 0.8;
     if (d > limit) {
@@ -833,7 +1069,7 @@ hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods
 if (import.meta.env.DEV) {
   Object.assign(window, {
     gods: {
-      state: () => ({ hero, fight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, foes: foes.map((f) => f.g) }),
+      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, foes: foes.map((f) => f.g) }),
       teleport(x: number, z: number, yaw = hero.yaw) {
         hero.x = x;
         hero.z = z;

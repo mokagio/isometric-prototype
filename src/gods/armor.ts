@@ -7,13 +7,13 @@ export const SLOTS: readonly Slot[] = ["helmet", "chest", "arms", "legs"];
  * What a slot is wearing. Bronze is what the blacksmith sells; a god's kit is
  * only ever won, a whole set at once, by beating that god.
  */
-export type Kit = "none" | "bronze" | "ares";
+export type Kit = "none" | "bronze" | "ares" | "poseidon";
 export type Armor = Record<Slot, Kit>;
 
 export const NO_ARMOR: Armor = { helmet: "none", chest: "none", arms: "none", legs: "none" };
 
 /** The share of every blow a piece of each kit soaks up. */
-export const GUARD: Record<Kit, number> = { none: 0, bronze: 0.12, ares: 0.18 };
+export const GUARD: Record<Kit, number> = { none: 0, bronze: 0.12, ares: 0.18, poseidon: 0.2 };
 
 export const PRICES: Record<Slot, number> = { helmet: 15, chest: 25, arms: 10, legs: 12 };
 
@@ -37,9 +37,9 @@ export function wearsFullKit(armor: Armor, kit: Kit): boolean {
   return SLOTS.every((slot) => armor[slot] === kit);
 }
 
-/** Ares's kit is the one thing that makes the sword hit harder. */
+/** A god's whole kit is the one thing that makes the sword hit harder. */
 export function swordPower(armor: Armor): number {
-  return wearsFullKit(armor, "ares") ? 2 : 1;
+  return wearsFullKit(armor, "ares") || wearsFullKit(armor, "poseidon") ? 2 : 1;
 }
 
 /** How wide the raised shield covers, in front of the hero. */
