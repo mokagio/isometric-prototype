@@ -4,7 +4,7 @@ import type { Kit, Slot } from "./armor";
 import { toon } from "./toon";
 
 /**
- * Every person in the game is the same doll — hero, skeleton, soldier, smith,
+ * Every person in the game is the same doll — hero, bandit, soldier, smith,
  * god — turned on a lathe rather than stacked from boxes, facing +z, with
  * joints at the hips, knees, shoulders and elbows. What differs is the paint
  * and the build.
@@ -49,22 +49,22 @@ export const HERO_BUILD: Build = {
   cape: null,
 };
 
-export const SKELETON_BUILD: Build = {
-  body: "bone",
-  skin: 0xe9e1c9,
-  hair: null,
-  hairStyle: "bald",
-  beard: null,
-  band: null,
-  tunic: null,
-  sandals: 0xe9e1c9,
-  eyes: 0xff4a2a,
-  eyeGlow: true,
-  bulk: 1,
-  shield: null,
+export const BANDIT_BUILD: Build = {
+  body: "flesh",
+  skin: 0xc98e5c,
+  hair: 0x2a1c12,
+  hairStyle: "long",
+  beard: 0x2a1c12,
+  band: 0x7a1f1a,
+  tunic: 0x6b5a3a,
+  sandals: 0x3b2a1a,
+  eyes: 0x1b1b2a,
+  eyeGlow: false,
+  bulk: 0.95,
+  shield: { rim: 0x4a3420, face: 0x8a6a44, emblem: 0x7a1f1a, sign: "spear" },
   weapon: "sword",
-  blade: 0x8f7a63,
-  cape: null,
+  blade: 0x9a8a72,
+  cape: 0x4a3a2a,
 };
 
 export const SPARTAN_BUILD: Build = {

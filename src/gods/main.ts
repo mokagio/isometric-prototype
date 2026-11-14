@@ -12,7 +12,7 @@ import {
   HERO_BUILD,
   KIT_PAINT,
   poseFigure,
-  SKELETON_BUILD,
+  BANDIT_BUILD,
   SMITH_BUILD,
   SPARTAN_BUILD,
   wearKit,
@@ -241,7 +241,7 @@ let foes: Foe[] = [];
 let nextId = 1;
 
 function addFoe(kind: GruntKind, x: number, z: number, yaw: number, camp: number): Foe {
-  const build = kind === "skeleton" ? SKELETON_BUILD : SPARTAN_BUILD;
+  const build = kind === "bandit" ? BANDIT_BUILD : SPARTAN_BUILD;
   const fig = buildFigure(build);
   if (kind === "spartan") wearKit(fig, { helmet: "bronze", chest: "bronze", arms: "none", legs: "bronze" });
   if (kind === "spartan") fig.crest.color.setHex(0xa3241e);
@@ -258,13 +258,13 @@ function removeFoe(f: Foe): void {
   foes = foes.filter((o) => o !== f);
 }
 
-/** Fill a camp back up to strength, so the road always has bones on it. */
+/** Fill a camp back up to strength, so the road is never safe. */
 function stockCamp(i: number): void {
   const camp = CAMPS[i]!;
   const have = foes.filter((f) => f.camp === i).length;
   for (let n = have; n < camp.count; n++) {
     const a = (n / camp.count) * Math.PI * 2 + i;
-    addFoe("skeleton", camp.x + Math.sin(a) * 2.2, camp.z + Math.cos(a) * 2.2, a, i);
+    addFoe("bandit", camp.x + Math.sin(a) * 2.2, camp.z + Math.cos(a) * 2.2, a, i);
   }
 }
 CAMPS.forEach((_, i) => stockCamp(i));
@@ -410,7 +410,7 @@ function swingLands(): void {
     if (result === "none") continue;
     hitAny = true;
     f.flash = 1;
-    burst(f.g.x, 1.2, f.g.z, f.g.kind === "skeleton" ? 0xf4ecd0 : 0xffd27a, result === "hurt" ? 8 : 16, 6);
+    burst(f.g.x, 1.2, f.g.z, f.g.kind === "bandit" ? 0xd9b98a : 0xffd27a, result === "hurt" ? 8 : 16, 6);
     if (result === "dead") dropCoins(f.g.x, f.g.z, BOUNTY[f.g.kind]);
   }
   if (ares && underBlade(hero, ares.a.x, ares.a.z, BODY)) {

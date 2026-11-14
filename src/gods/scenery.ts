@@ -498,7 +498,7 @@ function road(b: Batch): void {
       }
     }
   }
-  // Each camp: a ring of stones, a cold fire, scattered bones and a broken shield.
+  // Each camp: a ring of stones, a cold fire, and a broken shield.
   for (const camp of CAMPS) {
     for (let i = 0; i < 9; i++) {
       const a = (i / 9) * Math.PI * 2;
@@ -510,11 +510,14 @@ function road(b: Batch): void {
       b.add(G.rock, 0x7a7670, { x: camp.x + Math.sin(a) * 0.95, y: 0.1, z: camp.z + Math.cos(a) * 0.95 }, { y: a }, 0.22);
       b.add(G.cyl8, 0x4a3020, { x: camp.x + Math.sin(a) * 0.35, y: 0.15, z: camp.z + Math.cos(a) * 0.35 }, { z: 1.2, y: a }, { x: 0.06, y: 0.8, z: 0.06 });
     }
-    for (let i = 0; i < 4; i++) {
+    // Bedrolls round the fire, and the loot in sacks.
+    for (let i = 0; i < 3; i++) {
       const a = hash(i, Math.round(camp.z), 16) * Math.PI * 2;
-      b.add(G.cyl8, 0xe9e1c9, { x: camp.x + Math.sin(a) * 2.6, y: 0.05, z: camp.z + Math.cos(a) * 2.6 }, { z: Math.PI / 2, y: a }, { x: 0.04, y: 0.6, z: 0.04 });
+      const roll = i % 2 ? 0x7a1f1a : 0x6b5a3a;
+      b.add(G.cyl8, roll, { x: camp.x + Math.sin(a) * 3.2, y: 0.16, z: camp.z + Math.cos(a) * 3.2 }, { z: Math.PI / 2, y: a + Math.PI / 2 }, { x: 0.18, y: 1.4, z: 0.18 });
     }
-    b.add(G.blob, 0xe9e1c9, { x: camp.x + 2, y: 0.12, z: camp.z - 2.2 }, {}, { x: 0.14, y: 0.12, z: 0.16 });
+    b.add(G.blob, 0x9a7a4a, { x: camp.x + 2, y: 0.3, z: camp.z - 2.2 }, {}, { x: 0.36, y: 0.42, z: 0.34 });
+    b.add(G.blob, 0x8a6a3e, { x: camp.x + 2.6, y: 0.24, z: camp.z - 1.7 }, {}, { x: 0.3, y: 0.34, z: 0.3 });
     b.add(G.cyl, 0x8a6a3a, { x: camp.x - 2.4, y: 0.05, z: camp.z + 1.4 }, { x: 0.1 }, { x: 0.5, y: 0.04, z: 0.5 });
   }
 }

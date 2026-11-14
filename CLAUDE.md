@@ -188,12 +188,12 @@ Its `ad-` class names, its `ad:` storage keys and its `<style>` blocks stayed as
 
 ## Battle of the Gods
 
-`src/gods/` is a third-person 3D game in three.js: walk out of a city, past skeleton camps on the road, into a colosseum where a Greek god waits.
+`src/gods/` is a third-person 3D game in three.js: walk out of a city, past bandit camps on the road, into a colosseum where a Greek god waits.
 Beating the god wins that god's armour; the blacksmith in town sells bronze pieces for the coins the road pays.
 It was designed by two children, and the answers they gave are the spec: Ares first, sword and shield, armour bought in town plus a god's own kit for winning, a Breath of the Wild look, phone first, tablet second, computer last.
 It shares nothing with Blockpocalypse's code, only the library, and nothing with the rest of the playground but `createMenu` and the page furniture.
 
-There is no art to vendor and no credit to add: every model is built in code from primitives (`figure.ts` is one doll that hero, skeleton, soldier, smith and god are all painted from), so a new god is a `Build` and a kit paint, not a pack.
+There is no art to vendor and no credit to add: every model is built in code from primitives (`figure.ts` is one doll that hero, bandit, soldier, smith and god are all painted from), so a new god is a `Build` and a kit paint, not a pack.
 The look is `toon.ts` — three flat light bands plus a rim of sky light on every silhouette — rather than outlines, which would double the draw calls a phone can afford.
 Static scenery goes through `batch.ts`, merged into one mesh per colour for the same reason.
 
@@ -202,7 +202,7 @@ Headings follow three.js: yaw 0 faces +z, forward is `(sin yaw, cos yaw)`, and `
 
 Ares is beaten by not standing in front of him: his shield rings off frontal blows while he is on guard, and the opening is the charge — sidestep it and he runs into the wall and is dazed.
 He calls in Spartans at each line in `SUMMON_AT`.
-A skeleton felled is a heap that stands back up unless struck again; the camps restock whenever the hero is in the city, which also heals.
+A bandit knocked flat gets back up unless struck again while down; the camps restock whenever the hero is in the city, which also heals.
 
 On the dev server `window.gods` can read state, teleport the hero and add coins, so a recording can reach the colosseum without walking the road.
 Progress is under the `gods:save` storage key.

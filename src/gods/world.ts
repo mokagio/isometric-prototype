@@ -45,7 +45,7 @@ export interface Camp {
   count: number;
 }
 
-/** Skeleton camps along the road: one, then the rest in threes. */
+/** Bandit camps along the road: one, then the rest in threes. */
 export const CAMPS: readonly Camp[] = [
   { x: -4, z: -46, count: 2 },
   { x: 6, z: -68, count: 3 },
