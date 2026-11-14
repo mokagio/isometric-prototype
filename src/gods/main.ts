@@ -638,7 +638,7 @@ function update(dt: number): void {
       }
     }
   }
-  if (reward && dist(hero.x, hero.z, reward.x, reward.z) < 1.8) claimReward();
+  if (reward && dist(hero.x, hero.z, reward.x, reward.z) < 2.4) claimReward();
 
   // Coins hop out, settle, and fly to a hero who comes near.
   for (const c of coins) {
