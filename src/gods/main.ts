@@ -74,6 +74,8 @@ const START = { x: 0, z: 7, yaw: Math.PI };
 const canvas = document.getElementById("stage") as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(HORIZON);
 scene.fog = new THREE.Fog(HORIZON, 45, 230);
@@ -81,8 +83,20 @@ const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1200);
 
 scene.add(new THREE.HemisphereLight(0xd8ecff, 0x6a8a3a, 1.5));
 const sun = new THREE.DirectionalLight(0xfff0d2, 2.4);
-sun.position.set(40, 80, 30);
-scene.add(sun);
+// The sun's shadow box rides along with the hero: only what is near casts.
+const SUN_OFFSET = new THREE.Vector3(30, 60, 22);
+const SHADOW_REACH = 38;
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -SHADOW_REACH;
+sun.shadow.camera.right = SHADOW_REACH;
+sun.shadow.camera.top = SHADOW_REACH;
+sun.shadow.camera.bottom = -SHADOW_REACH;
+sun.shadow.camera.near = 10;
+sun.shadow.camera.far = 160;
+sun.shadow.bias = -0.0008;
+sun.shadow.normalBias = 0.04;
+scene.add(sun, sun.target);
 
 const scenery = buildScenery();
 scene.add(scenery.root);
@@ -108,8 +122,8 @@ const shadowTex = (() => {
   c.width = c.height = 64;
   const g = c.getContext("2d")!;
   const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, "rgba(20,30,10,0.45)");
-  grad.addColorStop(0.6, "rgba(20,30,10,0.25)");
+  grad.addColorStop(0, "rgba(20,30,10,0.3)");
+  grad.addColorStop(0.6, "rgba(20,30,10,0.12)");
   grad.addColorStop(1, "rgba(20,30,10,0)");
   g.fillStyle = grad;
   g.fillRect(0, 0, 64, 64);
@@ -787,6 +801,13 @@ function draw(dt: number): void {
     camPos.z + (Math.random() - 0.5) * jolt,
   );
   camera.lookAt(camLook);
+
+  // Snap the shadow box to whole texels, or shadows shimmer as the hero walks.
+  const texel = (SHADOW_REACH * 2) / sun.shadow.mapSize.x;
+  const sx = Math.round(hero.x / texel) * texel;
+  const sz = Math.round(hero.z / texel) * texel;
+  sun.target.position.set(sx, 0, sz);
+  sun.position.set(sx + SUN_OFFSET.x, SUN_OFFSET.y, sz + SUN_OFFSET.z);
 
   renderer.render(scene, camera);
 }
