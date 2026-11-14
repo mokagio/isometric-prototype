@@ -28,6 +28,7 @@ export default defineConfig({
         woods: resolve(import.meta.dirname, "woods.html"),
         blockpocalypse: resolve(import.meta.dirname, "blockpocalypse.html"),
         dungeon: resolve(import.meta.dirname, "dungeon.html"),
+        gods: resolve(import.meta.dirname, "gods.html"),
         editor: resolve(import.meta.dirname, "editor.html"),
         dungeonEditor: resolve(import.meta.dirname, "dungeonEditor.html"),
         woodsEditor: resolve(import.meta.dirname, "woodsEditor.html"),

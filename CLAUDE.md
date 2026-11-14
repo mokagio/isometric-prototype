@@ -1,10 +1,10 @@
 # Games Playground
 
 A browser games prototype: TypeScript, Vite, no framework, and one runtime dependency that only Blockpocalypse uses.
-Eleven pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), Peaceful Plains (`game.html`, entry `main.ts`), Whispering Woods (`woods.html`, entry `woods/main.ts`), Blockpocalypse (`blockpocalypse.html`, entry `blockpocalypse/main.ts`), Amelia's Dungeon (`dungeon.html`, entry `dungeon/main.ts`), a world editor for the Plains (`editor.html`), an island editor for the Woods (`woodsEditor.html`, entry `woods/editor/main.ts`), a coastline editor (`outline.html`), the dungeon builder (`dungeonEditor.html`, entry `dungeon/editor/main.ts`), the asset library (`library.html`, entry `sunnyside/catalogPage.ts`), and credits (`credits.html`).
+Twelve pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), Peaceful Plains (`game.html`, entry `main.ts`), Whispering Woods (`woods.html`, entry `woods/main.ts`), Blockpocalypse (`blockpocalypse.html`, entry `blockpocalypse/main.ts`), Amelia's Dungeon (`dungeon.html`, entry `dungeon/main.ts`), Battle of the Gods (`gods.html`, entry `gods/main.ts`), a world editor for the Plains (`editor.html`), an island editor for the Woods (`woodsEditor.html`, entry `woods/editor/main.ts`), a coastline editor (`outline.html`), the dungeon builder (`dungeonEditor.html`, entry `dungeon/editor/main.ts`), the asset library (`library.html`, entry `sunnyside/catalogPage.ts`), and credits (`credits.html`).
 A new game is an entry in `games.ts` plus its own page and Rollup input.
 Only Peaceful Plains is isometric: Whispering Woods is drawn straight down the screen, and shares the input, sprite, loop, and viewport plumbing but none of `iso.ts`.
-Blockpocalypse and Amelia's Dungeon share none of it — see below.
+Blockpocalypse, Amelia's Dungeon and Battle of the Gods share none of it — see below.
 
 ## Art that cannot be redistributed
 
@@ -185,6 +185,27 @@ What the port changed, and nothing else did:
 - **The menu carries the way home, and fullscreen.** It has its own `createMenu` rather than the shared one, so "All Games" and the `fullscreen.ts` item are wired into that copy.
 
 Its `ad-` class names, its `ad:` storage keys and its `<style>` blocks stayed as they were — the builder's block is `chrome.css`'s own `.ed-*` furniture recoloured off the tileset, and loads after it, so it wins every tie.
+
+## Battle of the Gods
+
+`src/gods/` is a third-person 3D game in three.js: walk out of a city, past skeleton camps on the road, into a colosseum where a Greek god waits.
+Beating the god wins that god's armour; the blacksmith in town sells bronze pieces for the coins the road pays.
+It was designed by two children, and the answers they gave are the spec: Ares first, sword and shield, armour bought in town plus a god's own kit for winning, a Breath of the Wild look, phone first, tablet second, computer last.
+It shares nothing with Blockpocalypse's code, only the library, and nothing with the rest of the playground but `createMenu` and the page furniture.
+
+There is no art to vendor and no credit to add: every model is built in code from primitives (`figure.ts` is one doll that hero, skeleton, soldier, smith and god are all painted from), so a new god is a `Build` and a kit paint, not a pack.
+The look is `toon.ts` — three flat light bands plus a rim of sky light on every silhouette — rather than outlines, which would double the draw calls a phone can afford.
+Static scenery goes through `batch.ts`, merged into one mesh per colour for the same reason.
+
+The rules live in modules with no three.js in them, and are what the tests cover: `hero.ts`, `grunts.ts`, `ares.ts`, `armor.ts` (guard, prices, the shield's arc), `world.ts` (layout and collision), `follow.ts` (camera-relative stick, auto-turn, lock-on), `save.ts`.
+Headings follow three.js: yaw 0 faces +z, forward is `(sin yaw, cos yaw)`, and `bearing.ts` is the arithmetic; the road runs north toward -z.
+
+Ares is beaten by not standing in front of him: his shield rings off frontal blows while he is on guard, and the opening is the charge — sidestep it and he runs into the wall and is dazed.
+He calls in Spartans at each line in `SUMMON_AT`.
+A skeleton felled is a heap that stands back up unless struck again; the camps restock whenever the hero is in the city, which also heals.
+
+On the dev server `window.gods` can read state, teleport the hero and add coins, so a recording can reach the colosseum without walking the road.
+Progress is under the `gods:save` storage key.
 
 ## Islands
 
