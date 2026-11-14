@@ -462,6 +462,7 @@ function claimReward(): void {
   if (!save.beaten.includes("ares")) save.beaten.push("ares");
   storeSave(save);
   wearKit(heroFig, save.armor);
+  hud.setArmor(save.armor);
   hud.banner("Armor of Ares", "Tougher, and your sword hits twice as hard", 4);
   window.setTimeout(() => hud.banner("More gods await…", "Their colosseums are coming soon", 3.5), 4500);
   if (ares) {
@@ -492,6 +493,7 @@ function openShop(): void {
       save.armor = sale.armor;
       storeSave(save);
       wearKit(heroFig, save.armor);
+      hud.setArmor(save.armor);
       hud.setCoins(save.coins);
       shopRedraw?.(save.coins, save.armor);
     },
@@ -678,6 +680,15 @@ function update(dt: number): void {
   blockAnim += ((hero.blocking ? 1 : 0) - blockAnim) * Math.min(1, dt * 18);
   heroFlash = Math.max(0, heroFlash - dt * 5);
   hud.setHealth(Math.ceil(hero.hp));
+  hud.setCompass(
+    camYaw,
+    fight === "on"
+      ? null
+      : [
+          { id: "colosseum", label: fight === "won" ? "Colosseum" : "Ares", yaw: yawTo(hero.x, hero.z, COLOSSEUM.x, COLOSSEUM.z) },
+          { id: "city", label: "City", yaw: yawTo(hero.x, hero.z, 0, 0) },
+        ].filter((m) => m.id !== "city" || !inCity(hero.x, hero.z)),
+  );
 }
 
 /** Where a grunt is in its own swing, as a 0..1 through the shared swing animation. */
@@ -814,6 +825,7 @@ function draw(dt: number): void {
 }
 
 hud.setCoins(save.coins);
+hud.setArmor(save.armor);
 hud.setHealth(hero.hp);
 hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods are coming" : "Ares waits in his colosseum, north of the city", 3.5);
 

@@ -11,6 +11,19 @@ export interface Hud {
   /** Opens the counter; the function it hands back redraws it after a sale. */
   openShop(coins: number, armor: Armor, onBuy: (slot: Slot) => void, onClose: () => void): (coins: number, armor: Armor) => void;
   shopOpen(): boolean;
+  /** Light the slots the hero is wearing. */
+  setArmor(armor: Armor): void;
+  /** Point the compass: `heading` is where the camera looks, and each mark a yaw on the ground. */
+  setCompass(heading: number, marks: Array<{ id: string; label: string; yaw: number }> | null): void;
+}
+
+/** Where a mark sits across the compass strip, 0..1, or null when it is behind you. */
+export function compassAt(heading: number, yaw: number, fov = Math.PI * 0.9): number | null {
+  let d = yaw - heading;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  // Yaw grows to the left of the view (right of a +z heading is -x), so flip it for the screen.
+  const x = 0.5 - d / fov;
+  return x < 0 || x > 1 ? null : x;
 }
 
 /** How full each heart is, from a health total: 1 whole, 0 empty, anything between. */
@@ -28,7 +41,32 @@ export function createHud(): Hud {
   const purse = div("gd-purse");
   purse.innerHTML = `<span class="gd-coin"></span><b>0</b>`;
   const coinCount = purse.querySelector("b")!;
-  corner.append(hearts, purse);
+  const kit = div("gd-kit");
+  const pips = new Map<Slot, HTMLElement>();
+  for (const slot of SLOTS) {
+    const pip = pieceIcon(slot);
+    pip.classList.add("gd-pip");
+    pip.title = PIECE_NAMES[slot];
+    pips.set(slot, pip);
+    kit.appendChild(pip);
+  }
+  corner.append(hearts, purse, kit);
+
+  const compass = div("gd-compass");
+  compass.innerHTML = `<div class="gd-compass-strip"></div>`;
+  const strip = compass.querySelector<HTMLElement>(".gd-compass-strip")!;
+  const marks = new Map<string, HTMLElement>();
+  for (const [label, offset] of [
+    ["N", Math.PI],
+    ["E", Math.PI / 2],
+    ["S", 0],
+    ["W", -Math.PI / 2],
+  ] as const) {
+    const t = div("gd-compass-tick");
+    t.textContent = label;
+    t.dataset.yaw = String(offset);
+    strip.appendChild(t);
+  }
 
   const fills: HTMLElement[] = [];
   for (let i = 0; i < MAX_HP / HEART_HP; i++) {
@@ -54,7 +92,7 @@ export function createHud(): Hud {
   const shop = div("gd-shop");
   shop.hidden = true;
 
-  document.body.append(corner, boss, bannerEl, shop);
+  document.body.append(corner, compass, boss, bannerEl, shop);
 
   let lastHp = -1;
   return {
@@ -131,6 +169,33 @@ export function createHud(): Hud {
       return render;
     },
     shopOpen: () => !shop.hidden,
+    setArmor(armor) {
+      for (const [slot, pip] of pips) pip.dataset.kit = armor[slot];
+    },
+    setCompass(heading, list) {
+      compass.hidden = list === null;
+      if (list === null) return;
+      for (const t of strip.querySelectorAll<HTMLElement>(".gd-compass-tick")) {
+        const x = compassAt(heading, Number(t.dataset.yaw));
+        t.hidden = x === null;
+        if (x !== null) t.style.left = `${x * 100}%`;
+      }
+      for (const el of marks.values()) el.hidden = true;
+      for (const m of list) {
+        let el = marks.get(m.id);
+        if (!el) {
+          el = div("gd-compass-mark");
+          el.dataset.id = m.id;
+          el.innerHTML = `<span></span><b></b>`;
+          el.querySelector("b")!.textContent = m.label;
+          strip.appendChild(el);
+          marks.set(m.id, el);
+        }
+        const x = compassAt(heading, m.yaw);
+        el.hidden = x === null;
+        if (x !== null) el.style.left = `${x * 100}%`;
+      }
+    },
   };
 }
 

@@ -155,10 +155,76 @@
         flex: none;
       }
 
+      /* Armour worn, under the purse: a dim outline until the piece is on. */
+      .gd-kit {
+        display: flex;
+        gap: 3px;
+        padding: 3px 6px;
+        align-self: flex-start;
+        border-radius: 999px;
+        background: var(--gd-panel);
+      }
+      .gd-pip svg { width: 22px; height: 22px; display: block; }
+      .gd-kit .gd-pip path, .gd-kit .gd-pip rect { fill: rgba(251, 243, 223, 0.12); stroke: rgba(251, 243, 223, 0.45); stroke-width: 1.6; }
+      .gd-kit .gd-pip .gd-crest { fill: rgba(251, 243, 223, 0.12); }
+      .gd-kit .gd-pip[data-kit="bronze"] path, .gd-kit .gd-pip[data-kit="bronze"] rect { fill: #d9a04a; stroke: #fbe3a8; }
+      .gd-kit .gd-pip[data-kit="bronze"] .gd-crest { fill: #4f86c8; }
+      .gd-kit .gd-pip[data-kit="ares"] path, .gd-kit .gd-pip[data-kit="ares"] rect { fill: #b3271f; stroke: var(--gd-gold); }
+      .gd-kit .gd-pip[data-kit="ares"] .gd-crest { fill: #1a0a08; }
+
+      /* Compass along the top: where the god is, and the way home. */
+      .gd-compass {
+        position: fixed;
+        top: calc(var(--ww-inset-top) + 6px);
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(46vw, 360px);
+        height: 34px;
+        pointer-events: none;
+        border-radius: 999px;
+        background: linear-gradient(90deg, transparent, var(--gd-panel) 18%, var(--gd-panel) 82%, transparent);
+      }
+      .gd-compass::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 2px;
+        border: 5px solid transparent;
+        border-top-color: var(--gd-gold);
+        transform: translateX(-50%);
+      }
+      /* Upright on a phone there is no room beside the hearts: it drops below them. */
+      @media (max-width: 560px) {
+        .gd-compass { top: calc(var(--ww-inset-top) + 132px); width: 70vw; }
+        body .gd-boss { top: calc(var(--ww-inset-top) + 132px); width: 80vw; }
+        body .gd-interact { bottom: calc(var(--ww-inset-bottom) + 175px); }
+      }
+      .gd-compass-strip {
+        position: absolute;
+        inset: 0 12%;
+        overflow: hidden;
+      }
+      .gd-compass-tick, .gd-compass-mark {
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        white-space: nowrap;
+      }
+      .gd-compass-tick { font: 700 12px var(--gd-serif); color: rgba(251, 243, 223, 0.55); }
+      .gd-compass-mark { display: flex; align-items: center; gap: 4px; font: italic 700 12px var(--gd-serif); color: var(--gd-cream); }
+      .gd-compass-mark span {
+        width: 10px;
+        height: 10px;
+        transform: rotate(45deg);
+        background: var(--gd-gold);
+        border: 1.5px solid var(--gd-ink);
+      }
+      .gd-compass-mark[data-id="colosseum"] span { background: #d8382c; }
+
       /* The god's health, top centre. */
       .gd-boss {
         position: fixed;
-        top: calc(var(--ww-inset-top) + 66px);
+        top: calc(var(--ww-inset-top) + 6px);
         left: 50%;
         transform: translateX(-50%);
         width: min(70vw, 420px);
