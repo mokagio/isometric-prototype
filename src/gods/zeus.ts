@@ -19,7 +19,7 @@ export function olympiaHouses(): Array<{ x: number; z: number; w: number; d: num
   const angles = [0, 35, 70, 110, 145, 215, 250, 290, 325];
   angles.forEach((deg, i) => {
     const a = (deg * Math.PI) / 180;
-    const r = 21 + (i % 2) * 2;
+    const r = 18 + (i % 2) * 2;
     const x = Math.round(OLYMPUS.x + Math.sin(a) * r);
     const z = Math.round(OLYMPUS.z + Math.cos(a) * r);
     const back = Math.atan2(OLYMPUS.x - x, OLYMPUS.z - z);
