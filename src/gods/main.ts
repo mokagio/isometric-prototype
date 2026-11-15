@@ -25,6 +25,7 @@ import {
   BANDIT_BUILD,
   FISHER_BUILD,
   HADES_BUILD,
+  LAVA_SKELETON_BUILD,
   SKELETON_BUILD,
   POSEIDON_BUILD,
   SMITH_BUILD,
@@ -65,13 +66,17 @@ import {
 import { createHud } from "./hud";
 import { loadSave, storeSave } from "./save";
 import { toon } from "./toon";
-import { buildScenery, HORIZON, SKY_TOP } from "./scenery";
+import { buildScenery, HORIZON, placeStep, SKY_TOP } from "./scenery";
 import {
   ARRIVAL,
   BODY as HADES_BODY,
   HADES_HP,
   hidden as hadesHidden,
+  BREAK_BEHIND,
+  COLLAPSE_AT,
   HADES_TRIGGER,
+  LOW_Y,
+  STAIRS,
   ISLAND_GUARDS,
   ISLANDS,
   HOME_PORTAL,
@@ -296,7 +301,7 @@ let foes: Foe[] = [];
 let nextId = 1;
 
 function addFoe(kind: GruntKind, x: number, z: number, yaw: number, camp: number): Foe {
-  const build = kind === "bandit" ? BANDIT_BUILD : kind === "skeleton" ? SKELETON_BUILD : SPARTAN_BUILD;
+  const build = kind === "bandit" ? BANDIT_BUILD : kind === "skeleton" ? SKELETON_BUILD : kind === "lava" ? LAVA_SKELETON_BUILD : SPARTAN_BUILD;
   const fig = buildFigure(build);
   if (kind === "spartan") wearKit(fig, { helmet: "bronze", chest: "bronze", arms: "none", legs: "bronze" });
   if (kind === "spartan") fig.crest.color.setHex(0xa3241e);
@@ -354,7 +359,7 @@ stockHell();
 function foeY(f: Foe): number {
   if (f.drop !== undefined) return f.drop;
   if (f.camp === STAIR_CAMP) return stepY(f.g.x - VOLCANO.x);
-  return inTartarus(f.g.x, f.g.z) ? (tartarusFooting(f.g.x, f.g.z) ?? TARTARUS.y) : 0;
+  return inTartarus(f.g.x, f.g.z) ? (tartarusFooting(f.g.x, f.g.z, stairsBroken) ?? TARTARUS.y) : 0;
 }
 
 /** Keep a stair skeleton on its stairs, whatever it is chasing. */
@@ -550,6 +555,139 @@ let hadesFight: Fight = save.beaten.includes("hades") ? "won" : "waiting";
 let hades: { h: Hades; fig: Figure; shadow: THREE.Mesh; flash: number } | null = null;
 let hadesGateClosed = false;
 
+// ---------------------------------------------------------------------------
+// The fire monster on the last staircase
+
+/** Stairs from here down toward the island are gone; Infinity while they stand. */
+let stairsBroken = Infinity;
+/** When each broken step started to fall, by step. */
+let stepFalls: number[] = [];
+const LAVA_CAMP = 300;
+let collapse: { t: number; at: number; broke: boolean; spawned: boolean } | null = null;
+let collapsedThisVisit = false;
+
+/** A giant of black rock split by fire, built facing -z, toward the stairs. Its right arm is `userData.arm`. */
+function fireMonster(): THREE.Group {
+  const g = new THREE.Group();
+  const rock = toon(0x2a1a14);
+  const glow = new THREE.MeshBasicMaterial({ color: 0xff6a1e });
+  const hot = new THREE.MeshBasicMaterial({ color: 0xffd060 });
+  const torso = new THREE.Mesh(new THREE.IcosahedronGeometry(4, 0), rock);
+  torso.scale.set(1, 1.3, 0.8);
+  torso.position.y = 7;
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(2, 0), rock);
+  head.position.set(0, 13, -0.6);
+  g.add(torso, head);
+  // Cracks of fire through the rock, and two burning eyes.
+  for (let k = 0; k < 9; k++) {
+    const crack = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.6 + (k % 3), 0.25), glow);
+    const a = k * 2.3;
+    crack.position.set(Math.sin(a) * 2.6, 5 + (k % 4) * 1.6, -Math.abs(Math.cos(a)) * 2.6 - 0.4);
+    crack.rotation.z = k;
+    g.add(crack);
+  }
+  for (const side of [-0.7, 0.7]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), hot);
+    eye.position.set(side, 13.3, -2.3);
+    g.add(eye);
+  }
+  // A crown of flame.
+  for (let k = 0; k < 5; k++) {
+    const f = new THREE.Mesh(new THREE.ConeGeometry(0.6, 2.4, 7), k % 2 ? glow : hot);
+    f.position.set((k - 2) * 0.7, 15, -0.4 + Math.abs(k - 2) * 0.3);
+    g.add(f);
+  }
+  // Arms on shoulder pivots; the right one is the one that smashes.
+  const arms: THREE.Group[] = [];
+  for (const side of [-1, 1]) {
+    const pivot = new THREE.Group();
+    pivot.position.set(side * 4, 10, -1);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.2, 6, 7), rock);
+    arm.position.y = 3;
+    const fist = new THREE.Mesh(new THREE.IcosahedronGeometry(1.6, 0), rock);
+    fist.position.y = 6.6;
+    pivot.add(arm, fist);
+    // Fire showing through the fist's faces.
+    fist.add(new THREE.Mesh(new THREE.IcosahedronGeometry(1.4, 1), glow));
+    g.add(pivot);
+    arms.push(pivot);
+  }
+  arms[0]!.rotation.x = 2.6; // the left arm hangs down
+  g.userData.arm = arms[1];
+  g.visible = false;
+  scene.add(g);
+  return g;
+}
+const monster = fireMonster();
+const MONSTER_Z = TARTARUS.z + 9;
+
+function startCollapse(): void {
+  collapsedThisVisit = true;
+  collapse = { t: 0, at: hero.x + BREAK_BEHIND, broke: false, spawned: false };
+  monster.visible = true;
+  monster.position.set(collapse.at + 3, FIRE_Y - 16, MONSTER_Z);
+  shake = 0.4;
+  hud.banner("Something is coming out of the fire!", "Keep climbing!", 2);
+}
+
+function breakStairs(at: number): void {
+  stairsBroken = at;
+  const stairs = scenery.hellStairs;
+  stepFalls = stairs.xs.map((x) => (x > at ? clock + (x - at) * 0.035 : -1));
+}
+
+function mendStairs(): void {
+  stairsBroken = Infinity;
+  stepFalls = [];
+  scenery.hellStairs.xs.forEach((_, i) => placeStep(scenery.hellStairs, i));
+  monster.visible = false;
+  collapse = null;
+  collapsedThisVisit = false;
+  for (const f of foes.filter((f) => f.camp === LAVA_CAMP)) removeFoe(f);
+}
+
+/** The monster's moment: up out of the fire, arm back, the blow, lava skeletons, and back down. */
+function stepCollapse(dt: number): void {
+  if (!collapse) return;
+  const c = collapse;
+  c.t += dt;
+  const stairY = tartarusFooting(c.at - 1, TARTARUS.z) ?? LOW_Y;
+  // Stood so the fist comes down on the top of the steps.
+  const standY = stairY - 6.5;
+  const arm = monster.userData.arm as THREE.Group;
+  if (c.t < 1.4) monster.position.y = FIRE_Y - 16 + (standY - FIRE_Y + 16) * Math.sin((c.t / 1.4) * (Math.PI / 2));
+  else if (c.t < 4.5) monster.position.y = standY;
+  else monster.position.y = standY - (c.t - 4.5) * 12;
+  if (c.t < 1.4) arm.rotation.x = 0.2;
+  else if (c.t < 2.0) arm.rotation.x = 0.2 + ((c.t - 1.4) / 0.6) * 0.5;
+  else if (c.t < 2.3) arm.rotation.x = 0.7 - ((c.t - 2.0) / 0.3) * 2.9;
+  else if (c.t > 3.4) arm.rotation.x = Math.min(0.2, -2.2 + (c.t - 3.4) * 2.4);
+  if (Math.random() < 0.5) burst(monster.position.x + (Math.random() - 0.5) * 6, monster.position.y + 8 + Math.random() * 6, MONSTER_Z, 0xff8a1e, 1, 3, 0.9);
+  if (!c.broke && c.t >= 2.3) {
+    c.broke = true;
+    breakStairs(c.at);
+    shake = 0.9;
+    stop = 0.12;
+    burst(c.at + 1, stairY + 0.5, TARTARUS.z, 0xff6a1e, 30, 9, 1.5);
+    hud.banner("It smashed the stairs!", "No way back now", 1.6);
+  }
+  if (!c.spawned && c.t >= 2.9) {
+    c.spawned = true;
+    // Lava skeletons climb out onto the steps above.
+    for (let k = 1; k <= 4; k++) {
+      const x = Math.max(STAIRS.x0 + 1, c.at - BREAK_BEHIND - 3 - k * 3.5);
+      const f = addFoe("lava", x, TARTARUS.z + (k % 2 ? 0.7 : -0.7), Math.PI / 2, LAVA_CAMP);
+      f.g.state = "walk";
+      burst(x, (tartarusFooting(x, TARTARUS.z) ?? LOW_Y) + 0.5, TARTARUS.z, 0xff6a1e, 16, 6);
+    }
+    hud.banner("Lava skeletons!", "Fight your way up!", 1.8);
+  }
+  if (c.t >= 6) {
+    monster.visible = false;
+    collapse = null;
+  }
+}
+
 /** Stalactites on their way down: a warning ring on the floor, then the rock itself. */
 const ROOF_Y = TARTARUS.y + 10.5;
 const dropGeo = new THREE.ConeGeometry(0.55, 2.4, 7).rotateX(Math.PI);
@@ -590,7 +728,7 @@ function intoTartarus(): void {
   hero.yaw = ARRIVAL.yaw;
   hero.vx = hero.vz = 0;
   camYaw = ARRIVAL.yaw;
-  heroY = tartarusFooting(hero.x, hero.z) ?? TARTARUS.y;
+  heroY = tartarusFooting(hero.x, hero.z, stairsBroken) ?? TARTARUS.y;
   camPos.set(0, 0, 0);
   camLook.set(0, 0, 0);
   underworld(true);
@@ -792,6 +930,7 @@ function claimReward(): void {
 
 function respawn(): void {
   endFight();
+  mendStairs();
   heroY = 0;
   falling = null;
   clearHades();
@@ -932,7 +1071,7 @@ function update(dt: number): void {
     }
   } else if (inTartarus(hero.x, hero.z)) {
     if (standing(hero)) {
-      const y = tartarusFooting(hero.x, hero.z);
+      const y = tartarusFooting(hero.x, hero.z, stairsBroken);
       if (y !== null) heroY = y;
       else {
         falling = { vy: 2, y: FIRE_Y, lava: true, landed: false };
@@ -943,6 +1082,8 @@ function update(dt: number): void {
         hud.banner("Into the fire!", "Back to the city", 2.6);
       }
       if (hadesFight === "waiting" && inHadesArena(hero.x, hero.z, HADES_TRIGGER)) startHadesFight();
+      const onLastStairs = hero.x > STAIRS.x0 && hero.x < COLLAPSE_AT && Math.abs(hero.z - TARTARUS.z) < STAIRS.half;
+      if (onLastStairs && !collapsedThisVisit && hadesFight !== "won") startCollapse();
       if (hadesFight === "won" && dist(hero.x, hero.z, HOME_PORTAL.x, HOME_PORTAL.z) < 1.4) outOfTartarus();
     }
   } else if (!inVolcano(hero.x, hero.z)) {
@@ -984,7 +1125,7 @@ function update(dt: number): void {
     const was = { x: f.g.x, z: f.g.z };
     const blow = updateGrunt(f.g, sim, { x: hero.x, z: hero.z, alive: standing(hero) });
     if (blow) heroLoses(blow);
-    if (f.camp >= HELL_CAMP && tartarusFooting(f.g.x, f.g.z) === null) {
+    if (f.camp >= HELL_CAMP && tartarusFooting(f.g.x, f.g.z, stairsBroken) === null) {
       // Knocked off the edge, it falls; walking, it just stops at the edge.
       if (f.g.state === "reel" || f.g.state === "down" || f.g.state === "dead") {
         f.drop = foeY(f);
@@ -1123,6 +1264,8 @@ function update(dt: number): void {
       }
     }
   }
+  stepCollapse(sim);
+
   // Hades.
   if (hades) {
     const h = hades.h;
@@ -1369,6 +1512,11 @@ function draw(dt: number): void {
     hades.shadow.position.set(h.x, TARTARUS.y + 0.07, h.z);
   }
   for (const p of scenery.portals) p.children[1]!.rotation.z = -clock * 2;
+  stepFalls.forEach((start, i) => {
+    if (start < 0 || clock < start) return;
+    const t = clock - start;
+    placeStep(scenery.hellStairs, i, 12 * t * t, t * (i % 2 ? 0.8 : -0.8));
+  });
   // Stalactites: hang and shiver while the rings glow, drop in the last moment, and are gone on impact.
   for (const d of drops) {
     d.t += stop > 0 ? 0 : dt;
@@ -1478,7 +1626,7 @@ hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods
 if (import.meta.env.DEV) {
   Object.assign(window, {
     gods: {
-      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, heroY, falling, foes: foes.map((f) => f.g) }),
+      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, heroY, falling, stairsBroken, collapse, foes: foes.map((f) => f.g) }),
       teleport(x: number, z: number, yaw = hero.yaw) {
         hero.x = x;
         hero.z = z;

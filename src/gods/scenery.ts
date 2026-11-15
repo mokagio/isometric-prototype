@@ -227,6 +227,8 @@ export interface Scenery {
   flood: THREE.Mesh;
   /** Hades's portcullis: up is open. */
   hadesGate: THREE.Group;
+  /** The last staircase, which the fire monster breaks. */
+  hellStairs: HellStairs;
   /** Smoke puffs over the volcano, drifted up every frame. */
   smoke: THREE.Group;
   lava: THREE.MeshBasicMaterial;
@@ -294,6 +296,8 @@ export function buildScenery(): Scenery {
   for (const f of flameSpots(HADES_LOOK)) flames.push(flame(root, f.x, f.y, f.z, 0.7, 0x3fe07a, 0xc8ffd8));
   const hadesGate = portcullis(HADES_LOOK);
   root.add(hadesGate);
+  const stairs = hellStairs();
+  root.add(stairs.steps, stairs.edges);
   root.add(below);
   const volcanoPortal = portal(VOLCANO.x, ISLAND_Y, VOLCANO.z, Math.PI / 2);
   const homePortal = portal(HOME_PORTAL.x, TARTARUS.y, HOME_PORTAL.z, Math.PI / 2);
@@ -313,7 +317,7 @@ export function buildScenery(): Scenery {
   root.add(flood);
   const clouds = cloudLayer();
   root.add(clouds);
-  return { root, gate, flames, clouds, grass: grass.material, water, sea: sea.material as THREE.ShaderMaterial, seaGate, hadesGate, flood, smoke: fire.smoke, lava: fire.lava, portals: [volcanoPortal, homePortal], sky: (root.getObjectByName("sky") as THREE.Mesh).material as THREE.ShaderMaterial };
+  return { root, gate, flames, clouds, grass: grass.material, water, sea: sea.material as THREE.ShaderMaterial, seaGate, hadesGate, hellStairs: stairs, flood, smoke: fire.smoke, lava: fire.lava, portals: [volcanoPortal, homePortal], sky: (root.getObjectByName("sky") as THREE.Mesh).material as THREE.ShaderMaterial };
 }
 
 /** A figure cast in one material, struck in a pose and set on a plinth. */
@@ -1290,6 +1294,48 @@ function volcanoFire(): { group: THREE.Group; smoke: THREE.Group; lava: THREE.Me
 // ---------------------------------------------------------------------------
 // Portals and Tartarus
 
+export interface HellStairs {
+  /** The step blocks and their glowing green edges, one instance per step. */
+  steps: THREE.InstancedMesh;
+  edges: THREE.InstancedMesh;
+  /** Each step's middle along x, and its top. */
+  xs: number[];
+  tops: number[];
+}
+
+/** Place step `i` of the last staircase: `drop` metres below where it belongs, tipped by `tip`. */
+export function placeStep(stairs: HellStairs, i: number, drop = 0, tip = 0): void {
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(tip * 0.7, 0, tip));
+  const x = stairs.xs[i]!;
+  const top = stairs.tops[i]! - drop;
+  m.compose(new THREE.Vector3(x, top - 1, TARTARUS.z), q, new THREE.Vector3(STAIRS.run, 2, STAIRS.half * 2));
+  stairs.steps.setMatrixAt(i, m);
+  m.compose(new THREE.Vector3(x + STAIRS.run / 2 - 0.05, top - 0.03, TARTARUS.z), q, new THREE.Vector3(0.06, 0.06, STAIRS.half * 2 + 0.02));
+  stairs.edges.setMatrixAt(i, m);
+  stairs.steps.instanceMatrix.needsUpdate = true;
+  stairs.edges.instanceMatrix.needsUpdate = true;
+}
+
+function hellStairs(): HellStairs {
+  const xs: number[] = [];
+  const tops: number[] = [];
+  for (let sx = STAIRS.x0; sx < STAIRS.x1; sx += STAIRS.run) {
+    xs.push(sx + STAIRS.run / 2);
+    tops.push(stairStepY(sx + STAIRS.run / 2));
+  }
+  const steps = new THREE.InstancedMesh(G.box, toon(0xffffff), xs.length);
+  const edges = new THREE.InstancedMesh(G.box, new THREE.MeshBasicMaterial({ color: 0x5fe08a }), xs.length);
+  const c = new THREE.Color();
+  xs.forEach((_, i) => steps.setColorAt(i, c.setHex(i % 2 ? 0x4a3e48 : 0x3e343c)));
+  steps.castShadow = steps.receiveShadow = true;
+  // They move, so the bounds three.js works out at the start are no good for culling.
+  steps.frustumCulled = edges.frustumCulled = false;
+  const stairs = { steps, edges, xs, tops };
+  xs.forEach((_, i) => placeStep(stairs, i));
+  return stairs;
+}
+
 /** A ring of black stone standing on its edge, with a swirl of purple light inside. The swirl is `children[1]`. */
 function portal(x: number, y: number, z: number, yaw: number): THREE.Group {
   const g = new THREE.Group();
@@ -1368,13 +1414,11 @@ function tartarusFloor(b: Batch): Array<{ x: number; y: number; z: number }> {
     }
   }
 
-  // The staircase: a block per step, with nothing either side.
-  const run = 1.2;
+  // Pillars under the staircase; the steps themselves are `hellStairs`, so they can break.
+  const run = STAIRS.run;
   let i = 0;
   for (let sx = STAIRS.x0; sx < STAIRS.x1; sx += run, i++) {
     const top = stairStepY(sx + run / 2);
-    b.add(G.box, i % 2 ? 0x4a3e48 : 0x3e343c, { x: sx + run / 2, y: top - 1, z }, {}, { x: run, y: 2, z: STAIRS.half * 2 });
-    b.add(G.box, 0x5fe08a, { x: sx + run - 0.05, y: top - 0.03, z }, {}, { x: 0.06, y: 0.06, z: STAIRS.half * 2 + 0.02 });
     if (i % 6 === 3) {
       for (const side of [-1, 1]) b.add(G.cone, 0x2a2228, { x: sx + run / 2, y: top - 4, z: z + side * (STAIRS.half - 0.4) }, { x: Math.PI }, { x: 0.5, y: 4, z: 0.5 });
     }

@@ -8,6 +8,7 @@ import {
   INTRO_TIME,
   CRUSH_DAMAGE,
   ARRIVAL,
+  COLLAPSE_AT,
   BRIDGES,
   ISLAND,
   ISLANDS,
@@ -149,5 +150,11 @@ describe("Hades", () => {
     const across = { x: -(q.z - p.z), z: q.x - p.x };
     const k = 3 / Math.hypot(across.x, across.z);
     expect(tartarusFooting(mid.x + across.x * k, mid.z + across.z * k)).toBeNull();
+  });
+
+  it("leaves nothing of the stairs past where the fire monster broke them", () => {
+    expect(tartarusFooting(COLLAPSE_AT - 1, TARTARUS.z, COLLAPSE_AT)).not.toBeNull();
+    expect(tartarusFooting(COLLAPSE_AT + 1, TARTARUS.z, COLLAPSE_AT)).toBeNull();
+    expect(tartarusFooting(ISLAND.x, ISLAND.z, COLLAPSE_AT)).toBe(LOW_Y);
   });
 });

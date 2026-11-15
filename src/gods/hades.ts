@@ -50,12 +50,17 @@ export function inHadesArena(x: number, z: number, within = TARTARUS.r): boolean
   return dist(x, z, TARTARUS.x, TARTARUS.z) < within;
 }
 
-/** How high the ground is in Tartarus, or null over the drop into the fire. */
-export function tartarusFooting(x: number, z: number): number | null {
+/** Halfway up the last staircase, the fire monster comes up and smashes the steps below you. */
+export const COLLAPSE_AT = (STAIRS.x0 + STAIRS.x1) / 2;
+/** It breaks the stairs this far below where you stand, so the blow never lands under your feet. */
+export const BREAK_BEHIND = 2.5;
+
+/** How high the ground is in Tartarus, or null over the drop into the fire; stairs past `brokenFrom` are gone. */
+export function tartarusFooting(x: number, z: number, brokenFrom = Infinity): number | null {
   const fromArena = dist(x, z, TARTARUS.x, TARTARUS.z);
   if (fromArena < TARTARUS.r + HADES_RING.thick && (fromArena < TARTARUS.r || Math.abs(z - TARTARUS.z) < GATE_HALF + 2)) return TARTARUS.y;
   // The top step tucks a little into the gateway, so the corner where curve meets straight is never a gap.
-  if (x >= STAIRS.x0 - 0.6 && x <= STAIRS.x1 && Math.abs(z - TARTARUS.z) < STAIRS.half) {
+  if (x >= STAIRS.x0 - 0.6 && x <= STAIRS.x1 && x < brokenFrom && Math.abs(z - TARTARUS.z) < STAIRS.half) {
     return stairStepY(x);
   }
   if (ISLANDS.some((i) => dist(x, z, i.x, i.z) < i.r)) return LOW_Y;

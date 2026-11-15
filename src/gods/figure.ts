@@ -67,6 +67,15 @@ export const SKELETON_BUILD: Build = {
   cape: null,
 };
 
+/** A skeleton of charred bone with fire in its eyes, climbed out of the lava under Tartarus. */
+export const LAVA_SKELETON_BUILD: Build = {
+  ...SKELETON_BUILD,
+  skin: 0x3a2620,
+  sandals: 0x3a2620,
+  eyes: 0xffa21e,
+  blade: 0xff6a1e,
+};
+
 export const BANDIT_BUILD: Build = {
   body: "flesh",
   skin: 0xc98e5c,
