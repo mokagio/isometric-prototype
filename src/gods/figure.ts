@@ -1000,9 +1000,16 @@ export function poseFigure(fig: Figure, dt: number, p: Partial<Pose>): void {
   }
 
   if (fig.shield) {
-    // Resting on the left side, or swung round in front of the chest.
-    fig.shield.position.set(lerp(0.4, 0.1, pose.block), lerp(1.08, 1.28, pose.block), lerp(0.0, 0.46, pose.block));
-    fig.shield.rotation.set(0, lerp(Math.PI / 2, 0, pose.block), 0);
+    // On the left side swinging with the arm that carries it, or swung round in front of the chest.
+    // It hangs from the body rather than the arm, so follow the arm's swing about the shoulder by hand.
+    const arm = fig.armL.rotation.x * (1 - pose.block);
+    const reach = 0.42;
+    fig.shield.position.set(
+      lerp(0.4, 0.1, pose.block),
+      lerp(1.08, 1.28, pose.block) + (1 - Math.cos(arm)) * reach,
+      lerp(0.0, 0.46, pose.block) - Math.sin(arm) * reach,
+    );
+    fig.shield.rotation.set(arm, lerp(Math.PI / 2, 0, pose.block), 0);
   }
   if (fig.cape) {
     const flutter = Math.sin(performance.now() / 160) * 0.06 * (0.3 + stride);
