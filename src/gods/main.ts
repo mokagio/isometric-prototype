@@ -30,6 +30,8 @@ import {
   boltGeometry,
   LAVA_SKELETON_BUILD,
   DROWNED_BUILD,
+  PHOBOS_BUILD,
+  DEIMOS_BUILD,
   SKELETON_BUILD,
   POSEIDON_BUILD,
   SMITH_BUILD,
@@ -120,8 +122,10 @@ import {
   BLACKSMITH,
   CAMPS,
   COLOSSEUM,
+  BOUNDS,
   FIGHT_TRIGGER,
   FISHERS,
+  houses,
   inArena,
   inCity,
   inSeaArena,
@@ -323,11 +327,32 @@ interface Foe {
 let foes: Foe[] = [];
 let nextId = 1;
 
+const BUILDS: Record<GruntKind, Build> = {
+  bandit: BANDIT_BUILD,
+  skeleton: SKELETON_BUILD,
+  lava: LAVA_SKELETON_BUILD,
+  drowned: DROWNED_BUILD,
+  spartan: SPARTAN_BUILD,
+  hoplite: SPARTAN_BUILD,
+  phobos: PHOBOS_BUILD,
+  deimos: DEIMOS_BUILD,
+};
+
 function addFoe(kind: GruntKind, x: number, z: number, yaw: number, camp: number): Foe {
-  const build = kind === "bandit" ? BANDIT_BUILD : kind === "skeleton" ? SKELETON_BUILD : kind === "lava" ? LAVA_SKELETON_BUILD : kind === "drowned" ? DROWNED_BUILD : SPARTAN_BUILD;
+  const build = BUILDS[kind];
   const fig = buildFigure(build);
-  if (kind === "spartan") wearKit(fig, { helmet: "bronze", chest: "bronze", arms: "none", legs: "bronze" });
-  if (kind === "spartan") fig.crest.color.setHex(0xa3241e);
+  if (kind === "spartan" || kind === "hoplite") {
+    wearKit(fig, { helmet: "bronze", chest: "bronze", arms: "none", legs: "bronze" });
+    fig.crest.color.setHex(0xa3241e);
+  }
+  if (kind === "phobos" || kind === "deimos") {
+    // In their father's black war-gear, each with his own crest, and a head taller than their men.
+    wearKit(fig, { helmet: "bronze", chest: "bronze", arms: "bronze", legs: "bronze" });
+    fig.metal.color.setHex(0x2a2228);
+    fig.trim.color.setHex(kind === "phobos" ? 0x8e1b16 : 0xd2691e);
+    fig.crest.color.setHex(kind === "phobos" ? 0xd8382c : 0xf08a1e);
+    fig.root.scale.setScalar(1.4);
+  }
   scene.add(fig.root);
   const g = makeGrunt(nextId++, kind, x, z, yaw);
   const foe: Foe = { g, fig, build, shadow: blob(1.1), flash: 0, camp };
@@ -1161,7 +1186,10 @@ function claimReward(): void {
     return;
   }
   hud.banner("Armor of Ares", "Tougher, and your sword hits twice as hard", 4);
-  if (seaFight !== "won") window.setTimeout(() => hud.banner("Poseidon awaits…", "Take the road east to the fishing village", 3.5), 4500);
+  if (invasion === "none") {
+    invasion = "coming";
+    invasionTimer = 9;
+  }
   if (ares) {
     scene.remove(ares.fig.root);
     scene.remove(ares.shadow);
@@ -1186,6 +1214,86 @@ function respawn(): void {
   hero = makeHero(START.x, START.z, START.yaw);
   camYaw = START.yaw;
   leftTown = false;
+}
+
+// ---------------------------------------------------------------------------
+// After Ares: his sons march on the city from opposite ends of the meadow.
+
+const INVASION_CAMP = 400;
+const SONS_HP = 16;
+type Invasion = "none" | "coming" | "on" | "done";
+let invasion: Invasion = save.beaten.includes("invasion") ? "done" : save.beaten.includes("ares") ? "coming" : "none";
+let invasionTimer = 6;
+let fires: THREE.Mesh[] = [];
+
+function startInvasion(): void {
+  invasion = "on";
+  const sides: Array<{ kind: "phobos" | "deimos"; x: number }> = [
+    { kind: "phobos", x: BOUNDS.x0 + 3 },
+    { kind: "deimos", x: BOUNDS.x1 - 3 },
+  ];
+  for (const { kind, x } of sides) {
+    const z = -12;
+    const inward = x < 0 ? Math.PI / 2 : -Math.PI / 2;
+    const lead = addFoe(kind, x, z, inward, INVASION_CAMP);
+    // Home is the city: with no hero near, they march there.
+    lead.g.homeX = Math.sign(x) * 6;
+    lead.g.homeZ = 0;
+    for (let k = 0; k < 5; k++) {
+      const row = Math.floor(k / 3) + 1;
+      const file = (k % 3) - 1;
+      const f = addFoe("hoplite", x - Math.sign(x) * row * 2, z + file * 2, inward, INVASION_CAMP);
+      f.g.homeX = Math.sign(x) * (8 + row * 2);
+      f.g.homeZ = file * 4;
+    }
+    burst(x, 2, z, 0xd8382c, 30, 6, 1.4);
+  }
+  hud.banner("Phobos and Deimos are coming!", "Ares's sons are marching on the city — defend it!", 4);
+}
+
+/** Houses catch fire while the invaders are in the city. */
+function setFires(on: boolean): void {
+  if (on && fires.length === 0) {
+    const glow = new THREE.MeshBasicMaterial({ color: 0xff7a1e, transparent: true, opacity: 0.9 });
+    const core = new THREE.MeshBasicMaterial({ color: 0xffe066 });
+    const geo = new THREE.ConeGeometry(0.5, 1.6, 7);
+    houses().slice(0, 6).forEach((h, i) => {
+      for (let k = 0; k < 3; k++) {
+        const m = new THREE.Mesh(geo, k === 1 ? core : glow);
+        m.position.set(h.x + (k - 1) * 1.1, 4.4 + (k === 1 ? 0.3 : 0), h.z + ((i + k) % 2 ? 0.6 : -0.6));
+        m.userData.base = m.position.y;
+        scene.add(m);
+        fires.push(m);
+      }
+    });
+  } else if (!on && fires.length > 0) {
+    for (const m of fires) scene.remove(m);
+    fires = [];
+  }
+}
+
+function stepInvasion(dt: number): void {
+  if (invasion === "coming") {
+    invasionTimer -= dt;
+    if (invasionTimer <= 0 && !ares && standing(hero)) startInvasion();
+    return;
+  }
+  if (invasion !== "on") return;
+  const army = foes.filter((f) => f.camp === INVASION_CAMP && f.g.state !== "dead");
+  const sons = army.filter((f) => f.g.kind === "phobos" || f.g.kind === "deimos");
+  if (!ares && !poseidon && !hades && !zeus) {
+    hud.setBoss("Phobos and Deimos", sons.reduce((sum, f) => sum + f.g.hp, 0) / SONS_HP);
+  }
+  setFires(army.some((f) => inCity(f.g.x, f.g.z)));
+  if (army.length === 0) {
+    invasion = "done";
+    save.beaten.push("invasion");
+    storeSave(save);
+    setFires(false);
+    hud.setBoss(null, 0);
+    dropCoins(hero.x, hero.z, 20);
+    hud.banner("The city is saved!", "Phobos and Deimos are beaten", 4);
+  }
 }
 
 let shopRedraw: ((coins: number, armor: typeof save.armor) => void) | null = null;
@@ -1362,7 +1470,7 @@ function update(dt: number): void {
 
   // The city mends you and restocks the road.
   const inTown = inCity(hero.x, hero.z) || (inVillage(hero.x, hero.z) && !inSeaArena(hero.x, hero.z, SEA_ARENA.r + SEA_ARENA.thick + 1));
-  if (inTown && standing(hero)) {
+  if (inTown && standing(hero) && !(invasion === "on" && inCity(hero.x, hero.z))) {
     hero.hp = Math.min(MAX_HP, hero.hp + CITY_HEAL * dt);
     for (let i = 0; i < CAMPS.length; i++) stockCamp(i);
     stockStairs();
@@ -1390,7 +1498,7 @@ function update(dt: number): void {
     const was = { x: f.g.x, z: f.g.z };
     const blow = updateGrunt(f.g, sim, { x: hero.x, z: hero.z, alive: standing(hero) });
     if (blow) heroLoses(blow);
-    if (f.camp >= HELL_CAMP && tartarusFooting(f.g.x, f.g.z, stairsBroken) === null) {
+    if (inTartarus(f.g.x, f.g.z) && tartarusFooting(f.g.x, f.g.z, stairsBroken) === null) {
       // Knocked off the edge, it falls; walking, it just stops at the edge.
       if (f.g.state === "reel" || f.g.state === "down" || f.g.state === "dead") {
         f.drop = foeY(f);
@@ -1540,6 +1648,7 @@ function update(dt: number): void {
   }
   stepCollapse(sim);
   crumble();
+  stepInvasion(sim);
   stepBack();
 
   // Zeus.
@@ -1869,6 +1978,7 @@ function draw(dt: number): void {
   if (hero.swing >= 0 && wearsFullKit(save.armor, "zeus") && Math.random() < 0.7) {
     burst(hero.x + Math.sin(hero.yaw) * 1.3, heroY + 1.3, hero.z + Math.cos(hero.yaw) * 1.3, 0xfff27a, 1, 4, 0.6);
   }
+  for (const m of fires) m.scale.y = 1 + Math.sin(clock * 15 + m.position.x) * 0.25;
   for (const p of scenery.portals) p.children[1]!.rotation.z = -clock * 2;
   stepFalls.forEach((start, i) => {
     if (start < 0 || clock < start) return;
@@ -1993,7 +2103,7 @@ hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods
 if (import.meta.env.DEV) {
   Object.assign(window, {
     gods: {
-      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, zeusFight, zeus: zeus?.z ?? null, heroY, falling, stairsBroken, collapse, foes: foes.map((f) => f.g) }),
+      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, zeusFight, invasion, invasionTimer, zeus: zeus?.z ?? null, heroY, falling, stairsBroken, collapse, foes: foes.map((f) => f.g) }),
       teleport(x: number, z: number, yaw = hero.yaw) {
         hero.x = x;
         hero.z = z;
@@ -2013,6 +2123,9 @@ if (import.meta.env.DEV) {
       },
       zoom(k: number) {
         devZoom = k;
+      },
+      invade() {
+        startInvasion();
       },
       give(n: number) {
         save.coins += n;
