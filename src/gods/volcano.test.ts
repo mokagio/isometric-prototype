@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { STEP_RUN, slopeY } from "./volcano";
 import { atPortal, footing, inVolcano, ISLAND_R, ISLAND_Y, LANDING_OUT, landing, LAVA_Y, PORTAL_R, STAIR_HALF, VOLCANO } from "./volcano";
 
 const along = (d: number, off = 0) => ({ x: VOLCANO.x + d, z: VOLCANO.z + off });
@@ -6,7 +7,7 @@ const along = (d: number, off = 0) => ({ x: VOLCANO.x + d, z: VOLCANO.z + off })
 describe("the volcano", () => {
   it("climbs the stairs from the ground at the foot to the top at the lip", () => {
     const foot = along(VOLCANO.r - 0.01);
-    expect(footing(foot.x, foot.z)!.y).toBeCloseTo(0, 1);
+    expect(footing(foot.x, foot.z)!.y).toBeLessThan(1.1);
     const top = along(LANDING_OUT);
     expect(footing(top.x, top.z)!.y).toBeCloseTo(VOLCANO.h);
   });
@@ -16,7 +17,8 @@ describe("the volcano", () => {
     for (let d = VOLCANO.r - 0.01; d > 0; d -= 0.1) {
       const f = footing(VOLCANO.x + d, VOLCANO.z);
       expect(f).not.toBeNull();
-      expect(Math.abs(f!.y - last)).toBeLessThan(0.4);
+      // Never more than one step at a time.
+      expect(Math.abs(f!.y - last)).toBeLessThanOrEqual(slopeY(LANDING_OUT) - slopeY(LANDING_OUT + STEP_RUN) + 1e-6);
       last = f!.y;
     }
   });

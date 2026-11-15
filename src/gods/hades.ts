@@ -11,7 +11,13 @@ export const GATE_HALF = 3.2;
 /** The island you land on, well below the colosseum. */
 export const LOW_Y = TARTARUS.y - 30;
 export const FIRE_Y = LOW_Y - 30;
-export const STAIRS = { x0: TARTARUS.x + TARTARUS.r + 3.5, x1: TARTARUS.x + TARTARUS.r + 3.5 + 36, half: 2 };
+export const STAIRS = { x0: TARTARUS.x + TARTARUS.r + 3.5, x1: TARTARUS.x + TARTARUS.r + 3.5 + 36, half: 2, run: 1.2 };
+
+/** The top of the step at `x`: each step is as high as its upper edge, which is what the hero stands on. */
+export function stairStepY(x: number): number {
+  const into = Math.max(0, Math.floor((x - STAIRS.x0) / STAIRS.run) * STAIRS.run);
+  return TARTARUS.y + (LOW_Y - TARTARUS.y) * (into / (STAIRS.x1 - STAIRS.x0));
+}
 /** The island at the foot of the stairs. */
 export const ISLAND = { x: STAIRS.x1 + 13, z: TARTARUS.z, r: 15 };
 /** Every island in the dark, the stairs' own first; you land on the last. */
@@ -50,7 +56,7 @@ export function tartarusFooting(x: number, z: number): number | null {
   if (fromArena < TARTARUS.r + HADES_RING.thick && (fromArena < TARTARUS.r || Math.abs(z - TARTARUS.z) < GATE_HALF + 2)) return TARTARUS.y;
   // The top step tucks a little into the gateway, so the corner where curve meets straight is never a gap.
   if (x >= STAIRS.x0 - 0.6 && x <= STAIRS.x1 && Math.abs(z - TARTARUS.z) < STAIRS.half) {
-    return TARTARUS.y + (LOW_Y - TARTARUS.y) * Math.max(0, (x - STAIRS.x0) / (STAIRS.x1 - STAIRS.x0));
+    return stairStepY(x);
   }
   if (ISLANDS.some((i) => dist(x, z, i.x, i.z) < i.r)) return LOW_Y;
   for (const [a, b] of BRIDGES) if (nearSegment(x, z, ISLANDS[a]!, ISLANDS[b]!) < BRIDGE_HALF) return LOW_Y;

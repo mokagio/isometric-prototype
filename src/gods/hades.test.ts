@@ -122,7 +122,8 @@ describe("Hades", () => {
     for (let x = ISLAND.x; x > TARTARUS.x; x -= 0.25) {
       const y = tartarusFooting(x, TARTARUS.z);
       expect(y).not.toBeNull();
-      expect(Math.abs(y! - last)).toBeLessThan(0.4);
+      // Never more than one step at a time.
+      expect(Math.abs(y! - last)).toBeLessThanOrEqual(((TARTARUS.y - LOW_Y) * STAIRS.run) / (STAIRS.x1 - STAIRS.x0) + 1e-6);
       last = y!;
     }
     expect(last).toBe(TARTARUS.y);

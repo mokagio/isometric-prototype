@@ -4,7 +4,7 @@ import { Batch } from "./batch";
 import { dist } from "./bearing";
 import { ARES_BUILD, buildFigure, HERO_BUILD, POSEIDON_BUILD, poseFigure, wearKit, type Build } from "./figure";
 import { godKit } from "./armor";
-import { BRIDGE_HALF as HELL_BRIDGE, BRIDGES, HADES_RING, HOME_PORTAL, ISLAND, ISLANDS, LOW_Y, STAIRS, TARTARUS } from "./hades";
+import { BRIDGE_HALF as HELL_BRIDGE, BRIDGES, HADES_RING, HOME_PORTAL, ISLAND, ISLANDS, LOW_Y, stairStepY, STAIRS, TARTARUS } from "./hades";
 import { toon } from "./toon";
 import {
   BRIDGE_HALF,
@@ -17,6 +17,7 @@ import {
   PORTAL_R,
   slopeY,
   STAIR_HALF,
+  stepY,
   VOLCANO,
 } from "./volcano";
 import {
@@ -1017,7 +1018,7 @@ function village(b: Batch): void {
   // Stone islands in Poseidon's arena, to stand on when the sea comes in.
   for (const c of SEA_ISLANDS) {
     b.add(G.cyl, 0x9fb4b8, { x: c.x, y: ISLAND_H / 2, z: c.z }, {}, { x: c.r, y: ISLAND_H, z: c.r });
-    b.add(G.cyl, 0xeef5f3, { x: c.x, y: ISLAND_H + 0.04, z: c.z }, {}, { x: c.r + 0.1, y: 0.1, z: c.r + 0.1 });
+    b.add(G.cyl, 0xeef5f3, { x: c.x, y: ISLAND_H - 0.05, z: c.z }, {}, { x: c.r + 0.1, y: 0.1, z: c.r + 0.1 });
     for (let k = 0; k < 5; k++) {
       const a = (k / 5) * Math.PI * 2;
       b.add(G.rock, 0x8fa4a8, { x: c.x + Math.sin(a) * c.r, y: 0.15, z: c.z + Math.cos(a) * c.r }, { y: a }, 0.35);
@@ -1195,7 +1196,7 @@ function volcano(b: Batch): Array<{ x: number; y: number; z: number }> {
   const run = 1.2;
   let i = 0;
   for (let d = LANDING_OUT; d < r; d += run, i++) {
-    const top = slopeY(d);
+    const top = stepY(d + run / 2);
     b.add(G.box, i % 2 ? ROCK.step : ROCK.stepDark, { x: vx + d + run / 2, y: top - 0.75, z: vz }, {}, { x: run, y: 1.5, z: STAIR_HALF * 2 });
     b.add(G.box, ROCK.nose, { x: vx + d + run - 0.06, y: top - 0.04, z: vz }, {}, { x: 0.14, y: 0.1, z: STAIR_HALF * 2 + 0.02 });
     // A torch every few steps, on alternate sides.
@@ -1234,7 +1235,7 @@ function volcano(b: Batch): Array<{ x: number; y: number; z: number }> {
     b.add(G.cyl8, ROCK.dark, { x: vx + d, y: LAVA_Y, z: vz }, {}, { x: 0.6, y: 3, z: 0.6 });
   }
   // The island: a stump of rock standing in the lava, a rim of stones round its pool.
-  b.add(G.cyl8, ROCK.mid, { x: vx, y: (ISLAND_Y + LAVA_Y - 1) / 2, z: vz }, {}, { x: ISLAND_R, y: ISLAND_Y - LAVA_Y + 1, z: ISLAND_R });
+  b.add(G.cyl, ROCK.mid, { x: vx, y: (ISLAND_Y + LAVA_Y - 1) / 2, z: vz }, {}, { x: ISLAND_R + 0.2, y: ISLAND_Y - LAVA_Y + 1, z: ISLAND_R + 0.2 });
   for (let k = 0; k < 10; k++) {
     const a = (k / 10) * Math.PI * 2;
     b.add(G.rock, ROCK.dark, { x: vx + Math.sin(a) * ISLAND_R, y: LAVA_Y + 0.2, z: vz + Math.cos(a) * ISLAND_R }, { y: a }, 0.8);
@@ -1326,7 +1327,7 @@ function tartarusFloor(b: Batch): Array<{ x: number; y: number; z: number }> {
 
   // The islands: slabs of black rock with ragged rims and the same taper beneath.
   ISLANDS.forEach((isl, n) => {
-    b.add(G.cyl8, 0x2e2428, { x: isl.x, y: LOW_Y - 0.6, z: isl.z }, { y: 0.2 + n }, { x: isl.r + 0.4, y: 1.2, z: isl.r + 0.4 });
+    b.add(G.cyl, 0x2e2428, { x: isl.x, y: LOW_Y - 0.6, z: isl.z }, { y: 0.2 + n }, { x: isl.r + 0.4, y: 1.2, z: isl.r + 0.4 });
     b.add(G.cone, 0x1e181c, { x: isl.x, y: LOW_Y - 11, z: isl.z }, { x: Math.PI, y: n }, { x: isl.r + 0.4, y: 14 + isl.r, z: isl.r + 0.4 });
     const stones = Math.round(isl.r * 1.1);
     for (let k = 0; k < stones; k++) {
@@ -1369,7 +1370,7 @@ function tartarusFloor(b: Batch): Array<{ x: number; y: number; z: number }> {
   const run = 1.2;
   let i = 0;
   for (let sx = STAIRS.x0; sx < STAIRS.x1; sx += run, i++) {
-    const top = y + (LOW_Y - y) * ((sx - STAIRS.x0) / (STAIRS.x1 - STAIRS.x0));
+    const top = stairStepY(sx + run / 2);
     b.add(G.box, i % 2 ? 0x4a3e48 : 0x3e343c, { x: sx + run / 2, y: top - 1, z }, {}, { x: run, y: 2, z: STAIRS.half * 2 });
     b.add(G.box, 0x5fe08a, { x: sx + run - 0.05, y: top - 0.03, z }, {}, { x: 0.06, y: 0.06, z: STAIRS.half * 2 + 0.02 });
     if (i % 6 === 3) {

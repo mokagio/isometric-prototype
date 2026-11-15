@@ -86,7 +86,7 @@ import {
   updateHades,
   type Hades,
 } from "./hades";
-import { atPortal, footing, inVolcano, ISLAND_Y, landing, LANDING_OUT, LAVA_Y, ontoStairs, SAFE_DROP, slopeY, STAIR_HALF, VOLCANO } from "./volcano";
+import { atPortal, footing, inVolcano, ISLAND_Y, landing, LANDING_OUT, LAVA_Y, ontoStairs, SAFE_DROP, slopeY, STAIR_HALF, stepY, VOLCANO } from "./volcano";
 import {
   ARENA_R,
   BLACKSMITH,
@@ -353,7 +353,7 @@ stockHell();
 /** How high a foe stands: up the volcano's stairs, down in Tartarus, or on the ground. */
 function foeY(f: Foe): number {
   if (f.drop !== undefined) return f.drop;
-  if (f.camp === STAIR_CAMP) return slopeY(f.g.x - VOLCANO.x);
+  if (f.camp === STAIR_CAMP) return stepY(f.g.x - VOLCANO.x);
   return inTartarus(f.g.x, f.g.z) ? (tartarusFooting(f.g.x, f.g.z) ?? TARTARUS.y) : 0;
 }
 
@@ -543,6 +543,7 @@ let leftTown = false;
 let wasInVillage = false;
 /** How high the hero stands: off the ground only on the volcano and the flood islands. */
 let heroY = 0;
+let shownY = 0;
 /** A fall off the volcano in progress: how fast, and where it ends. */
 let falling: { vy: number; y: number; lava: boolean; landed: boolean } | null = null;
 let hadesFight: Fight = save.beaten.includes("hades") ? "won" : "waiting";
@@ -1244,7 +1245,9 @@ function gruntSwing(g: Grunt): number {
 
 function draw(dt: number): void {
   // Hero.
-  heroFig.root.position.set(hero.x, heroY, hero.z);
+  // Step up and down stairs over a moment rather than popping a whole step; anything bigger (a portal, a fall) snaps.
+  shownY = Math.abs(heroY - shownY) > 2.5 ? heroY : shownY + (heroY - shownY) * Math.min(1, dt * 16);
+  heroFig.root.position.set(hero.x, shownY, hero.z);
   heroFig.root.rotation.y = hero.yaw;
   poseFigure(heroFig, dt, {
     speed: hero.speed,
@@ -1255,7 +1258,7 @@ function draw(dt: number): void {
   flash(heroFig, heroFlash * 0.8, 0xff3020);
   // Blink while nothing can hurt you, the way every game says so.
   heroFig.root.visible = !(hero.hurt > 0.25 && standing(hero) && Math.floor(clock * 20) % 2 === 0);
-  heroShadow.position.set(hero.x, heroY + 0.07, hero.z);
+  heroShadow.position.set(hero.x, shownY + 0.07, hero.z);
 
   // The smith hammers on.
   const hammer = (clock * 1.3) % 1;

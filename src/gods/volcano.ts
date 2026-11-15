@@ -29,6 +29,14 @@ export function slopeY(d: number): number {
   return (VOLCANO.h * (VOLCANO.r - d)) / (VOLCANO.r - LANDING_OUT);
 }
 
+/** How deep each stair is; the hero stands on the top of whichever step is underfoot. */
+export const STEP_RUN = 1.2;
+
+/** The top of the step `d` from the centre is on: each step is as high as its upper edge. */
+export function stepY(d: number): number {
+  return slopeY(LANDING_OUT + Math.floor((d - LANDING_OUT) / STEP_RUN) * STEP_RUN);
+}
+
 /** On the volcano at all: anywhere above its foot. */
 export function inVolcano(x: number, z: number): boolean {
   return dist(x, z, VOLCANO.x, VOLCANO.z) < VOLCANO.r - 0.5;
@@ -47,7 +55,7 @@ export function footing(x: number, z: number): Footing | null {
     return { y: ISLAND_Y + (VOLCANO.h - ISLAND_Y) * Math.max(0, k), kind: "bridge" };
   }
   if (d >= LANDING_IN && d < LANDING_OUT && off < LANDING_HALF) return { y: VOLCANO.h, kind: "landing" };
-  if (d >= LANDING_OUT && d <= VOLCANO.r && off < STAIR_HALF) return { y: slopeY(d), kind: "stair" };
+  if (d >= LANDING_OUT && d <= VOLCANO.r && off < STAIR_HALF) return { y: stepY(d), kind: "stair" };
   return null;
 }
 
