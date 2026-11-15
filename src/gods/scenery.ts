@@ -4,7 +4,7 @@ import { Batch } from "./batch";
 import { dist } from "./bearing";
 import { ARES_BUILD, buildFigure, HERO_BUILD, POSEIDON_BUILD, poseFigure, wearKit, type Build } from "./figure";
 import { godKit } from "./armor";
-import { HADES_RING, HOME_PORTAL, ISLAND, LOW_Y, STAIRS, TARTARUS } from "./hades";
+import { BRIDGE_HALF as HELL_BRIDGE, BRIDGES, HADES_RING, HOME_PORTAL, ISLAND, ISLANDS, LOW_Y, STAIRS, TARTARUS } from "./hades";
 import { toon } from "./toon";
 import {
   BRIDGE_HALF,
@@ -1324,19 +1324,39 @@ function tartarusFloor(b: Batch): Array<{ x: number; y: number; z: number }> {
   b.add(G.cyl, 0x2a2228, { x, y: y - 0.6, z }, {}, { x: outer, y: 1.2, z: outer });
   b.add(G.cone, 0x1e181c, { x, y: y - 14, z }, { x: Math.PI }, { x: outer, y: 26, z: outer });
 
-  // The island: a slab of black rock with a ragged rim and the same taper beneath.
-  b.add(G.cyl8, 0x2e2428, { x: ISLAND.x, y: LOW_Y - 0.6, z: ISLAND.z }, { y: 0.2 }, { x: ISLAND.r + 0.4, y: 1.2, z: ISLAND.r + 0.4 });
-  b.add(G.cone, 0x1e181c, { x: ISLAND.x, y: LOW_Y - 11, z: ISLAND.z }, { x: Math.PI }, { x: ISLAND.r + 0.4, y: 20, z: ISLAND.r + 0.4 });
-  for (let k = 0; k < 16; k++) {
-    const a = (k / 16) * Math.PI * 2;
-    if (Math.sin(a) < -0.85) continue; // the way to the stairs
-    b.add(G.rock, 0x3a3038, { x: ISLAND.x + Math.sin(a) * ISLAND.r, y: LOW_Y + 0.2, z: ISLAND.z + Math.cos(a) * ISLAND.r }, { y: a }, 0.8 + hash(k, 1, 83) * 0.6);
+  // The islands: slabs of black rock with ragged rims and the same taper beneath.
+  ISLANDS.forEach((isl, n) => {
+    b.add(G.cyl8, 0x2e2428, { x: isl.x, y: LOW_Y - 0.6, z: isl.z }, { y: 0.2 + n }, { x: isl.r + 0.4, y: 1.2, z: isl.r + 0.4 });
+    b.add(G.cone, 0x1e181c, { x: isl.x, y: LOW_Y - 11, z: isl.z }, { x: Math.PI, y: n }, { x: isl.r + 0.4, y: 14 + isl.r, z: isl.r + 0.4 });
+    const stones = Math.round(isl.r * 1.1);
+    for (let k = 0; k < stones; k++) {
+      const a = (k / stones) * Math.PI * 2;
+      const rx = isl.x + Math.sin(a) * isl.r;
+      const rz = isl.z + Math.cos(a) * isl.r;
+      // Leave a gap wherever a bridge or the stairs come in.
+      const gaps = [...BRIDGES.flatMap(([p, q]) => (p === n ? [ISLANDS[q]!] : q === n ? [ISLANDS[p]!] : [])), ...(n === 0 ? [{ x: STAIRS.x1, z: TARTARUS.z }] : [])];
+      if (gaps.some((g) => Math.abs(Math.atan2(g.x - isl.x, g.z - isl.z) - a + Math.PI * 4) % (Math.PI * 2) < 0.35 || Math.abs(Math.atan2(g.x - isl.x, g.z - isl.z) - a + Math.PI * 4) % (Math.PI * 2) > Math.PI * 2 - 0.35)) continue;
+      b.add(G.rock, 0x3a3038, { x: rx, y: LOW_Y + 0.2, z: rz }, { y: a }, 0.8 + hash(k, n, 83) * 0.6);
+    }
+  });
+  // Bridges of rock slabs, sagging a little, with nothing either side.
+  for (const [p, q] of BRIDGES) {
+    const a = ISLANDS[p]!;
+    const c = ISLANDS[q]!;
+    const len = Math.hypot(c.x - a.x, c.z - a.z);
+    const yaw = Math.atan2(c.x - a.x, c.z - a.z);
+    const slabs = Math.round(len / 1.4);
+    for (let k = 0; k <= slabs; k++) {
+      const t = k / slabs;
+      b.add(G.box, k % 2 ? 0x3e343c : 0x4a3e48, { x: a.x + (c.x - a.x) * t, y: LOW_Y - 0.35, z: a.z + (c.z - a.z) * t }, { y: yaw + (hash(k, p, 84) - 0.5) * 0.08 }, { x: HELL_BRIDGE * 2, y: 0.7, z: 1.3 });
+    }
   }
   // Broken columns and green fires on the island.
-  for (let k = 0; k < 5; k++) {
-    const a = (k / 5) * Math.PI * 2 + 0.6;
-    const cx = ISLAND.x + Math.sin(a) * (ISLAND.r - 3);
-    const cz = ISLAND.z + Math.cos(a) * (ISLAND.r - 3);
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2 + 0.6;
+    const isl = ISLANDS[k % ISLANDS.length]!;
+    const cx = isl.x + Math.sin(a) * (isl.r - 3);
+    const cz = isl.z + Math.cos(a) * (isl.r - 3);
     const h = 2 + hash(k, 2, 83) * 4;
     b.add(G.fluted, 0x3a3038, { x: cx, y: LOW_Y + h / 2, z: cz }, { z: (hash(k, 3, 83) - 0.5) * 0.15 }, { x: 0.5, y: h, z: 0.5 });
     if (k % 2 === 0) {
@@ -1373,14 +1393,18 @@ function tartarus(): THREE.Group {
   const g = new THREE.Group();
   const sea = new THREE.Mesh(new THREE.CircleGeometry(160, 48), new THREE.MeshBasicMaterial({ color: 0x8a1e08, fog: false }));
   sea.rotation.x = -Math.PI / 2;
-  sea.position.set((TARTARUS.x + ISLAND.x) / 2, LOW_Y - 30, TARTARUS.z);
+  sea.position.set(ISLAND.x, LOW_Y - 30, TARTARUS.z);
   g.add(sea);
   const rock = toon(0x241c20);
   for (let k = 0; k < 14; k++) {
     const a = (k / 14) * Math.PI * 2;
     const d = TARTARUS.r + 30 + hash(k, 2, 81) * 40;
+    const rx = ISLAND.x + Math.sin(a) * d;
+    const rz = TARTARUS.z + Math.cos(a) * d;
+    // Hanging rock, but never in the way of the path.
+    if (ISLANDS.some((i) => Math.hypot(rx - i.x, rz - i.z) < i.r + 12) || Math.hypot(rx - TARTARUS.x, rz - TARTARUS.z) < TARTARUS.r + 12) continue;
     const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), rock);
-    m.position.set(TARTARUS.x + Math.sin(a) * d, TARTARUS.y - 8 + hash(k, 3, 81) * 20, TARTARUS.z + Math.cos(a) * d);
+    m.position.set(rx, TARTARUS.y - 8 + hash(k, 3, 81) * 20, rz);
     m.scale.set(2 + hash(k, 4, 81) * 4, 2 + hash(k, 5, 81) * 3, 2 + hash(k, 6, 81) * 4);
     m.rotation.set(k, k * 2, 0);
     g.add(m);

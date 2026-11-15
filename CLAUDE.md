@@ -213,7 +213,7 @@ At each line in `FLOOD_AT` he floods the arena, nothing reaches him while the se
 West of the city a path leads to the volcano (`volcano.ts`): one staircase up its side with skeletons pacing it, no rails, and a crater of lava with a rock island in the middle.
 `footing` is the only rule for where you can stand up there — anything it returns null for is a fall, which `pushOut` deliberately does not prevent; within `SAFE_DROP` of the ground a stumble is put back on the stairs instead.
 The portal in the middle of the island leads to Tartarus (`hades.ts`), under the world, where the fog and sky turn dark while you are there.
-You land on a rock island at `LOW_Y` and climb a staircase to Hades's roofed colosseum at `TARTARUS.y`; `tartarusFooting` is the only rule for where there is ground, and anywhere else is a fall into the fire.
+You land on the far one of `ISLANDS`, cross the `BRIDGES` past skeleton camps (a skeleton knocked off an edge falls into the fire; one walking just stops there), and climb a staircase to Hades's roofed colosseum at `TARTARUS.y`; `tartarusFooting` is the only rule for where there is ground, and anywhere else is a fall into the fire.
 The colosseum is the same `colosseum()` as the other two, lifted by `ArenaLook.y` and given a roof hung with stalactites.
 Hades takes turns between two tricks: he vanishes and comes back behind you, glowing green before he strikes, then stands open; or he strikes the floor, red rings mark where stalactites will land (one under the hero), and they come down after `QUAKE_WARN`. He raises skeletons at each line in `RAISE_AT`.
 

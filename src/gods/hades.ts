@@ -12,15 +12,32 @@ export const GATE_HALF = 3.2;
 export const LOW_Y = TARTARUS.y - 30;
 export const FIRE_Y = LOW_Y - 30;
 export const STAIRS = { x0: TARTARUS.x + TARTARUS.r + 3.5, x1: TARTARUS.x + TARTARUS.r + 3.5 + 36, half: 2 };
+/** The island at the foot of the stairs. */
 export const ISLAND = { x: STAIRS.x1 + 13, z: TARTARUS.z, r: 15 };
+/** Every island in the dark, the stairs' own first; you land on the last. */
+export const ISLANDS: ReadonlyArray<{ x: number; z: number; r: number }> = [
+  ISLAND,
+  { x: ISLAND.x + 34, z: TARTARUS.z + 20, r: 10 },
+  { x: ISLAND.x + 62, z: TARTARUS.z - 6, r: 11 },
+  { x: ISLAND.x + 6, z: TARTARUS.z - 38, r: 8 },
+];
+/** Narrow rock bridges between islands, by index into `ISLANDS`. */
+export const BRIDGES: ReadonlyArray<[number, number]> = [
+  [0, 1],
+  [1, 2],
+  [0, 3],
+];
+export const BRIDGE_HALF = 1.3;
 /** Where the portal from the volcano sets you down, and where the way home stands once he is beaten. */
-export const ARRIVAL = { x: ISLAND.x + 9, z: ISLAND.z, yaw: -Math.PI / 2 };
+export const ARRIVAL = { x: ISLANDS[2]!.x + 6, z: ISLANDS[2]!.z, yaw: -Math.PI / 2 };
+/** Skeletons guarding the islands: how many on each. */
+export const ISLAND_GUARDS: readonly number[] = [3, 3, 2, 3];
 export const HOME_PORTAL = { x: TARTARUS.x - 10, z: TARTARUS.z };
 /** Step this far inside and the gate drops behind you. */
 export const HADES_TRIGGER = TARTARUS.r - 4;
 
 export function inTartarus(x: number, z: number): boolean {
-  return z > TARTARUS.z - 80 && z < TARTARUS.z + 80 && x > TARTARUS.x - 60 && x < ISLAND.x + 60;
+  return z > TARTARUS.z - 80 && z < TARTARUS.z + 80 && x > TARTARUS.x - 60 && x < ISLAND.x + 100;
 }
 
 export function inHadesArena(x: number, z: number, within = TARTARUS.r): boolean {
@@ -35,8 +52,18 @@ export function tartarusFooting(x: number, z: number): number | null {
   if (x >= STAIRS.x0 - 0.6 && x <= STAIRS.x1 && Math.abs(z - TARTARUS.z) < STAIRS.half) {
     return TARTARUS.y + (LOW_Y - TARTARUS.y) * Math.max(0, (x - STAIRS.x0) / (STAIRS.x1 - STAIRS.x0));
   }
-  if (dist(x, z, ISLAND.x, ISLAND.z) < ISLAND.r) return LOW_Y;
+  if (ISLANDS.some((i) => dist(x, z, i.x, i.z) < i.r)) return LOW_Y;
+  for (const [a, b] of BRIDGES) if (nearSegment(x, z, ISLANDS[a]!, ISLANDS[b]!) < BRIDGE_HALF) return LOW_Y;
   return null;
+}
+
+/** How far `(x, z)` is from the line between two points, or Infinity past either end. */
+function nearSegment(x: number, z: number, a: { x: number; z: number }, b: { x: number; z: number }): number {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const t = ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz);
+  if (t < 0 || t > 1) return Infinity;
+  return Math.abs((x - a.x) * dz - (z - a.z) * dx) / Math.hypot(dx, dz);
 }
 
 export const HADES_HP = 20;

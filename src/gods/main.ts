@@ -72,6 +72,8 @@ import {
   HADES_HP,
   hidden as hadesHidden,
   HADES_TRIGGER,
+  ISLAND_GUARDS,
+  ISLANDS,
   HOME_PORTAL,
   inHadesArena,
   inTartarus,
@@ -287,6 +289,8 @@ interface Foe {
   flash: number;
   /** Which camp it belongs to, or -1 for Ares's soldiers. */
   camp: number;
+  /** Knocked off an island in Tartarus: how high it is on the way down to the fire. */
+  drop?: number;
 }
 let foes: Foe[] = [];
 let nextId = 1;
@@ -333,8 +337,22 @@ function stockStairs(): void {
 }
 stockStairs();
 
+/** Skeletons guarding Tartarus's islands, a camp per island. */
+const HELL_CAMP = 200;
+function stockHell(): void {
+  ISLANDS.forEach((isl, n) => {
+    const have = foes.filter((f) => f.camp === HELL_CAMP + n).length;
+    for (let k = have; k < ISLAND_GUARDS[n]!; k++) {
+      const a = (k / ISLAND_GUARDS[n]!) * Math.PI * 2 + n;
+      addFoe("skeleton", isl.x + Math.sin(a) * isl.r * 0.45, isl.z + Math.cos(a) * isl.r * 0.45, a, HELL_CAMP + n);
+    }
+  });
+}
+stockHell();
+
 /** How high a foe stands: up the volcano's stairs, down in Tartarus, or on the ground. */
 function foeY(f: Foe): number {
+  if (f.drop !== undefined) return f.drop;
   if (f.camp === STAIR_CAMP) return slopeY(f.g.x - VOLCANO.x);
   return inTartarus(f.g.x, f.g.z) ? (tartarusFooting(f.g.x, f.g.z) ?? TARTARUS.y) : 0;
 }
@@ -941,6 +959,7 @@ function update(dt: number): void {
     hero.hp = Math.min(MAX_HP, hero.hp + CITY_HEAL * dt);
     for (let i = 0; i < CAMPS.length; i++) stockCamp(i);
     stockStairs();
+    stockHell();
     if (leftTown) leftTown = false;
   } else if (!leftTown && hero.z < -26) {
     leftTown = true;
@@ -952,8 +971,30 @@ function update(dt: number): void {
 
   // Grunts.
   for (const f of foes) {
+    if (f.drop !== undefined) {
+      // Falling into the fire, and gone when it gets there.
+      f.drop -= 24 * sim;
+      if (f.drop < FIRE_Y) {
+        burst(f.g.x, FIRE_Y + 0.5, f.g.z, 0xff6a1e, 16, 6);
+        f.g.t = DEAD_FADE + 1;
+      }
+      continue;
+    }
+    const was = { x: f.g.x, z: f.g.z };
     const blow = updateGrunt(f.g, sim, { x: hero.x, z: hero.z, alive: standing(hero) });
     if (blow) heroLoses(blow);
+    if (f.camp >= HELL_CAMP && tartarusFooting(f.g.x, f.g.z) === null) {
+      // Knocked off the edge, it falls; walking, it just stops at the edge.
+      if (f.g.state === "reel" || f.g.state === "down" || f.g.state === "dead") {
+        f.drop = foeY(f);
+        f.g.state = "dead";
+        f.g.t = 0;
+        hud.banner("Into the fire!", "", 0.9);
+      } else {
+        f.g.x = was.x;
+        f.g.z = was.z;
+      }
+    }
     if (f.camp === STAIR_CAMP && f.g.state === "idle") {
       // Pace up and down the stairs until someone comes near.
       let dir = pacing.get(f.g.id) ?? 1;

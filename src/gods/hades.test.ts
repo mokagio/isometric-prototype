@@ -7,7 +7,10 @@ import {
   HADES_HP,
   INTRO_TIME,
   CRUSH_DAMAGE,
+  ARRIVAL,
+  BRIDGES,
   ISLAND,
+  ISLANDS,
   LOW_Y,
   QUAKE_COUNT,
   QUAKE_WARN,
@@ -127,5 +130,23 @@ describe("Hades", () => {
 
   it("has nothing beside the stairs but the drop", () => {
     expect(tartarusFooting((STAIRS.x0 + STAIRS.x1) / 2, TARTARUS.z + STAIRS.half + 0.5)).toBeNull();
+  });
+
+  it("joins every island by a bridge you can walk the length of", () => {
+    for (const [a, b] of BRIDGES) {
+      const p = ISLANDS[a]!;
+      const q = ISLANDS[b]!;
+      for (let t = 0; t <= 1; t += 0.02) expect(tartarusFooting(p.x + (q.x - p.x) * t, p.z + (q.z - p.z) * t)).toBe(LOW_Y);
+    }
+    expect(tartarusFooting(ARRIVAL.x, ARRIVAL.z)).toBe(LOW_Y);
+  });
+
+  it("has nothing beside a bridge but the drop", () => {
+    const p = ISLANDS[0]!;
+    const q = ISLANDS[1]!;
+    const mid = { x: (p.x + q.x) / 2, z: (p.z + q.z) / 2 };
+    const across = { x: -(q.z - p.z), z: q.x - p.x };
+    const k = 3 / Math.hypot(across.x, across.z);
+    expect(tartarusFooting(mid.x + across.x * k, mid.z + across.z * k)).toBeNull();
   });
 });
