@@ -1220,7 +1220,7 @@ function respawn(): void {
 // After Ares: his sons march on the city from opposite ends of the meadow.
 
 const INVASION_CAMP = 400;
-const SONS_HP = 16;
+const SONS_HP = GRUNTS.phobos.hp + GRUNTS.deimos.hp;
 type Invasion = "none" | "coming" | "on" | "done";
 let invasion: Invasion = save.beaten.includes("invasion") ? "done" : save.beaten.includes("ares") ? "coming" : "none";
 let invasionTimer = 6;

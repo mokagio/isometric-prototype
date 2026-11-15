@@ -25,8 +25,8 @@ export const GRUNTS: Record<GruntKind, GruntStats> = {
   drowned: { hp: 3, speed: 2.3, reach: 1.7, damage: 12, windup: 0.6, recover: 0.7, aggro: 40 },
   // Ares's sons and the soldiers they march on the city with: they only turn on the hero close by, so they keep marching.
   hoplite: { hp: 2, speed: 3.2, reach: 1.8, damage: 10, windup: 0.5, recover: 0.6, aggro: 12 },
-  phobos: { hp: 8, speed: 3.0, reach: 2.2, damage: 18, windup: 0.6, recover: 0.6, aggro: 14 },
-  deimos: { hp: 8, speed: 3.0, reach: 2.2, damage: 18, windup: 0.6, recover: 0.6, aggro: 14 },
+  phobos: { hp: 16, speed: 3.4, reach: 2.5, damage: 26, windup: 0.5, recover: 0.45, aggro: 14 },
+  deimos: { hp: 16, speed: 3.4, reach: 2.5, damage: 26, windup: 0.5, recover: 0.45, aggro: 14 },
   bandit: { hp: 3, speed: 2.4, reach: 1.7, damage: 12, windup: 0.6, recover: 0.7, aggro: 13 },
   spartan: { hp: 2, speed: 3.6, reach: 1.8, damage: 10, windup: 0.45, recover: 0.55, aggro: 60 },
 };
