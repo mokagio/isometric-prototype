@@ -1328,7 +1328,9 @@ function tartarusFloor(b: Batch): Array<{ x: number; y: number; z: number }> {
   // The islands: slabs of black rock with ragged rims and the same taper beneath.
   ISLANDS.forEach((isl, n) => {
     b.add(G.cyl, 0x2e2428, { x: isl.x, y: LOW_Y - 0.6, z: isl.z }, { y: 0.2 + n }, { x: isl.r + 0.4, y: 1.2, z: isl.r + 0.4 });
-    b.add(G.cone, 0x1e181c, { x: isl.x, y: LOW_Y - 11, z: isl.z }, { x: Math.PI, y: n }, { x: isl.r + 0.4, y: 14 + isl.r, z: isl.r + 0.4 });
+    // The taper hangs from just under the slab, however deep it goes.
+    const under = 14 + isl.r;
+    b.add(G.cone, 0x1e181c, { x: isl.x, y: LOW_Y - 1 - under / 2, z: isl.z }, { x: Math.PI, y: n }, { x: isl.r + 0.4, y: under, z: isl.r + 0.4 });
     const stones = Math.round(isl.r * 1.1);
     for (let k = 0; k < stones; k++) {
       const a = (k / stones) * Math.PI * 2;
