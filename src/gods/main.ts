@@ -24,6 +24,8 @@ import {
   poseFigure,
   BANDIT_BUILD,
   FISHER_BUILD,
+  HADES_BUILD,
+  SKELETON_BUILD,
   POSEIDON_BUILD,
   SMITH_BUILD,
   SPARTAN_BUILD,
@@ -63,7 +65,21 @@ import {
 import { createHud } from "./hud";
 import { loadSave, storeSave } from "./save";
 import { toon } from "./toon";
-import { buildScenery, HORIZON } from "./scenery";
+import { buildScenery, HORIZON, SKY_TOP } from "./scenery";
+import {
+  ARRIVAL,
+  BODY as HADES_BODY,
+  HADES_HP,
+  hidden as hadesHidden,
+  HOME_PORTAL,
+  inTartarus,
+  makeHades,
+  strikeHades,
+  TARTARUS,
+  updateHades,
+  type Hades,
+} from "./hades";
+import { atPortal, footing, inVolcano, ISLAND_Y, landing, LANDING_OUT, LAVA_Y, ontoStairs, SAFE_DROP, slopeY, STAIR_HALF, VOLCANO } from "./volcano";
 import {
   ARENA_R,
   BLACKSMITH,
@@ -271,7 +287,7 @@ let foes: Foe[] = [];
 let nextId = 1;
 
 function addFoe(kind: GruntKind, x: number, z: number, yaw: number, camp: number): Foe {
-  const build = kind === "bandit" ? BANDIT_BUILD : SPARTAN_BUILD;
+  const build = kind === "bandit" ? BANDIT_BUILD : kind === "skeleton" ? SKELETON_BUILD : SPARTAN_BUILD;
   const fig = buildFigure(build);
   if (kind === "spartan") wearKit(fig, { helmet: "bronze", chest: "bronze", arms: "none", legs: "bronze" });
   if (kind === "spartan") fig.crest.color.setHex(0xa3241e);
@@ -298,6 +314,31 @@ function stockCamp(i: number): void {
   }
 }
 CAMPS.forEach((_, i) => stockCamp(i));
+
+/** The skeletons that walk the volcano's stairs, as a camp of their own. */
+const STAIR_CAMP = 99;
+const STAIR_POSTS = [18, 24, 30, 36, 43];
+const pacing = new Map<number, number>();
+function stockStairs(): void {
+  const have = foes.filter((f) => f.camp === STAIR_CAMP).length;
+  for (let n = have; n < STAIR_POSTS.length; n++) {
+    const f = addFoe("skeleton", VOLCANO.x + STAIR_POSTS[n]!, VOLCANO.z + (n % 2 ? 0.6 : -0.6), Math.PI / 2, STAIR_CAMP);
+    pacing.set(f.g.id, n % 2 ? 1 : -1);
+  }
+}
+stockStairs();
+
+/** How high a foe stands: up the volcano's stairs, down in Tartarus, or on the ground. */
+function foeY(f: Foe): number {
+  if (f.camp === STAIR_CAMP) return slopeY(f.g.x - VOLCANO.x);
+  return inTartarus(f.g.x, f.g.z) ? TARTARUS.y : 0;
+}
+
+/** Keep a stair skeleton on its stairs, whatever it is chasing. */
+function onStairs(g: Grunt): void {
+  g.x = Math.min(VOLCANO.x + VOLCANO.r - 1, Math.max(VOLCANO.x + LANDING_OUT + 0.5, g.x));
+  g.z = Math.min(VOLCANO.z + STAIR_HALF - 0.4, Math.max(VOLCANO.z - STAIR_HALF + 0.4, g.z));
+}
 
 // Ares and his arena.
 type Fight = "waiting" | "on" | "won";
@@ -477,6 +518,86 @@ let lastDrag = -10;
 let clock = 0;
 let leftTown = false;
 let wasInVillage = false;
+/** How high the hero stands: off the ground only on the volcano and the flood islands. */
+let heroY = 0;
+/** A fall off the volcano in progress: how fast, and where it ends. */
+let falling: { vy: number; y: number; lava: boolean; landed: boolean } | null = null;
+let hadesFight: Fight = save.beaten.includes("hades") ? "won" : "waiting";
+let hades: { h: Hades; fig: Figure; shadow: THREE.Mesh; flash: number } | null = null;
+
+/** Down below the light changes: a red-black sky and close, dark air. */
+function underworld(on: boolean): void {
+  const fog = scene.fog as THREE.Fog;
+  fog.color.setHex(on ? 0x1a0a10 : HORIZON);
+  fog.near = on ? 18 : 45;
+  fog.far = on ? 95 : 230;
+  (scene.background as THREE.Color).setHex(on ? 0x1a0a10 : HORIZON);
+  scenery.sky.uniforms.top!.value.setHex(on ? 0x080306 : SKY_TOP);
+  scenery.sky.uniforms.horizon!.value.setHex(on ? 0x4a1018 : HORIZON);
+}
+
+function intoTartarus(): void {
+  burst(hero.x, heroY + 1.5, hero.z, 0xb88aff, 30, 6, 1.2);
+  hero.x = ARRIVAL.x;
+  hero.z = ARRIVAL.z;
+  hero.yaw = ARRIVAL.yaw;
+  hero.vx = hero.vz = 0;
+  camYaw = ARRIVAL.yaw;
+  heroY = TARTARUS.y;
+  camPos.set(0, 0, 0);
+  camLook.set(0, 0, 0);
+  underworld(true);
+  burst(hero.x, heroY + 1.5, hero.z, 0xb88aff, 30, 6, 1.2);
+  if (hadesFight === "waiting") startHadesFight();
+  else hud.banner("Tartarus", "Hades is beaten. The portal leads home", 2.6);
+}
+
+function outOfTartarus(): void {
+  hero.x = VOLCANO.x + 3;
+  hero.z = VOLCANO.z;
+  hero.yaw = Math.PI / 2;
+  camYaw = hero.yaw;
+  heroY = ISLAND_Y;
+  camPos.set(0, 0, 0);
+  camLook.set(0, 0, 0);
+  underworld(false);
+  burst(hero.x, heroY + 1.5, hero.z, 0xb88aff, 30, 6, 1.2);
+}
+
+function startHadesFight(): void {
+  hadesFight = "on";
+  const fig = buildFigure(HADES_BUILD);
+  fig.root.scale.setScalar(1.8);
+  scene.add(fig.root);
+  hades = { h: makeHades(TARTARUS.x - 8, TARTARUS.z, Math.PI / 2), fig, shadow: blob(2.4), flash: 0 };
+  hud.banner("HADES", "Lord of the Underworld", 2.6);
+  hud.setBoss("Hades, Lord of the Underworld", 1);
+  shake = 0.4;
+}
+
+function clearHades(): void {
+  if (!hades) return;
+  scene.remove(hades.fig.root);
+  scene.remove(hades.shadow);
+  hades = null;
+}
+
+function hadesFalls(): void {
+  if (!hades) return;
+  hadesFight = "won";
+  hud.banner("Hades is beaten!", "Claim his armor", 3.5);
+  hud.setBoss(null, 0);
+  shake = 0.7;
+  stop = 0.25;
+  burst(hades.h.x, TARTARUS.y + 2, hades.h.z, 0x5fe08a, 40, 10, 1.6);
+  for (const f of foes) if (f.camp === -1 && f.g.state !== "dead") {
+    f.g.state = "dead";
+    f.g.t = 0;
+  }
+  spawnReward(hades.h.x, hades.h.z, "hades");
+  reward!.mesh.position.y = TARTARUS.y;
+  scenery.portals[1]!.visible = true;
+}
 let fallTimer = 0;
 const camPos = new THREE.Vector3();
 const camLook = new THREE.Vector3();
@@ -534,6 +655,22 @@ function swingLands(): void {
       if (result === "dead") aresFalls();
     }
   }
+  if (hades && underBlade(hero, hades.h.x, hades.h.z, HADES_BODY)) {
+    const h = hades.h;
+    const result = strikeHades(h, power, hero.x, hero.z);
+    if (result === "clang") {
+      burst(h.x + Math.sin(h.yaw) * 1.2, TARTARUS.y + 1.8, h.z + Math.cos(h.yaw) * 1.2, 0x9fffc0, 14, 7);
+      shove(hero, h.x, h.z, 7);
+      stop = 0.07;
+      hitAny = true;
+    } else if (result !== "none") {
+      hades.flash = 1;
+      hitAny = true;
+      burst(h.x, TARTARUS.y + 2.2, h.z, 0x5fe08a, 14, 7);
+      hud.setBoss("Hades, Lord of the Underworld", h.hp / HADES_HP);
+      if (result === "dead") hadesFalls();
+    }
+  }
   if (poseidon && underBlade(hero, poseidon.p.x, poseidon.p.z, SEA_BODY)) {
     const p = poseidon.p;
     const result = strikePoseidon(p, power, hero.x, hero.z);
@@ -584,6 +721,11 @@ function claimReward(): void {
   storeSave(save);
   wearKit(heroFig, save.armor);
   hud.setArmor(save.armor);
+  if (kit === "hades") {
+    hud.banner("Armor of Hades", "The toughest of all, and your sword hits twice as hard", 4);
+    clearHades();
+    return;
+  }
   if (kit === "poseidon") {
     hud.banner("Armor of Poseidon", "The toughest yet, and your sword hits twice as hard", 4);
     clearPoseidon();
@@ -601,6 +743,11 @@ function claimReward(): void {
 
 function respawn(): void {
   endFight();
+  heroY = 0;
+  falling = null;
+  clearHades();
+  if (hadesFight === "on") hadesFight = "waiting";
+  underworld(false);
   if (fight === "on") fight = "waiting";
   if (seaFight === "on") seaFight = "waiting";
   hero = makeHero(START.x, START.z, START.yaw);
@@ -654,6 +801,7 @@ function update(dt: number): void {
   const seaUp = poseidon && poseidon.p.state !== "dead";
   if (aresUp && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, ares!.a, dt);
   else if (seaUp && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, poseidon!.p, dt);
+  else if (hades && hades.h.state !== "dead" && !hadesHidden(hades.h) && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, hades.h, dt);
   else if (!blocking && standing(hero)) camYaw = autoTurn(camYaw, stick.x, dt);
   const move = moveFromStick(stick.x, stick.y, camYaw);
   // Wading through the flood is slow going.
@@ -668,6 +816,7 @@ function update(dt: number): void {
     const targets: Array<{ x: number; z: number }> = foes.filter((f) => f.g.state !== "dead").map((f) => f.g);
     if (ares && ares.a.state !== "dead") targets.push(ares.a);
     if (poseidon && poseidon.p.state !== "dead") targets.push(poseidon.p);
+    if (hades && hades.h.state !== "dead" && !hadesHidden(hades.h)) targets.push(hades.h);
     let best: { x: number; z: number } | null = null;
     let bestD = SWING_REACH + 2;
     for (const t of targets) {
@@ -688,9 +837,58 @@ function update(dt: number): void {
   hero.x = p.x;
   hero.z = p.z;
 
+  // The volcano: stand on its path, and fall off anywhere else.
+  if (falling) {
+    falling.vy -= 30 * dt;
+    if (!falling.lava) {
+      // Off the side of the stairs is a long tumble down the slope to the foot.
+      const d = dist(hero.x, hero.z, VOLCANO.x, VOLCANO.z);
+      if (d < VOLCANO.r && d > 1e-3) {
+        const step = Math.min(VOLCANO.r - d, 14 * dt);
+        hero.x += ((hero.x - VOLCANO.x) / d) * step;
+        hero.z += ((hero.z - VOLCANO.z) / d) * step;
+        falling.y = slopeY(d + step);
+        if (Math.random() < 0.4) burst(hero.x, falling.y + 0.3, hero.z, 0x8a7a70, 2, 3);
+      }
+    }
+    heroY = Math.max(falling.y, heroY + falling.vy * dt);
+    if (heroY <= falling.y && !falling.landed && (falling.lava || falling.y < 0.1)) {
+      falling.landed = true;
+      shake = 0.5;
+      if (falling.lava) burst(hero.x, LAVA_Y + 0.3, hero.z, 0xff6a1e, 30, 8, 1.4);
+      else burst(hero.x, heroY + 0.3, hero.z, 0x8a7a70, 16, 5);
+    }
+  } else if (inVolcano(hero.x, hero.z) && standing(hero)) {
+    let f = footing(hero.x, hero.z);
+    if (!f && heroY < SAFE_DROP) {
+      const q = ontoStairs(hero.x, hero.z, RADIUS);
+      hero.x = q.x;
+      hero.z = q.z;
+      f = footing(hero.x, hero.z);
+    }
+    if (f) {
+      heroY = f.y;
+      if (atPortal(hero.x, hero.z)) intoTartarus();
+    } else {
+      // Off the edge.
+      const end = landing(hero.x, hero.z);
+      falling = { vy: 2, y: end.y, lava: end.lava, landed: false };
+      hero.hp = 0;
+      hero.fallen = 0;
+      hero.swing = -1;
+      fallTimer = 0;
+      hud.banner(end.lava ? "Into the lava!" : "You fell!", "Back to the city", 2.6);
+    }
+  } else if (inTartarus(hero.x, hero.z)) {
+    heroY = TARTARUS.y;
+    if (hadesFight === "won" && dist(hero.x, hero.z, HOME_PORTAL.x, HOME_PORTAL.z) < 1.4 && standing(hero)) outOfTartarus();
+  } else if (!inVolcano(hero.x, hero.z)) {
+    heroY = onIsland(hero.x, hero.z) ? ISLAND_H : 0;
+  }
+
   if (!standing(hero)) {
     fallTimer += dt;
-    if (fallTimer > 2.8) respawn();
+    if (fallTimer > 2.8 && (!falling || falling.landed)) respawn();
   }
 
   // The city mends you and restocks the road.
@@ -698,6 +896,7 @@ function update(dt: number): void {
   if (inTown && standing(hero)) {
     hero.hp = Math.min(MAX_HP, hero.hp + CITY_HEAL * dt);
     for (let i = 0; i < CAMPS.length; i++) stockCamp(i);
+    stockStairs();
     if (leftTown) leftTown = false;
   } else if (!leftTown && hero.z < -26) {
     leftTown = true;
@@ -711,7 +910,20 @@ function update(dt: number): void {
   for (const f of foes) {
     const blow = updateGrunt(f.g, sim, { x: hero.x, z: hero.z, alive: standing(hero) });
     if (blow) heroLoses(blow);
-    if (f.g.state !== "dead") {
+    if (f.camp === STAIR_CAMP && f.g.state === "idle") {
+      // Pace up and down the stairs until someone comes near.
+      let dir = pacing.get(f.g.id) ?? 1;
+      f.g.x += dir * 1.2 * sim;
+      f.g.yaw = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+      f.g.moving = true;
+      const d = f.g.x - VOLCANO.x;
+      if (d > VOLCANO.r - 2 || d < LANDING_OUT + 1) {
+        dir = -dir;
+        pacing.set(f.g.id, dir);
+      }
+    }
+    if (f.camp === STAIR_CAMP) onStairs(f.g);
+    else if (f.g.state !== "dead") {
       const q = pushOut(world, f.g.x, f.g.z, 0.45, gateClosed || f.camp === -1);
       f.g.x = q.x;
       f.g.z = q.z;
@@ -825,6 +1037,41 @@ function update(dt: number): void {
       }
     }
   }
+  // Hades.
+  if (hades) {
+    const h = hades.h;
+    const events = updateHades(h, sim, { x: hero.x, z: hero.z, yaw: hero.yaw, alive: standing(hero) }, TARTARUS);
+    for (const e of events) {
+      if (e.kind === "blow") heroLoses(e);
+      else if (e.kind === "roar") shake = 0.35;
+      else if (e.kind === "vanish") {
+        burst(h.x, TARTARUS.y + 1.5, h.z, 0x3a2a44, 24, 5, 1.4);
+        hud.banner("He vanished!", "Watch your back", 1.4);
+      } else if (e.kind === "appear") burst(e.x, TARTARUS.y + 1.5, e.z, 0x5fe08a, 20, 5, 1.2);
+      else if (e.kind === "raise") {
+        for (let i = 0; i < e.count; i++) {
+          const a = yawTo(TARTARUS.x, TARTARUS.z, hero.x, hero.z) + Math.PI + (i - 1) * 0.9;
+          const x = TARTARUS.x + Math.sin(a) * (TARTARUS.r - 3);
+          const z = TARTARUS.z + Math.cos(a) * (TARTARUS.r - 3);
+          const f = addFoe("skeleton", x, z, a + Math.PI, -1);
+          f.g.state = "walk";
+          burst(x, TARTARUS.y + 0.5, z, 0x5fe08a, 12, 5);
+        }
+        hud.banner("Rise, my dead!", "", 1.6);
+      }
+    }
+    if (h.state !== "dead" && !hadesHidden(h)) {
+      const q = pushOut(world, h.x, h.z, HADES_BODY, true);
+      h.x = q.x;
+      h.z = q.z;
+      const d = dist(h.x, h.z, hero.x, hero.z);
+      const min = HADES_BODY + RADIUS;
+      if (d < min && d > 1e-4) {
+        hero.x = h.x + ((hero.x - h.x) / d) * min;
+        hero.z = h.z + ((hero.z - h.z) / d) * min;
+      }
+    }
+  }
   if (reward && dist(hero.x, hero.z, reward.x, reward.z) < 2.4) claimReward();
 
   // Coins hop out, settle, and fly to a hero who comes near.
@@ -869,13 +1116,19 @@ function update(dt: number): void {
   hud.setHealth(Math.ceil(hero.hp));
   hud.setCompass(
     camYaw,
-    fight === "on" || seaFight === "on"
+    fight === "on" || seaFight === "on" || inTartarus(hero.x, hero.z)
       ? null
       : [
           { id: "colosseum", label: fight === "won" ? "Colosseum" : "Ares", yaw: yawTo(hero.x, hero.z, COLOSSEUM.x, COLOSSEUM.z) },
           { id: "city", label: "City", yaw: yawTo(hero.x, hero.z, 0, 0) },
           { id: "village", label: seaFight === "won" ? "Village" : "Poseidon", yaw: yawTo(hero.x, hero.z, VILLAGE.x, VILLAGE.z) },
-        ].filter((m) => (m.id !== "city" || !inCity(hero.x, hero.z)) && (m.id !== "village" || !inVillage(hero.x, hero.z))),
+          { id: "volcano", label: "Volcano", yaw: yawTo(hero.x, hero.z, VOLCANO.x, VOLCANO.z) },
+        ].filter(
+          (m) =>
+            (m.id !== "city" || !inCity(hero.x, hero.z)) &&
+            (m.id !== "village" || !inVillage(hero.x, hero.z)) &&
+            (m.id !== "volcano" || !inVolcano(hero.x, hero.z)),
+        ),
   );
 }
 
@@ -890,7 +1143,6 @@ function gruntSwing(g: Grunt): number {
 
 function draw(dt: number): void {
   // Hero.
-  const heroY = onIsland(hero.x, hero.z) ? ISLAND_H : 0;
   heroFig.root.position.set(hero.x, heroY, hero.z);
   heroFig.root.rotation.y = hero.yaw;
   poseFigure(heroFig, dt, {
@@ -911,7 +1163,7 @@ function draw(dt: number): void {
 
   for (const f of foes) {
     const g = f.g;
-    f.fig.root.position.set(g.x, 0, g.z);
+    f.fig.root.position.set(g.x, foeY(f), g.z);
     f.fig.root.rotation.y = g.yaw;
     let fallen = -1;
     if (g.state === "down") fallen = g.t + 0.5;
@@ -923,7 +1175,7 @@ function draw(dt: number): void {
     else flash(f.fig, f.flash, 0xffffff);
     f.flash = Math.max(0, f.flash - dt * 6);
     if (g.state === "dead") fade(f.fig, Math.max(0, 1 - g.t / DEAD_FADE));
-    f.shadow.position.set(g.x, 0.07, g.z);
+    f.shadow.position.set(g.x, foeY(f) + 0.07, g.z);
     f.shadow.visible = g.state !== "dead";
   }
 
@@ -992,6 +1244,29 @@ function draw(dt: number): void {
     }
   }
 
+  if (hades) {
+    const h = hades.h;
+    const fig = hades.fig;
+    fig.root.position.set(h.x, TARTARUS.y, h.z);
+    fig.root.rotation.y = h.yaw;
+    let swing = -1;
+    if (h.state === "windup" || h.state === "ambush") swing = 0.38 * Math.min(1, h.t / 0.7);
+    else if (h.state === "strike") swing = 0.38 + 0.24 * Math.min(1, h.t / 0.2);
+    else if (h.state === "recover" || h.state === "exposed") swing = 0.62 + 0.38 * Math.min(1, h.t / 0.4);
+    poseFigure(fig, dt, { speed: h.moving ? 2.6 : 0, swing, raise: h.state === "raise" ? 1 : 0, daze: h.state === "exposed" ? 0.5 : 0, fallen: h.state === "dead" ? h.t : -1 });
+    // Fading out into the helmet's dark, and the green warning before he strikes from behind.
+    fade(fig, h.state === "vanish" ? Math.max(0, 1 - h.t * 3) : 1);
+    fig.root.visible = !(h.state === "vanish" && h.t > 0.35);
+    if (h.state === "ambush") flash(fig, 0.45 + 0.45 * Math.sin(clock * 26), 0x5fff8a);
+    else if (h.state === "windup") flash(fig, 0.2 + 0.2 * Math.sin(clock * 30), 0xffaa40);
+    else flash(fig, hades.flash, 0xffffff);
+    hades.flash = Math.max(0, hades.flash - dt * 6);
+    hades.shadow.visible = fig.root.visible;
+    hades.shadow.position.set(h.x, TARTARUS.y + 0.07, h.z);
+  }
+  for (const p of scenery.portals) p.children[1]!.rotation.z = -clock * 2;
+  scenery.portals[1]!.visible = hadesFight === "won";
+
   if (reward) {
     reward.mesh.children[1]!.rotation.y = clock * 1.5;
     reward.mesh.children[1]!.position.y = 1.2 + Math.sin(clock * 2) * 0.2;
@@ -1007,6 +1282,15 @@ function draw(dt: number): void {
   }
   scenery.grass.uniforms.time!.value = clock;
   scenery.sea.uniforms.time!.value = clock;
+  scenery.lava.color.setHSL(0.045, 1, 0.5 + Math.sin(clock * 2) * 0.06);
+  for (const puff of scenery.smoke.children) {
+    puff.position.y += dt * 2.5;
+    puff.scale.addScalar(dt * 0.4);
+    if (puff.position.y > VOLCANO.h + 34) {
+      puff.position.y = VOLCANO.h + 3;
+      puff.scale.setScalar(3);
+    }
+  }
   scenery.seaGate.position.y += ((seaGateClosed ? 0 : 6) - scenery.seaGate.position.y) * Math.min(1, dt * (seaGateClosed ? 10 : 2));
   for (const c of scenery.clouds.children) {
     c.position.x += dt * 2;
@@ -1015,7 +1299,7 @@ function draw(dt: number): void {
   updateSparks(dt);
 
   // Camera: behind the hero, pulled back and up in the arena so the god fits in frame.
-  const fighting = (ares !== null && ares.a.state !== "dead") || (poseidon !== null && poseidon.p.state !== "dead");
+  const fighting = (ares !== null && ares.a.state !== "dead") || (poseidon !== null && poseidon.p.state !== "dead") || (hades !== null && hades.h.state !== "dead");
   const back = (fighting ? CAM_DIST + 2.5 : CAM_DIST) * devZoom;
   const up = LOOK_HEIGHT + ((fighting ? CAM_HEIGHT + 1.6 : CAM_HEIGHT) - LOOK_HEIGHT) * devZoom;
   const tx = hero.x;
@@ -1038,9 +1322,13 @@ function draw(dt: number): void {
       cz = COLOSSEUM.z + ((cz - COLOSSEUM.z) / d) * limit;
     }
   }
+  // Up the volcano the camera rises with the hero, and never sinks into the rock.
+  let cy = up + heroY;
+  const camFrom = dist(cx, cz, VOLCANO.x, VOLCANO.z);
+  if (camFrom < VOLCANO.r + 2) cy = Math.max(cy, (camFrom < VOLCANO.rim ? LAVA_Y : slopeY(camFrom)) + 2.5);
   const k = 1 - Math.exp(-dt * 9);
-  camPos.lerp(new THREE.Vector3(cx, up, cz), camPos.lengthSq() === 0 ? 1 : k);
-  camLook.lerp(new THREE.Vector3(tx, LOOK_HEIGHT, tz), camLook.lengthSq() === 0 ? 1 : Math.min(1, k * 1.6));
+  camPos.lerp(new THREE.Vector3(cx, cy, cz), camPos.lengthSq() === 0 ? 1 : k);
+  camLook.lerp(new THREE.Vector3(tx, LOOK_HEIGHT + heroY, tz), camLook.lengthSq() === 0 ? 1 : Math.min(1, k * 1.6));
   shake = Math.max(0, shake - dt * 1.6);
   const jolt = shake * shake;
   camera.position.set(
@@ -1054,8 +1342,8 @@ function draw(dt: number): void {
   const texel = (SHADOW_REACH * 2) / sun.shadow.mapSize.x;
   const sx = Math.round(hero.x / texel) * texel;
   const sz = Math.round(hero.z / texel) * texel;
-  sun.target.position.set(sx, 0, sz);
-  sun.position.set(sx + SUN_OFFSET.x, SUN_OFFSET.y, sz + SUN_OFFSET.z);
+  sun.target.position.set(sx, heroY, sz);
+  sun.position.set(sx + SUN_OFFSET.x, SUN_OFFSET.y + heroY, sz + SUN_OFFSET.z);
 
   renderer.render(scene, camera);
 }
@@ -1069,7 +1357,7 @@ hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods
 if (import.meta.env.DEV) {
   Object.assign(window, {
     gods: {
-      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, foes: foes.map((f) => f.g) }),
+      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, heroY, falling, foes: foes.map((f) => f.g) }),
       teleport(x: number, z: number, yaw = hero.yaw) {
         hero.x = x;
         hero.z = z;

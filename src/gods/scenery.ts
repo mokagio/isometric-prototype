@@ -4,7 +4,21 @@ import { Batch } from "./batch";
 import { dist } from "./bearing";
 import { ARES_BUILD, buildFigure, HERO_BUILD, POSEIDON_BUILD, poseFigure, wearKit, type Build } from "./figure";
 import { godKit } from "./armor";
+import { HOME_PORTAL, TARTARUS } from "./hades";
 import { toon } from "./toon";
+import {
+  BRIDGE_HALF,
+  ISLAND_R,
+  ISLAND_Y,
+  LANDING_HALF,
+  LANDING_IN,
+  LANDING_OUT,
+  LAVA_Y,
+  PORTAL_R,
+  slopeY,
+  STAIR_HALF,
+  VOLCANO,
+} from "./volcano";
 import {
   ARENA_R,
   BLACKSMITH,
@@ -210,6 +224,12 @@ export interface Scenery {
   seaGate: THREE.Group;
   /** The water he floods his arena with, raised by the fight. */
   flood: THREE.Mesh;
+  /** Smoke puffs over the volcano, drifted up every frame. */
+  smoke: THREE.Group;
+  lava: THREE.MeshBasicMaterial;
+  /** The swirl inside each portal, spun every frame: the volcano's, then the way home from Tartarus. */
+  portals: THREE.Group[];
+  sky: THREE.ShaderMaterial;
 }
 
 export function buildScenery(): Scenery {
@@ -230,7 +250,12 @@ export function buildScenery(): Scenery {
   eastRoad(batch);
   village(batch);
   colosseum(batch, SEA_LOOK);
+  const torches = volcano(batch);
+  const pits = tartarusFloor(batch);
   root.add(batch.build());
+  const fire = volcanoFire();
+  root.add(fire.group);
+  const below = tartarus();
   const sea = seaPlane();
   root.add(sea);
   root.add(mountains());
@@ -260,6 +285,13 @@ export function buildScenery(): Scenery {
   // Poseidon's braziers burn sea-green, and the lighthouse keeps its fire lit.
   for (const f of flameSpots(SEA_LOOK)) flames.push(flame(root, f.x, f.y, f.z, 0.7, 0x2fd6c8, 0xc8fff6));
   flames.push(flame(root, LIGHTHOUSE.x, LIGHTHOUSE_TOP + 0.2, LIGHTHOUSE.z, 1.1));
+  for (const t of torches) flames.push(flame(root, t.x, t.y, t.z, 0.45));
+  for (const t of pits) flames.push(flame(root, t.x, t.y, t.z, 0.8, 0x3fe07a, 0xc8ffd8));
+  root.add(below);
+  const volcanoPortal = portal(VOLCANO.x, ISLAND_Y, VOLCANO.z, Math.PI / 2);
+  const homePortal = portal(HOME_PORTAL.x, TARTARUS.y, HOME_PORTAL.z, Math.PI / 2);
+  homePortal.visible = false;
+  root.add(volcanoPortal, homePortal);
 
   const gate = portcullis(ARES_LOOK);
   root.add(gate);
@@ -274,7 +306,7 @@ export function buildScenery(): Scenery {
   root.add(flood);
   const clouds = cloudLayer();
   root.add(clouds);
-  return { root, gate, flames, clouds, grass: grass.material, water, sea: sea.material as THREE.ShaderMaterial, seaGate, flood };
+  return { root, gate, flames, clouds, grass: grass.material, water, sea: sea.material as THREE.ShaderMaterial, seaGate, flood, smoke: fire.smoke, lava: fire.lava, portals: [volcanoPortal, homePortal], sky: (root.getObjectByName("sky") as THREE.Mesh).material as THREE.ShaderMaterial };
 }
 
 /** A figure cast in one material, struck in a pose and set on a plinth. */
@@ -1082,6 +1114,221 @@ function seaPlane(): THREE.Mesh {
 }
 
 // ---------------------------------------------------------------------------
+// The volcano: a cone of dark rock, one staircase up it, lava in the crater
+// and a rock island with a pool in the middle.
+
+const ROCK = { dark: 0x4a3c38, mid: 0x5e4c46, step: 0x8a7a70, stepDark: 0x74665e, nose: 0xa8988c };
+
+/** Returns where the stair torches burn. */
+function volcano(b: Batch): Array<{ x: number; y: number; z: number }> {
+  const { x: vx, z: vz, r, h, rim } = VOLCANO;
+  // The cone, faceted, with its crater dished out of the top.
+  const cone = flat(
+    lathe(
+      [
+        [r + 2, -1],
+        [r, 0],
+        [LANDING_OUT, h],
+        [rim, h],
+        [rim - 0.6, h - 1],
+        [rim - 0.5, LAVA_Y - 0.6],
+        [0, LAVA_Y - 0.6],
+      ],
+      36,
+    ),
+  );
+  b.add(cone, ROCK.dark, { x: vx, y: 0, z: vz });
+  // Ridges of lighter rock running down the flanks.
+  for (let k = 0; k < 14; k++) {
+    const a = (k / 14) * Math.PI * 2 + 0.2;
+    if (Math.abs(Math.sin(a) - 1) < 0.08) continue;
+    const d = rim + 8 + hash(k, 1, 70) * 22;
+    b.add(G.rock, ROCK.mid, { x: vx + Math.sin(a) * d, y: slopeY(d) + 0.3, z: vz + Math.cos(a) * d }, { y: a }, { x: 1.6, y: 1.0, z: 3.2 });
+  }
+
+  // The staircase, one block per step, each a little proud of the slope.
+  const torches: Array<{ x: number; y: number; z: number }> = [];
+  const run = 1.2;
+  let i = 0;
+  for (let d = LANDING_OUT; d < r; d += run, i++) {
+    const top = slopeY(d);
+    b.add(G.box, i % 2 ? ROCK.step : ROCK.stepDark, { x: vx + d + run / 2, y: top - 0.75, z: vz }, {}, { x: run, y: 1.5, z: STAIR_HALF * 2 });
+    b.add(G.box, ROCK.nose, { x: vx + d + run - 0.06, y: top - 0.04, z: vz }, {}, { x: 0.14, y: 0.1, z: STAIR_HALF * 2 + 0.02 });
+    // A torch every few steps, on alternate sides.
+    if (i % 5 === 2) {
+      const side = i % 10 === 2 ? 1 : -1;
+      const tz = vz + side * (STAIR_HALF + 0.35);
+      const ty = slopeY(d + run / 2);
+      b.add(G.cyl8, C.wood, { x: vx + d + run / 2, y: ty + 0.6, z: tz }, {}, { x: 0.07, y: 1.6, z: 0.07 });
+      b.add(G.cyl8, C.iron, { x: vx + d + run / 2, y: ty + 1.4, z: tz }, {}, { x: 0.16, y: 0.18, z: 0.16 });
+      torches.push({ x: vx + d + run / 2, y: ty + 1.45, z: tz });
+    }
+  }
+  // Bones and skulls at the foot, to say what is up there.
+  for (const side of [-1, 1]) {
+    const px = vx + r + 1;
+    const pz = vz + side * (STAIR_HALF + 1);
+    b.add(G.box, ROCK.step, { x: px, y: 1.2, z: pz }, {}, { x: 0.7, y: 2.4, z: 0.7 });
+    b.add(G.blob, 0xe9e1c9, { x: px, y: 2.6, z: pz }, {}, { x: 0.3, y: 0.28, z: 0.32 });
+    b.add(G.blob, 0x1b1410, { x: px + 0.22, y: 2.62, z: pz - 0.1 }, {}, 0.07);
+    b.add(G.blob, 0x1b1410, { x: px + 0.22, y: 2.62, z: pz + 0.1 }, {}, 0.07);
+  }
+  // A worn path to it from the meadow.
+  const pathFrom = BOUNDS.x0 + 2;
+  b.add(G.box, C.dirt, { x: (pathFrom + vx + r) / 2, y: 0.02, z: vz }, {}, { x: pathFrom - (vx + r), y: 0.03, z: 4.5 });
+
+  // The landing on the lip, and the bridge down to the island.
+  b.add(G.box, ROCK.step, { x: vx + (LANDING_IN + LANDING_OUT) / 2, y: h - 0.6, z: vz }, {}, { x: LANDING_OUT - LANDING_IN, y: 1.2, z: LANDING_HALF * 2 });
+  const slabs = 10;
+  for (let k = 0; k < slabs; k++) {
+    const d0 = ISLAND_R - 0.4 + ((LANDING_IN - ISLAND_R + 0.4) * k) / slabs;
+    const d1 = ISLAND_R - 0.4 + ((LANDING_IN - ISLAND_R + 0.4) * (k + 1)) / slabs;
+    const y = ISLAND_Y + (h - ISLAND_Y) * Math.max(0, ((d0 + d1) / 2 - ISLAND_R) / (LANDING_IN - ISLAND_R));
+    b.add(G.box, k % 2 ? ROCK.step : ROCK.stepDark, { x: vx + (d0 + d1) / 2, y: y - 0.3, z: vz }, {}, { x: d1 - d0 + 0.05, y: 0.6, z: BRIDGE_HALF * 2 });
+  }
+  for (const d of [ISLAND_R + 1.5, (ISLAND_R + LANDING_IN) / 2 + 0.5]) {
+    b.add(G.cyl8, ROCK.dark, { x: vx + d, y: LAVA_Y, z: vz }, {}, { x: 0.6, y: 3, z: 0.6 });
+  }
+  // The island: a stump of rock standing in the lava, a rim of stones round its pool.
+  b.add(G.cyl8, ROCK.mid, { x: vx, y: (ISLAND_Y + LAVA_Y - 1) / 2, z: vz }, {}, { x: ISLAND_R, y: ISLAND_Y - LAVA_Y + 1, z: ISLAND_R });
+  for (let k = 0; k < 10; k++) {
+    const a = (k / 10) * Math.PI * 2;
+    b.add(G.rock, ROCK.dark, { x: vx + Math.sin(a) * ISLAND_R, y: LAVA_Y + 0.2, z: vz + Math.cos(a) * ISLAND_R }, { y: a }, 0.8);
+    b.add(G.rock, ROCK.nose, { x: vx + Math.sin(a) * (PORTAL_R + 1.6), y: ISLAND_Y + 0.05, z: vz + Math.cos(a) * (PORTAL_R + 1.6) }, { y: a }, 0.4);
+  }
+  // Crust floating on the lava.
+  for (let k = 0; k < 18; k++) {
+    const a = hash(k, 2, 71) * Math.PI * 2;
+    const d = ISLAND_R + 1 + hash(k, 3, 71) * (rim - ISLAND_R - 2);
+    if (Math.abs(Math.sin(a) - 1) < 0.15) continue;
+    b.add(G.rock, 0x2a201e, { x: vx + Math.sin(a) * d, y: LAVA_Y, z: vz + Math.cos(a) * d }, { y: a }, { x: 0.9, y: 0.25, z: 0.7 });
+  }
+  return torches;
+}
+
+/** What glows on the volcano: the lava lake, the streams down its sides, and its smoke. */
+function volcanoFire(): { group: THREE.Group; smoke: THREE.Group; lava: THREE.MeshBasicMaterial } {
+  const { x: vx, z: vz, rim } = VOLCANO;
+  const group = new THREE.Group();
+  const lava = new THREE.MeshBasicMaterial({ color: 0xff5a14 });
+  const lake = new THREE.Mesh(new THREE.CylinderGeometry(rim - 0.5, rim - 0.5, 0.1, 36), lava);
+  lake.position.set(vx, LAVA_Y, vz);
+  group.add(lake);
+  // Streams of lava down the flanks, all one mesh.
+  const parts: THREE.BufferGeometry[] = [];
+  const o = new THREE.Object3D();
+  for (const deg of [25, 60, 130, 165, 215, 250, 300, 335]) {
+    const a = (deg * Math.PI) / 180;
+    const d0 = LANDING_OUT - 0.5;
+    const d1 = d0 + 14 + hash(deg, 0, 72) * 12;
+    const start = new THREE.Vector3(vx + Math.sin(a) * d0, slopeY(d0) + 0.08, vz + Math.cos(a) * d0);
+    const end = new THREE.Vector3(vx + Math.sin(a) * d1, slopeY(d1) + 0.08, vz + Math.cos(a) * d1);
+    o.position.copy(start).add(end).multiplyScalar(0.5);
+    o.lookAt(end);
+    o.updateMatrix();
+    parts.push(new THREE.BoxGeometry(0.8 + hash(deg, 1, 72), 0.12, start.distanceTo(end)).applyMatrix4(o.matrix));
+  }
+  group.add(new THREE.Mesh(mergeGeometries(parts)!, lava));
+  const smoke = new THREE.Group();
+  const puff = new THREE.IcosahedronGeometry(1, 1);
+  const grey = new THREE.MeshBasicMaterial({ color: 0x9a928e, transparent: true, opacity: 0.7, fog: false });
+  for (let k = 0; k < 7; k++) {
+    const m = new THREE.Mesh(puff, grey);
+    m.position.set(vx + (hash(k, 0, 73) - 0.5) * 6, VOLCANO.h + 4 + k * 4, vz + (hash(k, 1, 73) - 0.5) * 6);
+    m.scale.setScalar(3 + k * 0.8);
+    smoke.add(m);
+  }
+  group.add(smoke);
+  return { group, smoke, lava };
+}
+
+// ---------------------------------------------------------------------------
+// Portals and Tartarus
+
+/** A ring of black stone standing on its edge, with a swirl of purple light inside. The swirl is `children[1]`. */
+function portal(x: number, y: number, z: number, yaw: number): THREE.Group {
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.28, 10, 32), toon(0x2a2030, { emissive: 0x200a30 }));
+  ring.castShadow = true;
+  g.add(ring);
+  const swirl = new THREE.Group();
+  const glow = new THREE.MeshBasicMaterial({ color: 0x9a4aff, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+  swirl.add(new THREE.Mesh(new THREE.CircleGeometry(1.4, 32), glow));
+  const arm = new THREE.MeshBasicMaterial({ color: 0xe0c8ff, side: THREE.DoubleSide });
+  for (let k = 0; k < 4; k++) {
+    const m = new THREE.Mesh(new THREE.RingGeometry(0.3 + k * 0.25, 0.4 + k * 0.25, 24, 1, k * 1.7, 2.2), arm);
+    m.position.z = 0.01;
+    swirl.add(m);
+  }
+  g.add(swirl);
+  for (const side of [-1, 1]) {
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.8), toon(0x2a2030));
+    foot.position.set(side * 1.3, -1.45, 0);
+    g.add(foot);
+  }
+  g.position.set(x, y + 1.7, z);
+  g.rotation.y = yaw;
+  return g;
+}
+
+/** The floor of Tartarus: black rock hanging in the dark, ringed by broken columns and green fire. Returns where the fires burn. */
+function tartarusFloor(b: Batch): Array<{ x: number; y: number; z: number }> {
+  const { x, y, z, r } = TARTARUS;
+  b.add(G.cyl, 0x2a2228, { x, y: y - 0.5, z }, {}, { x: r + 0.6, y: 1, z: r + 0.6 });
+  b.add(G.cone, 0x1e181c, { x, y: y - 9, z }, { x: Math.PI }, { x: r + 0.6, y: 16, z: r + 0.6 });
+  // A ring of green tiles round a dark star in the middle.
+  b.add(new THREE.TorusGeometry(1, 0.03, 3, 64), 0x3fe07a, { x, y: y + 0.02, z }, { x: Math.PI / 2 }, { x: r - 2, y: r - 2, z: 1 });
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2;
+    b.add(G.box, 0x3a2a44, { x: x + Math.sin(a) * 3, y: y + 0.02, z: z + Math.cos(a) * 3 }, { y: a }, { x: 0.6, y: 0.03, z: 5.5 });
+  }
+  const fires: Array<{ x: number; y: number; z: number }> = [];
+  for (let k = 0; k < 10; k++) {
+    const a = (k / 10) * Math.PI * 2 + 0.3;
+    const cx = x + Math.sin(a) * (r - 0.6);
+    const cz = z + Math.cos(a) * (r - 0.6);
+    // Leave the arrival and the way home clear.
+    if (Math.sin(a) > 0.9) continue;
+    const h = 3 + hash(k, 0, 80) * 5;
+    b.add(G.fluted, 0x3a3038, { x: cx, y: y + h / 2, z: cz }, { z: (hash(k, 1, 80) - 0.5) * 0.1 }, { x: 0.55, y: h, z: 0.55 });
+    b.add(G.box, 0x3a3038, { x: cx, y: y + 0.15, z: cz }, {}, { x: 1.4, y: 0.3, z: 1.4 });
+    if (k % 2 === 0) {
+      b.add(G.dome, C.iron, { x: cx, y: y + h + 0.2, z: cz }, { x: Math.PI }, { x: 0.5, y: 0.3, z: 0.5 });
+      fires.push({ x: cx, y: y + h + 0.2, z: cz });
+    }
+  }
+  // His throne, at the far side from where you arrive.
+  const tx = x - r + 3;
+  b.add(G.box, 0x1a1420, { x: tx, y: y + 0.6, z }, {}, { x: 2.4, y: 1.2, z: 3 });
+  b.add(G.box, 0x1a1420, { x: tx - 1.0, y: y + 2.8, z }, {}, { x: 0.5, y: 4.4, z: 3 });
+  for (const side of [-1, 1]) {
+    b.add(G.box, 0x3a1a4a, { x: tx, y: y + 1.6, z: z + side * 1.4 }, {}, { x: 2.2, y: 0.3, z: 0.3 });
+    b.add(G.blob, 0xe9e1c9, { x: tx - 1.0, y: y + 5.2, z: z + side * 1.2 }, {}, { x: 0.32, y: 0.3, z: 0.34 });
+  }
+  return fires;
+}
+
+/** The fire far below the floor of Tartarus, and rocks hanging in the dark. */
+function tartarus(): THREE.Group {
+  const g = new THREE.Group();
+  const sea = new THREE.Mesh(new THREE.CircleGeometry(160, 48), new THREE.MeshBasicMaterial({ color: 0x8a1e08, fog: false }));
+  sea.rotation.x = -Math.PI / 2;
+  sea.position.set(TARTARUS.x, TARTARUS.y - 40, TARTARUS.z);
+  g.add(sea);
+  const rock = toon(0x241c20);
+  for (let k = 0; k < 14; k++) {
+    const a = (k / 14) * Math.PI * 2;
+    const d = TARTARUS.r + 12 + hash(k, 2, 81) * 30;
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), rock);
+    m.position.set(TARTARUS.x + Math.sin(a) * d, TARTARUS.y - 8 + hash(k, 3, 81) * 20, TARTARUS.z + Math.cos(a) * d);
+    m.scale.set(2 + hash(k, 4, 81) * 4, 2 + hash(k, 5, 81) * 3, 2 + hash(k, 6, 81) * 4);
+    m.rotation.set(k, k * 2, 0);
+    g.add(m);
+  }
+  return g;
+}
+
+// ---------------------------------------------------------------------------
 // Sky, ground and grass
 
 function sky(): THREE.Mesh {
@@ -1116,6 +1363,7 @@ function ground(): THREE.Mesh {
   const tmp = new THREE.Color();
   const sand = new THREE.Color(0xe6d29a);
   const sandWet = new THREE.Color(0xb8a77a);
+  const ash = new THREE.Color(0x6a5c54);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const z = pos.getZ(i);
@@ -1125,11 +1373,14 @@ function ground(): THREE.Mesh {
     const beach = Math.min(1, Math.max(0, (x - (SHORE_X - 14)) / 6));
     if (beach > 0) tmp.lerp(x > SHORE_X + 1 ? sandWet : sand, beach);
     else if (inVillage(x, z, 21)) tmp.lerp(sand, 0.55);
+    const fromVolcano = dist(x, z, VOLCANO.x, VOLCANO.z);
+    if (fromVolcano < VOLCANO.r + 14) tmp.lerp(ash, Math.min(1, (VOLCANO.r + 14 - fromVolcano) / 14));
     colors.set([tmp.r, tmp.g, tmp.b], i * 3);
     // Rolling hills past the edge of the world, flat where anyone walks, easing down to the shore and under the sea.
     const out = Math.min(outside(x, z), 60);
     const coast = Math.min(1, Math.max(0, (SHORE_X - 4 - x) / 24));
-    const y = out * 0.25 * smoothNoise(x / 30, z / 30) * coast;
+    const clear = Math.min(1, Math.max(0, (fromVolcano - VOLCANO.r - 4) / 20));
+    const y = out * 0.25 * smoothNoise(x / 30, z / 30) * coast * clear;
     pos.setY(i, x > SHORE_X - 2 ? -Math.min(3, (x - SHORE_X + 2) * 0.3) : y);
   }
   g.setAttribute("color", new THREE.BufferAttribute(colors, 3));

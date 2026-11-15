@@ -210,6 +210,11 @@ Both colosseums are drawn by one `colosseum()` from an `ArenaLook`, built facing
 Poseidon (`poseidon.ts`) parries from the front while he holds his trident, and the opening is the throw: block it or dodge it, and he is unarmed until it comes back.
 At each line in `FLOOD_AT` he floods the arena, nothing reaches him while the sea is up, and only the four `SEA_ISLANDS` keep the hero dry.
 
+West of the city a path leads to the volcano (`volcano.ts`): one staircase up its side with skeletons pacing it, no rails, and a crater of lava with a rock island in the middle.
+`footing` is the only rule for where you can stand up there — anything it returns null for is a fall, which `pushOut` deliberately does not prevent; within `SAFE_DROP` of the ground a stumble is put back on the stairs instead.
+The portal in the middle of the island leads to Tartarus (`hades.ts`), a floor of rock under the world at `TARTARUS.y`, where the fog and sky turn dark while you are there.
+Hades vanishes when you keep away and comes back behind you, glowing green before he strikes; after that blow he is open. He raises skeletons at each line in `RAISE_AT`.
+
 On the dev server `window.gods` can read state, teleport the hero and add coins, so a recording can reach the colosseum without walking the road.
 Progress is under the `gods:save` storage key.
 

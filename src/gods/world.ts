@@ -1,4 +1,6 @@
 import { dist } from "./bearing";
+import { inTartarus, TARTARUS } from "./hades";
+import { inVolcano, VOLCANO } from "./volcano";
 
 /**
  * Where everything stands, in metres. The city sits at the origin and the road
@@ -70,6 +72,8 @@ export const SEA_STATUE = { x: EAST_ROAD_END - 5, z: VILLAGE.z + 7 };
 /** Everywhere the hero can walk: the meadow, the road east, the village, and out along the piers. */
 export const REGIONS: readonly Box[] = [
   BOUNDS,
+  // The path west to the foot of the volcano's stairs.
+  { x0: VOLCANO.x + VOLCANO.r - 1, z0: VOLCANO.z - 6, x1: BOUNDS.x0 + 2, z1: VOLCANO.z + 6 },
   { x0: BOUNDS.x1 - 2, z0: EAST_ROAD_Z - 8, x1: VILLAGE.x - VILLAGE.r + 4, z1: EAST_ROAD_Z + 8 },
   { x0: VILLAGE.x - VILLAGE.r - 2, z0: VILLAGE.z - 34, x1: SHORE_X, z1: VILLAGE.z + 34 },
   ...PIERS.map((z) => ({ x0: SHORE_X - 2, z0: z - PIER_HALF, x1: SHORE_X + PIER_LENGTH, z1: z + PIER_HALF })),
@@ -232,6 +236,8 @@ export function trees(): Tree[] {
       if (nearRoad(x, z, 5)) continue;
       if (nearColosseum(x, z, 8)) continue;
       if (inVillage(x, z, VILLAGE.r + 5)) continue;
+      if (dist(x, z, VOLCANO.x, VOLCANO.z) < VOLCANO.r + 8) continue;
+      if (x < BOUNDS.x0 + 6 && Math.abs(z - VOLCANO.z) < 8) continue;
       if (CAMPS.some((c) => dist(x, z, c.x, c.z) < 9)) continue;
       out.push({ x, z, size: 0.8 + hash(gx, gz, 4) * 0.7 });
     }
@@ -292,6 +298,14 @@ function wall(ring: Ring, x: number, z: number, r: number, closed: boolean): { x
 
 /** Slide a body of radius `r` back out of whatever it walked into. */
 export function pushOut(world: World, x: number, z: number, r: number, gateClosed: boolean, seaGateClosed = false): { x: number; z: number } {
+  // Up on the volcano nothing holds you in: stepping off the path is a fall.
+  if (inVolcano(x, z)) return { x, z };
+  // Tartarus is one round floor with nothing round it.
+  if (inTartarus(x, z)) {
+    const d = dist(x, z, TARTARUS.x, TARTARUS.z);
+    const limit = TARTARUS.r - r;
+    return d > limit ? { x: TARTARUS.x + ((x - TARTARUS.x) / d) * limit, z: TARTARUS.z + ((z - TARTARUS.z) / d) * limit } : { x, z };
+  }
   ({ x, z } = clampToRegions(x, z, r));
 
   for (const c of world.circles) {

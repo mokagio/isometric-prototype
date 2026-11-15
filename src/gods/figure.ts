@@ -4,7 +4,7 @@ import type { Kit, Slot } from "./armor";
 import { toon } from "./toon";
 
 /**
- * Every person in the game is the same doll — hero, bandit, soldier, smith,
+ * Every person in the game is the same doll — hero, bandit, skeleton, soldier, smith,
  * god — turned on a lathe rather than stacked from boxes, facing +z, with
  * joints at the hips, knees, shoulders and elbows. What differs is the paint
  * and the build.
@@ -26,7 +26,7 @@ export interface Build {
   /** How heavily built: 1 is the hero. */
   bulk: number;
   shield: { rim: number; face: number; emblem: number; sign: "star" | "lambda" | "spear" } | null;
-  weapon: "sword" | "hammer" | "trident";
+  weapon: "sword" | "hammer" | "trident" | "bident";
   blade: number;
   cape: number | null;
 }
@@ -46,6 +46,24 @@ export const HERO_BUILD: Build = {
   shield: { rim: 0xb07a35, face: 0xeee4cc, emblem: 0x2f6fb5, sign: "star" },
   weapon: "sword",
   blade: 0xdfe8f0,
+  cape: null,
+};
+
+export const SKELETON_BUILD: Build = {
+  body: "bone",
+  skin: 0xe9e1c9,
+  hair: null,
+  hairStyle: "bald",
+  beard: null,
+  band: null,
+  tunic: null,
+  sandals: 0xe9e1c9,
+  eyes: 0xff4a2a,
+  eyeGlow: true,
+  bulk: 1,
+  shield: null,
+  weapon: "sword",
+  blade: 0x8f7a63,
   cape: null,
 };
 
@@ -139,6 +157,24 @@ export const POSEIDON_BUILD: Build = {
   cape: 0x2a7fa8,
 };
 
+export const HADES_BUILD: Build = {
+  body: "flesh",
+  skin: 0xb8c0cc,
+  hair: 0x10161a,
+  hairStyle: "long",
+  beard: 0x10161a,
+  band: null,
+  tunic: 0x1a1420,
+  sandals: 0x101014,
+  eyes: 0x5fff8a,
+  eyeGlow: true,
+  bulk: 1.25,
+  shield: null,
+  weapon: "bident",
+  blade: 0x5fe08a,
+  cape: 0x3a1a4a,
+};
+
 export const FISHER_BUILD: Build = {
   body: "flesh",
   skin: 0xc98a58,
@@ -162,6 +198,7 @@ export const KIT_PAINT: Record<Exclude<Kit, "none">, { metal: number; trim: numb
   bronze: { metal: 0xc8913a, trim: 0x8a5a22, crest: 0x2f6fb5 },
   ares: { metal: 0x8e1b16, trim: 0xe8b83e, crest: 0x1a0a08 },
   poseidon: { metal: 0x2f9a92, trim: 0xe8b83e, crest: 0xf2f8f8 },
+  hades: { metal: 0x2a2430, trim: 0x5fe08a, crest: 0x5fe08a },
 };
 
 export interface Figure {
@@ -544,12 +581,12 @@ export function buildFigure(b: Build): Figure {
     sword.add(part(BOX, mat(0xb88a2e), [0.18, 0.035, 0.05], [0, 0.09, 0]));
     sword.add(part(CYL, leather, [0.024, 0.15, 0.024], [0, 0.0, 0]));
     sword.add(part(SPHERE, mat(0xb88a2e), [0.035, 0.035, 0.035], [0, -0.09, 0]));
-  } else if (b.weapon === "trident") {
-    // A long shaft held near the middle, a crossbar and three barbed prongs.
+  } else if (b.weapon === "trident" || b.weapon === "bident") {
+    // A long shaft held near the middle, a crossbar and barbed prongs: three for the sea, two for the dead.
     const metal = mat(b.blade);
-    sword.add(part(CYL, mat(0x7a5232), [0.022, 1.9, 0.022], [0, 0.35, 0]));
+    sword.add(part(CYL, mat(b.weapon === "bident" ? 0x1a1418 : 0x7a5232), [0.022, 1.9, 0.022], [0, 0.35, 0]));
     sword.add(part(BOX, metal, [0.34, 0.04, 0.04], [0, 1.3, 0]));
-    for (const x of [-0.15, 0, 0.15]) {
+    for (const x of b.weapon === "bident" ? [-0.13, 0.13] : [-0.15, 0, 0.15]) {
       sword.add(part(CYL, metal, [0.018, x === 0 ? 0.42 : 0.32, 0.018], [x, x === 0 ? 1.51 : 1.46, 0]));
       sword.add(part(CONE, metal, [0.04, 0.12, 0.04], [x, x === 0 ? 1.77 : 1.67, 0]));
     }
@@ -736,7 +773,7 @@ export function wearKit(fig: Figure, armor: Record<Slot, Kit>): void {
   for (const m of fig.hairline) m.visible = armor.helmet === "none";
   // One paint for the whole figure: the god's if any piece is the god's.
   const kits = Object.values(armor);
-  const kit: Kit = kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
+  const kit: Kit = kits.includes("hades") ? "hades" : kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
   if (kit !== "none") {
     const paint = KIT_PAINT[kit];
     fig.metal.color.setHex(paint.metal);

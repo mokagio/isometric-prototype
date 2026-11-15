@@ -1,7 +1,7 @@
 import { dist, inArc, turnToward, yawTo } from "./bearing";
 
-/** The rank and file: bandits on the road, and the soldiers Ares calls in. */
-export type GruntKind = "bandit" | "spartan";
+/** The rank and file: bandits on the road, skeletons on the volcano's stairs, and the soldiers Ares calls in. */
+export type GruntKind = "bandit" | "skeleton" | "spartan";
 
 export interface GruntStats {
   hp: number;
@@ -17,6 +17,7 @@ export interface GruntStats {
 }
 
 export const GRUNTS: Record<GruntKind, GruntStats> = {
+  skeleton: { hp: 3, speed: 2.2, reach: 1.7, damage: 12, windup: 0.6, recover: 0.7, aggro: 9 },
   bandit: { hp: 3, speed: 2.4, reach: 1.7, damage: 12, windup: 0.6, recover: 0.7, aggro: 13 },
   spartan: { hp: 2, speed: 3.6, reach: 1.8, damage: 10, windup: 0.45, recover: 0.55, aggro: 60 },
 };
@@ -167,7 +168,7 @@ export function strikeGrunt(g: Grunt, power: number, fromX: number, fromZ: numbe
     g.hp = 0;
     g.vx = Math.sin(away) * KNOCK * 0.6;
     g.vz = Math.cos(away) * KNOCK * 0.6;
-    const fell = g.kind === "bandit" ? "down" : "dead";
+    const fell = g.kind === "spartan" ? "dead" : "down";
     enter(g, fell);
     return fell;
   }
@@ -178,4 +179,4 @@ export function strikeGrunt(g: Grunt, power: number, fromX: number, fromZ: numbe
 }
 
 /** How many coins a grunt leaves behind when it is finished for good. */
-export const BOUNTY: Record<GruntKind, number> = { bandit: 3, spartan: 2 };
+export const BOUNTY: Record<GruntKind, number> = { bandit: 3, skeleton: 4, spartan: 2 };
