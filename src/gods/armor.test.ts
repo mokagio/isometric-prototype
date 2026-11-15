@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buy, damageTaken, godKit, GUARD, NO_ARMOR, PRICES, shieldStops, swordPower, type Armor } from "./armor";
+import { buy, damageTaken, godKit, GUARD, NO_ARMOR, outfitArmor, outfits, PRICES, shieldStops, swordPower, wornOutfit, type Armor } from "./armor";
 
 const bronze: Armor = { helmet: "bronze", chest: "bronze", arms: "bronze", legs: "bronze" };
 
@@ -57,5 +57,25 @@ describe("the shield", () => {
   });
   it("does nothing lowered", () => {
     expect(shieldStops(false, 0, hero, { x: 0, z: 2 })).toBe(false);
+  });
+});
+
+describe("the wardrobe", () => {
+  it("offers bronze once a piece is bought, and each god's kit once that god is beaten", () => {
+    expect(outfits([], [])).toEqual(["none"]);
+    expect(outfits(["ares", "invasion"], ["helmet"])).toEqual(["none", "bronze", "ares"]);
+    expect(outfits(["zeus", "poseidon"], [])).toEqual(["none", "poseidon", "zeus"]);
+  });
+
+  it("puts on only the bronze pieces actually bought", () => {
+    expect(outfitArmor("bronze", ["helmet", "legs"])).toEqual({ ...NO_ARMOR, helmet: "bronze", legs: "bronze" });
+    expect(outfitArmor("hades", ["helmet"])).toEqual(godKit("hades"));
+    expect(outfitArmor("none", ["helmet"])).toEqual(NO_ARMOR);
+  });
+
+  it("knows what is being worn", () => {
+    expect(wornOutfit(godKit("poseidon"))).toBe("poseidon");
+    expect(wornOutfit({ ...NO_ARMOR, chest: "bronze" })).toBe("bronze");
+    expect(wornOutfit(NO_ARMOR)).toBe("none");
   });
 });

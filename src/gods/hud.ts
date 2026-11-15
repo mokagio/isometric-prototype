@@ -1,4 +1,4 @@
-import { buy, PIECE_NAMES, PRICES, SLOTS, type Armor, type Slot } from "./armor";
+import { buy, PIECE_NAMES, PRICES, SLOTS, type Armor, type Outfit, type Slot } from "./armor";
 import { MAX_HP } from "./hero";
 
 export const HEART_HP = 10;
@@ -11,6 +11,10 @@ export interface Hud {
   /** Opens the counter; the function it hands back redraws it after a sale. */
   openShop(coins: number, armor: Armor, onBuy: (slot: Slot) => void, onClose: () => void): (coins: number, armor: Armor) => void;
   shopOpen(): boolean;
+  /** Lists the outfits the hero owns; picking one hands it back and closes the card. */
+  openWardrobe(owned: Outfit[], worn: Outfit, onPick: (outfit: Outfit) => void): void;
+  /** Called when the armour button by the pips is pressed. */
+  onWardrobe(handler: () => void): void;
   /** Light the slots the hero is wearing. */
   setArmor(armor: Armor): void;
   /** Point the compass: `heading` is where the camera looks, and each mark a yaw on the ground. */
@@ -50,7 +54,16 @@ export function createHud(): Hud {
     pips.set(slot, pip);
     kit.appendChild(pip);
   }
-  corner.append(hearts, purse, kit);
+  // The way into the wardrobe, beside the pips.
+  const wardrobeBtn = document.createElement("button");
+  wardrobeBtn.type = "button";
+  wardrobeBtn.className = "gd-wardrobe-btn";
+  wardrobeBtn.textContent = "Armor";
+  let wardrobeHandler: (() => void) | null = null;
+  wardrobeBtn.addEventListener("click", () => wardrobeHandler?.());
+  const kitRow = div("gd-kit-row");
+  kitRow.append(kit, wardrobeBtn);
+  corner.append(hearts, purse, kitRow);
 
   const compass = div("gd-compass");
   compass.innerHTML = `<div class="gd-compass-strip"></div>`;
@@ -142,7 +155,7 @@ export function createHud(): Hud {
           b.className = "gd-shop-buy";
           const worn = kit[slot];
           if (worn !== "none") {
-            b.textContent = worn === "bronze" ? "Wearing" : "Ares's";
+            b.textContent = worn === "bronze" ? "Wearing" : `${OUTFIT_NAMES[worn]}`;
             b.disabled = true;
           } else {
             b.innerHTML = `<span class="gd-coin"></span>${PRICES[slot]}`;
@@ -169,6 +182,52 @@ export function createHud(): Hud {
       return render;
     },
     shopOpen: () => !shop.hidden,
+    onWardrobe(handler) {
+      wardrobeHandler = handler;
+    },
+    openWardrobe(owned, worn, onPick) {
+      shop.innerHTML = "";
+      const card = div("gd-shop-card");
+      const head = div("gd-shop-head");
+      head.innerHTML = `<h2>Your Armor</h2>`;
+      card.appendChild(head);
+      const lede = document.createElement("p");
+      lede.className = "gd-shop-lede";
+      lede.textContent = "Put on any armor you have.";
+      card.appendChild(lede);
+      for (const outfit of owned) {
+        const row = div("gd-shop-row");
+        const swatch = pieceIcon("helmet");
+        swatch.classList.add("gd-pip");
+        swatch.dataset.kit = outfit;
+        const sw = div("gd-kit");
+        sw.appendChild(swatch);
+        const name = document.createElement("span");
+        name.className = "gd-shop-name";
+        name.textContent = OUTFIT_NAMES[outfit];
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "gd-shop-buy";
+        b.textContent = outfit === worn ? "Wearing" : "Wear";
+        b.disabled = outfit === worn;
+        b.addEventListener("click", () => {
+          shop.hidden = true;
+          onPick(outfit);
+        });
+        row.append(sw, name, b);
+        card.appendChild(row);
+      }
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "gd-shop-close";
+      close.textContent = "Back";
+      close.addEventListener("click", () => {
+        shop.hidden = true;
+      });
+      card.appendChild(close);
+      shop.appendChild(card);
+      shop.hidden = false;
+    },
     setArmor(armor) {
       for (const [slot, pip] of pips) pip.dataset.kit = armor[slot];
     },
@@ -198,6 +257,15 @@ export function createHud(): Hud {
     },
   };
 }
+
+export const OUTFIT_NAMES: Record<Outfit, string> = {
+  none: "No armor",
+  bronze: "Bronze",
+  ares: "Armor of Ares",
+  poseidon: "Armor of Poseidon",
+  hades: "Armor of Hades",
+  zeus: "Armor of Zeus",
+};
 
 function div(className: string): HTMLElement {
   const d = document.createElement("div");

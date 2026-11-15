@@ -126,6 +126,8 @@
         flex-direction: column;
         gap: 6px;
         pointer-events: none;
+        /* Above the touch zones, which come later in the page, so the Armor button gets its taps. */
+        z-index: 1;
       }
       .gd-hearts { display: flex; flex-wrap: wrap; gap: 2px; max-width: 150px; }
       .gd-heart { position: relative; width: 26px; height: 26px; }
@@ -154,6 +156,21 @@
         box-sizing: border-box;
         flex: none;
       }
+
+      /* The pips and the wardrobe button beside them. */
+      .gd-kit-row { display: flex; align-items: center; gap: 6px; }
+      .gd-wardrobe-btn {
+        pointer-events: auto;
+        min-height: 32px;
+        padding: 4px 12px;
+        border: 2px solid var(--gd-gold);
+        border-radius: 999px;
+        background: var(--gd-panel);
+        color: var(--gd-cream);
+        font: italic 700 14px var(--gd-serif);
+        cursor: pointer;
+      }
+      .gd-wardrobe-btn:active { transform: scale(0.96); }
 
       /* Armour worn, under the purse: a dim outline until the piece is on. */
       .gd-kit {

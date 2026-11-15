@@ -69,3 +69,29 @@ export function buy(slot: Slot, coins: number, armor: Armor): Purchase {
 export function godKit(kit: Exclude<Kit, "none" | "bronze">): Armor {
   return { helmet: kit, chest: kit, arms: kit, legs: kit };
 }
+
+/** What the wardrobe offers: nothing, the bronze bought so far, or a whole god's kit. */
+export type Outfit = Kit;
+export const GOD_KITS: ReadonlyArray<Exclude<Kit, "none" | "bronze">> = ["ares", "poseidon", "hades", "zeus"];
+
+/** Every outfit the hero owns: always none, bronze once a piece is bought, and each god's kit once that god is beaten. */
+export function outfits(beaten: readonly string[], bronze: readonly Slot[]): Outfit[] {
+  return ["none", ...(bronze.length > 0 ? (["bronze"] as const) : []), ...GOD_KITS.filter((k) => beaten.includes(k))];
+}
+
+/** What wearing an outfit puts in each slot: bronze only covers the pieces actually bought. */
+export function outfitArmor(outfit: Outfit, bronze: readonly Slot[]): Armor {
+  if (outfit === "none") return { ...NO_ARMOR };
+  if (outfit === "bronze") {
+    const armor = { ...NO_ARMOR };
+    for (const slot of bronze) armor[slot] = "bronze";
+    return armor;
+  }
+  return godKit(outfit);
+}
+
+/** Which outfit the hero has on: a god's when any piece is that god's, bronze when any is bronze. */
+export function wornOutfit(armor: Armor): Outfit {
+  const worn = SLOTS.map((s) => armor[s]);
+  return GOD_KITS.find((k) => worn.includes(k)) ?? (worn.includes("bronze") ? "bronze" : "none");
+}

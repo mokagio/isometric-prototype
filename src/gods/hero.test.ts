@@ -53,8 +53,13 @@ describe("the hero", () => {
 
 describe("the save", () => {
   it("round-trips", () => {
-    const save = { coins: 12, armor: godKit("ares"), beaten: ["ares"] };
+    const save = { coins: 12, armor: godKit("ares"), beaten: ["ares"], bronze: ["helmet" as const, "legs" as const] };
     expect(decodeSave(encodeSave(save))).toEqual(save);
+  });
+
+  it("remembers the bronze worn in a save from before the wardrobe", () => {
+    const old = decodeSave(JSON.stringify({ coins: 0, armor: { helmet: "bronze", chest: "none", arms: "bronze", legs: "none" }, beaten: [] }));
+    expect(old.bronze).toEqual(["helmet", "arms"]);
   });
 
   it("starts over on anything it cannot read", () => {

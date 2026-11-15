@@ -1,16 +1,18 @@
-import { NO_ARMOR, SLOTS, type Armor, type Kit } from "./armor";
+import { NO_ARMOR, SLOTS, type Armor, type Kit, type Slot } from "./armor";
 
 /** What a run keeps between visits: purse, kit, and which gods are down. */
 export interface Save {
   coins: number;
   armor: Armor;
   beaten: string[];
+  /** Bronze pieces bought from the blacksmith, kept while a god's kit is worn over them. */
+  bronze: Slot[];
 }
 
 export const SAVE_KEY = "gods:save";
 
 export function freshSave(): Save {
-  return { coins: 0, armor: { ...NO_ARMOR }, beaten: [] };
+  return { coins: 0, armor: { ...NO_ARMOR }, beaten: [], bronze: [] };
 }
 
 const KITS: readonly Kit[] = ["none", "bronze", "ares", "poseidon", "hades", "zeus"];
@@ -30,7 +32,11 @@ export function decodeSave(raw: string | null): Save {
       if (typeof kit === "string" && (KITS as readonly string[]).includes(kit)) armor[slot] = kit as Kit;
     }
     const beaten = Array.isArray(d.beaten) ? d.beaten.filter((g): g is string => typeof g === "string") : [];
-    return { coins, armor, beaten };
+    // Saves from before the wardrobe only know the bronze being worn.
+    const bronze = Array.isArray(d.bronze)
+      ? SLOTS.filter((s) => (d.bronze as unknown[]).includes(s))
+      : SLOTS.filter((s) => armor[s] === "bronze");
+    return { coins, armor, beaten, bronze };
   } catch {
     return freshSave();
   }

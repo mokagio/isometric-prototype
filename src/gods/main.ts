@@ -11,7 +11,7 @@ import {
   updatePoseidon,
   type Poseidon,
 } from "./poseidon";
-import { buy, damageTaken, godKit, shieldStops, swordPower, wearsFullKit, type Kit } from "./armor";
+import { buy, damageTaken, godKit, outfitArmor, outfits, shieldStops, swordPower, wearsFullKit, wornOutfit, type Kit } from "./armor";
 import { dist, inArc, yawTo } from "./bearing";
 import { createControls } from "./controls";
 import {
@@ -1297,6 +1297,19 @@ function stepInvasion(dt: number): void {
 }
 
 let shopRedraw: ((coins: number, armor: typeof save.armor) => void) | null = null;
+
+// The wardrobe: swap into any armour already owned.
+hud.onWardrobe(() => {
+  if (hud.shopOpen()) return;
+  hud.openWardrobe(outfits(save.beaten, save.bronze), wornOutfit(save.armor), (outfit) => {
+    save.armor = outfitArmor(outfit, save.bronze);
+    storeSave(save);
+    wearKit(heroFig, save.armor);
+    armHero();
+    hud.setArmor(save.armor);
+    burst(hero.x, heroY + 1.2, hero.z, 0xffd860, 20, 5, 1);
+  });
+});
 function openShop(): void {
   shopRedraw = hud.openShop(
     save.coins,
@@ -1306,6 +1319,7 @@ function openShop(): void {
       if (!sale.ok) return;
       save.coins = sale.coins;
       save.armor = sale.armor;
+      if (!save.bronze.includes(slot)) save.bronze.push(slot);
       storeSave(save);
       wearKit(heroFig, save.armor);
       armHero();
