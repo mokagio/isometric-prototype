@@ -208,7 +208,7 @@ The road forks just past the city: north to Ares, east to a fishing village on t
 The walkable world is `REGIONS` in `world.ts` — the meadow, the road east, the village and the piers — and everything past them is hills or sea, so a new place to go is a new box there.
 Both colosseums are drawn by one `colosseum()` from an `ArenaLook`, built facing +z and turned through `Batch.setFrame` to face its road; `pushOut` keeps each one's wall with its gate open or shut.
 Poseidon (`poseidon.ts`) parries from the front while he holds his trident, and the opening is the throw: block it or dodge it, and he is unarmed until it comes back.
-At each line in `FLOOD_AT` he floods the arena, nothing reaches him while the sea is up, and only the four `SEA_ISLANDS` keep the hero dry.
+At each line in `FLOOD_AT` he floods the arena and three drowned skeletons rise out of it; nothing reaches him while the sea is up, and only the four `SEA_ISLANDS` keep the hero dry.
 
 West of the city a path leads to the volcano (`volcano.ts`): one staircase up its side with skeletons pacing it, no rails, and a crater of lava with a rock island in the middle.
 `footing` is the only rule for where you can stand up there — anything it returns null for is a fall, which `pushOut` deliberately does not prevent; within `SAFE_DROP` of the ground a stumble is put back on the stairs instead.

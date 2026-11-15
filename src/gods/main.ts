@@ -29,6 +29,7 @@ import {
   ANGEL_BUILD,
   boltGeometry,
   LAVA_SKELETON_BUILD,
+  DROWNED_BUILD,
   SKELETON_BUILD,
   POSEIDON_BUILD,
   SMITH_BUILD,
@@ -323,7 +324,7 @@ let foes: Foe[] = [];
 let nextId = 1;
 
 function addFoe(kind: GruntKind, x: number, z: number, yaw: number, camp: number): Foe {
-  const build = kind === "bandit" ? BANDIT_BUILD : kind === "skeleton" ? SKELETON_BUILD : kind === "lava" ? LAVA_SKELETON_BUILD : SPARTAN_BUILD;
+  const build = kind === "bandit" ? BANDIT_BUILD : kind === "skeleton" ? SKELETON_BUILD : kind === "lava" ? LAVA_SKELETON_BUILD : kind === "drowned" ? DROWNED_BUILD : SPARTAN_BUILD;
   const fig = buildFigure(build);
   if (kind === "spartan") wearKit(fig, { helmet: "bronze", chest: "bronze", arms: "none", legs: "bronze" });
   if (kind === "spartan") fig.crest.color.setHex(0xa3241e);
@@ -465,6 +466,10 @@ function poseidonFalls(): void {
   burst(poseidon.p.x, 2, poseidon.p.z, 0x6fe0ff, 40, 10, 1.6);
   seaGateClosed = false;
   scenery.flood.visible = false;
+  for (const f of foes) if (f.camp === -1 && f.g.state !== "dead") {
+    f.g.state = "dead";
+    f.g.t = 0;
+  }
   spawnReward(poseidon.p.x, poseidon.p.z, "poseidon");
 }
 
@@ -1492,7 +1497,16 @@ function update(dt: number): void {
         hud.banner("He threw his trident!", "Hit him now!", 1.6);
       } else if (e.kind === "flood") {
         shake = 0.6;
-        hud.banner("The sea is coming!", "Get up on an island!", 2.2);
+        hud.banner("The sea is coming!", "Get up on an island! Drowned skeletons!", 2.2);
+        // Drowned skeletons rise out of the water, across the arena from the hero.
+        for (let i = 0; i < 3; i++) {
+          const a = yawTo(SEA_ARENA.x, SEA_ARENA.z, hero.x, hero.z) + Math.PI + (i - 1) * 0.9;
+          const x = SEA_ARENA.x + Math.sin(a) * (SEA_ARENA.r - 3);
+          const z = SEA_ARENA.z + Math.cos(a) * (SEA_ARENA.r - 3);
+          const f = addFoe("drowned", x, z, a + Math.PI, -1);
+          f.g.state = "walk";
+          burst(x, 0.6, z, 0x9fe8ff, 16, 5);
+        }
       }
     }
     // Caught in the flood, off the islands: it stings, a little at a time.

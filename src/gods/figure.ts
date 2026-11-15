@@ -76,6 +76,16 @@ export const LAVA_SKELETON_BUILD: Build = {
   blade: 0xff6a1e,
 };
 
+/** A skeleton the sea gave back: bone gone green, weed round it, a rusted blade, eyes like deep water. */
+export const DROWNED_BUILD: Build = {
+  ...SKELETON_BUILD,
+  skin: 0x9fbfae,
+  sandals: 0x3f6b4a,
+  eyes: 0x3fe8d0,
+  blade: 0x7a6a4a,
+  cape: 0x3f6b4a,
+};
+
 export const BANDIT_BUILD: Build = {
   body: "flesh",
   skin: 0xc98e5c,
