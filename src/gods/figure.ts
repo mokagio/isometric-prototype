@@ -112,6 +112,9 @@ export const SPARTAN_BUILD: Build = {
   cape: 0xa3241e,
 };
 
+/** Every god's eyes glow the same gold. */
+export const GOD_EYES = 0xffc81e;
+
 export const ARES_BUILD: Build = {
   body: "flesh",
   skin: 0xb8784a,
@@ -121,7 +124,7 @@ export const ARES_BUILD: Build = {
   band: null,
   tunic: 0x3a0d0d,
   sandals: 0x2a1410,
-  eyes: 0xff3a1a,
+  eyes: GOD_EYES,
   eyeGlow: true,
   bulk: 1.2,
   shield: { rim: 0xe2b23c, face: 0x7d1612, emblem: 0xe2b23c, sign: "spear" },
@@ -157,7 +160,7 @@ export const POSEIDON_BUILD: Build = {
   band: null,
   tunic: 0x1f4f9a,
   sandals: 0x2a3f5a,
-  eyes: 0x3fe0ff,
+  eyes: GOD_EYES,
   eyeGlow: true,
   bulk: 1.25,
   shield: null,
@@ -175,7 +178,7 @@ export const HADES_BUILD: Build = {
   band: null,
   tunic: 0x1a1420,
   sandals: 0x101014,
-  eyes: 0x5fff8a,
+  eyes: GOD_EYES,
   eyeGlow: true,
   bulk: 1.25,
   shield: null,
@@ -193,7 +196,7 @@ export const ZEUS_BUILD: Build = {
   band: null,
   tunic: 0xf6f2e6,
   sandals: 0xb88a2e,
-  eyes: 0x8fd8ff,
+  eyes: GOD_EYES,
   eyeGlow: true,
   bulk: 1.3,
   shield: null,
