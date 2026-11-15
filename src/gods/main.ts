@@ -26,6 +26,7 @@ import {
   FISHER_BUILD,
   HADES_BUILD,
   ZEUS_BUILD,
+  KRONOS_BUILD,
   ANGEL_BUILD,
   boltGeometry,
   LAVA_SKELETON_BUILD,
@@ -73,6 +74,7 @@ import { createHud } from "./hud";
 import { loadSave, storeSave } from "./save";
 import { toon } from "./toon";
 import { buildScenery, HORIZON, placeStep, SKY_TOP } from "./scenery";
+import { BODY as KRONOS_BODY, KRONOS_HP, makeKronos, SLOW, strikeKronos, updateKronos, type Kronos } from "./kronos";
 import {
   BODY as ZEUS_BODY,
   inZeusArena,
@@ -87,6 +89,7 @@ import {
   strikeZeus,
   updateZeus,
   DOOR,
+  MONUMENT,
   ZEUS_HP,
   ZEUS_RING,
   type Zeus,
@@ -782,6 +785,51 @@ function armHero(): void {
 armHero();
 
 // ---------------------------------------------------------------------------
+// Kronos, behind the monument's door
+
+let kronosFight: Fight = save.beaten.includes("kronos") ? "won" : "waiting";
+let kronos: { k: Kronos; fig: Figure; shadow: THREE.Mesh; flash: number } | null = null;
+/** How far open the monument's doors are, 0..1. */
+let doorsOpen = kronosFight === "won" ? 1 : 0;
+
+function startKronos(): void {
+  kronosFight = "on";
+  const fig = buildFigure(KRONOS_BUILD);
+  fig.root.scale.setScalar(2.0);
+  scene.add(fig.root);
+  kronos = { k: makeKronos(MONUMENT.x, MONUMENT.z - MONUMENT.d / 2 + 1, Math.PI), fig, shadow: blob(2.6), flash: 0 };
+  shake = 0.7;
+  hud.banner("KRONOS", "Titan of Time — the doors burst open!", 2.6);
+  hud.setBoss("Kronos, Titan of Time", 1);
+}
+
+function clearKronos(): void {
+  if (!kronos) return;
+  scene.remove(kronos.fig.root, kronos.shadow);
+  kronos = null;
+}
+
+function endKronosFight(): void {
+  clearKronos();
+  if (kronosFight === "on") {
+    kronosFight = "waiting";
+    doorsOpen = 0;
+  }
+}
+
+function kronosFalls(): void {
+  if (!kronos) return;
+  kronosFight = "won";
+  hud.banner("Kronos is beaten!", "Claim his armor", 3.5);
+  hud.setBoss(null, 0);
+  shake = 0.9;
+  stop = 0.3;
+  burst(kronos.k.x, OLYMPUS.h + 2.5, kronos.k.z, 0xb88aff, 50, 11, 1.8);
+  spawnReward(kronos.k.x, kronos.k.z, "kronos");
+  reward!.mesh.position.y = OLYMPUS.h;
+}
+
+// ---------------------------------------------------------------------------
 // The fire monster on the last staircase
 
 /** Stairs from here down toward the island are gone; Infinity while they stand. */
@@ -1082,6 +1130,22 @@ function swingLands(): void {
       if (result === "dead") aresFalls();
     }
   }
+  if (kronos && kronos.k.state !== "emerge" && underBlade(hero, kronos.k.x, kronos.k.z, KRONOS_BODY)) {
+    const k = kronos.k;
+    const result = strikeKronos(k, power, hero.x, hero.z);
+    if (result === "clang") {
+      burst(k.x + Math.sin(k.yaw) * 1.3, OLYMPUS.h + 2, k.z + Math.cos(k.yaw) * 1.3, 0xd8c8ff, 14, 7);
+      shove(hero, k.x, k.z, 8);
+      stop = 0.07;
+      hitAny = true;
+    } else if (result !== "none") {
+      kronos.flash = 1;
+      hitAny = true;
+      burst(k.x, OLYMPUS.h + 2.4, k.z, 0xb88aff, 14, 7);
+      hud.setBoss("Kronos, Titan of Time", k.hp / KRONOS_HP);
+      if (result === "dead") kronosFalls();
+    }
+  }
   if (zeus && underBlade(hero, zeus.z.x, zeus.z.z, ZEUS_BODY)) {
     const zz = zeus.z;
     const result = strikeZeus(zz, power, hero.x, hero.z);
@@ -1170,6 +1234,11 @@ function claimReward(): void {
   wearKit(heroFig, save.armor);
   hud.setArmor(save.armor);
   armHero();
+  if (kit === "kronos") {
+    hud.banner("Armor of Kronos", "The Titan's own armor — the strongest there is", 4);
+    clearKronos();
+    return;
+  }
   if (kit === "zeus") {
     hud.banner("Armor of Zeus", "Your sword is a lightning bolt now!", 4);
     clearZeus();
@@ -1202,6 +1271,7 @@ function respawn(): void {
   endFight();
   mendStairs();
   endZeusFight();
+  endKronosFight();
   heroY = 0;
   falling = null;
   clearHades();
@@ -1220,14 +1290,18 @@ function respawn(): void {
 // After Ares: his sons march on the city from opposite ends of the meadow.
 
 const INVASION_CAMP = 400;
+/** Between one attack by Ares's sons and the next, in seconds of play. Every attack is the same strength. */
+const WAVE_GAP = 15 * 60;
 const SONS_HP = GRUNTS.phobos.hp + GRUNTS.deimos.hp;
+const ARMY = 5;
 type Invasion = "none" | "coming" | "on" | "done";
-let invasion: Invasion = save.beaten.includes("invasion") ? "done" : save.beaten.includes("ares") ? "coming" : "none";
-let invasionTimer = 6;
+let invasion: Invasion = save.beaten.includes("ares") ? "coming" : "none";
+let invasionTimer = save.beaten.includes("invasion") ? WAVE_GAP : 6;
 let fires: THREE.Mesh[] = [];
 
 function startInvasion(): void {
   invasion = "on";
+  const again = save.beaten.includes("invasion");
   const sides: Array<{ kind: "phobos" | "deimos"; x: number }> = [
     { kind: "phobos", x: BOUNDS.x0 + 3 },
     { kind: "deimos", x: BOUNDS.x1 - 3 },
@@ -1239,7 +1313,7 @@ function startInvasion(): void {
     // Home is the city: with no hero near, they march there.
     lead.g.homeX = Math.sign(x) * 6;
     lead.g.homeZ = 0;
-    for (let k = 0; k < 5; k++) {
+    for (let k = 0; k < ARMY; k++) {
       const row = Math.floor(k / 3) + 1;
       const file = (k % 3) - 1;
       const f = addFoe("hoplite", x - Math.sign(x) * row * 2, z + file * 2, inward, INVASION_CAMP);
@@ -1248,7 +1322,7 @@ function startInvasion(): void {
     }
     burst(x, 2, z, 0xd8382c, 30, 6, 1.4);
   }
-  hud.banner("Phobos and Deimos are coming!", "Ares's sons are marching on the city — defend it!", 4);
+  hud.banner(again ? "Phobos and Deimos are back!" : "Phobos and Deimos are coming!", "Ares's sons are marching on the city — defend it!", 4);
 }
 
 /** Houses catch fire while the invaders are in the city. */
@@ -1281,18 +1355,19 @@ function stepInvasion(dt: number): void {
   if (invasion !== "on") return;
   const army = foes.filter((f) => f.camp === INVASION_CAMP && f.g.state !== "dead");
   const sons = army.filter((f) => f.g.kind === "phobos" || f.g.kind === "deimos");
-  if (!ares && !poseidon && !hades && !zeus) {
+  if (!ares && !poseidon && !hades && !zeus && !kronos) {
     hud.setBoss("Phobos and Deimos", sons.reduce((sum, f) => sum + f.g.hp, 0) / SONS_HP);
   }
   setFires(army.some((f) => inCity(f.g.x, f.g.z)));
   if (army.length === 0) {
-    invasion = "done";
-    save.beaten.push("invasion");
+    invasion = "coming";
+    invasionTimer = WAVE_GAP;
+    if (!save.beaten.includes("invasion")) save.beaten.push("invasion");
     storeSave(save);
     setFires(false);
     hud.setBoss(null, 0);
     dropCoins(hero.x, hero.z, 20);
-    hud.banner("The city is saved!", "Phobos and Deimos are beaten", 4);
+    hud.banner("The city is saved!", "For now… they'll be back", 4);
   }
 }
 
@@ -1359,6 +1434,7 @@ function update(dt: number): void {
   else if (seaUp && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, poseidon!.p, dt);
   else if (hades && hades.h.state !== "dead" && !hadesHidden(hades.h) && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, hades.h, dt);
   else if (zeus && zeus.z.state !== "dead" && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, zeus.z, dt);
+  else if (kronos && kronos.k.state !== "dead" && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, kronos.k, dt);
   else if (!blocking && standing(hero)) camYaw = autoTurn(camYaw, stick.x, dt);
   const move = moveFromStick(stick.x, stick.y, camYaw);
   // Wading through the flood is slow going.
@@ -1375,6 +1451,7 @@ function update(dt: number): void {
     if (poseidon && poseidon.p.state !== "dead") targets.push(poseidon.p);
     if (hades && hades.h.state !== "dead" && !hadesHidden(hades.h)) targets.push(hades.h);
     if (zeus && zeus.z.state !== "dead") targets.push(zeus.z);
+    if (kronos && kronos.k.state !== "dead") targets.push(kronos.k);
     let best: { x: number; z: number } | null = null;
     let bestD = SWING_REACH + 2;
     for (const t of targets) {
@@ -1390,7 +1467,9 @@ function update(dt: number): void {
   const sim = stop > 0 ? 0 : dt;
   stop = Math.max(0, stop - dt);
 
-  if (stepHero(hero, sim, { move, block: blocking })) swingLands();
+  // While Kronos holds time, the hero's own world runs slow.
+  const heroSim = kronos && kronos.k.slow > 0 ? sim * SLOW : sim;
+  if (stepHero(hero, heroSim, { move, block: blocking })) swingLands();
   const p = pushOut(world, hero.x, hero.z, RADIUS, gateClosed, seaGateClosed, hadesGateClosed, zeusGateClosed, zeusFight === "won");
   hero.x = p.x;
   hero.z = p.z;
@@ -1665,6 +1744,37 @@ function update(dt: number): void {
   stepInvasion(sim);
   stepBack();
 
+  // Kronos: reaching the top opens the door.
+  const onSummit = onOlympus(hero.x, hero.z) && heroY > OLYMPUS.h - 0.5 && dist(hero.x, hero.z, OLYMPUS.x, OLYMPUS.z) < OLYMPUS.top;
+  if (kronosFight === "waiting" && onSummit && standing(hero) && !falling) startKronos();
+  if (kronosFight !== "waiting") doorsOpen = Math.min(1, doorsOpen + dt / 0.5);
+  if (kronos) {
+    const k = kronos.k;
+    const events = updateKronos(k, sim, { x: hero.x, z: hero.z, alive: standing(hero) });
+    for (const e of events) {
+      if (e.kind === "blow") heroLoses(e);
+      else if (e.kind === "roar") shake = 0.5;
+      else if (e.kind === "slow") {
+        shake = 0.4;
+        hud.banner("Time is slowing down!", "Hold on until it wears off", 2);
+      } else if (e.kind === "tired") hud.banner("He's worn out!", "Hit him now!", 1.6);
+    }
+    if (k.state !== "dead" && k.state !== "emerge") {
+      const q = pushOut(world, k.x, k.z, KRONOS_BODY, true, true, true, true);
+      // Keep him on the summit.
+      const d = dist(q.x, q.z, OLYMPUS.x, OLYMPUS.z);
+      const limit = OLYMPUS.top - 2;
+      k.x = d > limit ? OLYMPUS.x + ((q.x - OLYMPUS.x) / d) * limit : q.x;
+      k.z = d > limit ? OLYMPUS.z + ((q.z - OLYMPUS.z) / d) * limit : q.z;
+      const dh = dist(k.x, k.z, hero.x, hero.z);
+      const min = KRONOS_BODY + RADIUS;
+      if (dh < min && dh > 1e-4) {
+        hero.x = k.x + ((hero.x - k.x) / dh) * min;
+        hero.z = k.z + ((hero.z - k.z) / dh) * min;
+      }
+    }
+  }
+
   // Zeus.
   if (zeusFight === "waiting" && inZeusArena(hero.x, hero.z, ZEUS_RING.r - 4) && standing(hero)) startZeusFight();
   updateAngels(dt);
@@ -1805,7 +1915,7 @@ function update(dt: number): void {
   hud.setHealth(Math.ceil(hero.hp));
   hud.setCompass(
     camYaw,
-    fight === "on" || seaFight === "on" || zeusFight === "on" || inTartarus(hero.x, hero.z)
+    fight === "on" || seaFight === "on" || zeusFight === "on" || kronosFight === "on" || inTartarus(hero.x, hero.z)
       ? null
       : [
           { id: "colosseum", label: fight === "won" ? "Colosseum" : "Ares", yaw: yawTo(hero.x, hero.z, COLOSSEUM.x, COLOSSEUM.z) },
@@ -1982,6 +2092,26 @@ function draw(dt: number): void {
       if (Math.random() < 0.6) burst(zz.bolt.x, 1.8, zz.bolt.z, 0xfff27a, 1, 3, 0.7);
     }
   }
+  scenery.doors.forEach((door, i) => (door.rotation.y = (i === 0 ? 1 : -1) * 1.45 * doorsOpen));
+  if (kronos) {
+    const k = kronos.k;
+    const fig = kronos.fig;
+    fig.root.position.set(k.x, OLYMPUS.h, k.z);
+    fig.root.rotation.y = k.yaw;
+    let swing = -1;
+    if (k.state === "windup") swing = 0.38 * Math.min(1, k.t / 0.8);
+    else if (k.state === "sweep") swing = 0.38 + 0.24 * Math.min(1, k.t / 0.3);
+    else if (k.state === "recover") swing = 0.62 + 0.38 * Math.min(1, k.t / 0.4);
+    poseFigure(fig, dt, { speed: k.moving ? 2.4 : 0, swing, raise: k.state === "cast" ? 1 : 0, daze: k.state === "tired" ? 0.8 : 0, fallen: k.state === "dead" ? k.t : -1 });
+    // The sweep spins him right round.
+    if (k.state === "sweep") fig.root.rotation.y = k.yaw + (k.t / 0.3) * Math.PI * 2;
+    if (k.state === "cast") flash(fig, 0.4 + 0.4 * Math.sin(clock * 22), 0xb88aff);
+    else if (k.state === "windup") flash(fig, 0.25 + 0.25 * Math.sin(clock * 30), 0xffaa40);
+    else flash(fig, kronos.flash, 0xffffff);
+    kronos.flash = Math.max(0, kronos.flash - dt * 6);
+    kronos.shadow.position.set(k.x, OLYMPUS.h + 0.07, k.z);
+    if (k.slow > 0 && Math.random() < 0.6) burst(hero.x + (Math.random() - 0.5) * 1.6, heroY + 0.5 + Math.random() * 1.6, hero.z + (Math.random() - 0.5) * 1.6, 0xb88aff, 1, 1, 0.8);
+  }
   for (const s of strikes) {
     s.t += stop > 0 ? 0 : dt;
     (s.ring.material as THREE.MeshBasicMaterial).opacity = 0.45 + 0.4 * Math.sin(clock * 22);
@@ -2043,7 +2173,7 @@ function draw(dt: number): void {
   updateSparks(dt);
 
   // Camera: behind the hero, pulled back and up in the arena so the god fits in frame.
-  const fighting = (ares !== null && ares.a.state !== "dead") || (poseidon !== null && poseidon.p.state !== "dead") || (hades !== null && hades.h.state !== "dead") || (zeus !== null && zeus.z.state !== "dead");
+  const fighting = (ares !== null && ares.a.state !== "dead") || (poseidon !== null && poseidon.p.state !== "dead") || (hades !== null && hades.h.state !== "dead") || (zeus !== null && zeus.z.state !== "dead") || (kronos !== null && kronos.k.state !== "dead");
   const back = (fighting ? CAM_DIST + 2.5 : CAM_DIST) * devZoom;
   const up = LOOK_HEIGHT + ((fighting ? CAM_HEIGHT + 1.6 : CAM_HEIGHT) - LOOK_HEIGHT) * devZoom;
   const tx = hero.x;
@@ -2117,7 +2247,7 @@ hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods
 if (import.meta.env.DEV) {
   Object.assign(window, {
     gods: {
-      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, zeusFight, invasion, invasionTimer, zeus: zeus?.z ?? null, heroY, falling, stairsBroken, collapse, foes: foes.map((f) => f.g) }),
+      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, zeusFight, kronosFight, kronos: kronos?.k ?? null, invasion, invasionTimer, zeus: zeus?.z ?? null, heroY, falling, stairsBroken, collapse, foes: foes.map((f) => f.g) }),
       teleport(x: number, z: number, yaw = hero.yaw) {
         hero.x = x;
         hero.z = z;

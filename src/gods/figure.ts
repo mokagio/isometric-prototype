@@ -26,7 +26,7 @@ export interface Build {
   /** How heavily built: 1 is the hero. */
   bulk: number;
   shield: { rim: number; face: number; emblem: number; sign: "star" | "lambda" | "spear" } | null;
-  weapon: "sword" | "hammer" | "trident" | "bident" | "bolt";
+  weapon: "sword" | "hammer" | "trident" | "bident" | "bolt" | "scythe";
   blade: number;
   cape: number | null;
 }
@@ -278,6 +278,25 @@ export const ANGEL_BUILD: Build = {
   cape: null,
 };
 
+/** Kronos, Titan of time: old as the world, grey and huge, with the scythe. */
+export const KRONOS_BUILD: Build = {
+  body: "flesh",
+  skin: 0xa8a090,
+  hair: 0xd6d2c4,
+  hairStyle: "long",
+  beard: 0xd6d2c4,
+  band: null,
+  tunic: 0x3a2a5a,
+  sandals: 0x2a2030,
+  eyes: GOD_EYES,
+  eyeGlow: true,
+  bulk: 1.45,
+  shield: null,
+  weapon: "scythe",
+  blade: 0xc0c4cc,
+  cape: 0x1a1a3a,
+};
+
 export const FISHER_BUILD: Build = {
   body: "flesh",
   skin: 0xc98a58,
@@ -303,6 +322,7 @@ export const KIT_PAINT: Record<Exclude<Kit, "none">, { metal: number; trim: numb
   poseidon: { metal: 0x2f9a92, trim: 0xe8b83e, crest: 0xf2f8f8 },
   hades: { metal: 0x2a2430, trim: 0x5fe08a, crest: 0x5fe08a },
   zeus: { metal: 0xf2ecd8, trim: 0xe8b83e, crest: 0x4ab0ff },
+  kronos: { metal: 0x5a4a7a, trim: 0xe8b83e, crest: 0xe8e0d0 },
 };
 
 export interface Figure {
@@ -685,6 +705,10 @@ export function buildFigure(b: Build): Figure {
     sword.add(part(BOX, mat(0xb88a2e), [0.18, 0.035, 0.05], [0, 0.09, 0]));
     sword.add(part(CYL, leather, [0.024, 0.15, 0.024], [0, 0.0, 0]));
     sword.add(part(SPHERE, mat(0xb88a2e), [0.035, 0.035, 0.035], [0, -0.09, 0]));
+  } else if (b.weapon === "scythe") {
+    // A long shaft and a great curved blade at the top, swept back.
+    sword.add(part(CYL, mat(0x3a2a1e), [0.03, 2.2, 0.03], [0, 0.6, 0]));
+    sword.add(part(new THREE.TorusGeometry(0.6, 0.06, 6, 18, Math.PI * 0.75), mat(b.blade), [1, 1, 0.4], [0.6, 1.62, 0], [0, 0, Math.PI * 0.55]));
   } else if (b.weapon === "bolt") {
     sword.add(part(boltGeometry(), mat(b.blade), [1, 1, 1], [0, 0.05, 0]));
   } else if (b.weapon === "trident" || b.weapon === "bident") {
@@ -879,7 +903,7 @@ export function wearKit(fig: Figure, armor: Record<Slot, Kit>): void {
   for (const m of fig.hairline) m.visible = armor.helmet === "none";
   // One paint for the whole figure: the god's if any piece is the god's.
   const kits = Object.values(armor);
-  const kit: Kit = kits.includes("zeus") ? "zeus" : kits.includes("hades") ? "hades" : kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
+  const kit: Kit = kits.includes("kronos") ? "kronos" : kits.includes("zeus") ? "zeus" : kits.includes("hades") ? "hades" : kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
   if (kit !== "none") {
     const paint = KIT_PAINT[kit];
     fig.metal.color.setHex(paint.metal);

@@ -203,7 +203,7 @@ Headings follow three.js: yaw 0 faces +z, forward is `(sin yaw, cos yaw)`, and `
 Ares is beaten by not standing in front of him: his shield rings off frontal blows while he is on guard, and the opening is the charge — sidestep it and he runs into the wall and is dazed.
 He calls in Spartans at each line in `SUMMON_AT`.
 Once his armour is claimed, his sons Phobos and Deimos march on the city from opposite ends of the meadow, each with five hoplites; their `homeX/homeZ` is the city, which is what makes an idle grunt march there, and their low `aggro` is what keeps them marching rather than chasing the hero across the map.
-While any of them is in the city the houses burn and the city stops healing; beating them all is saved as `invasion` in `beaten`.
+While any of them is in the city the houses burn and the city stops healing; beating them all is saved as `invasion` in `beaten`, and they come back every `WAVE_GAP` (15 minutes) at the same strength.
 A bandit knocked flat gets back up unless struck again while down; the camps restock whenever the hero is in the city, which also heals.
 
 The road forks just past the city: north to Ares, east to a fishing village on the coast with Poseidon's colosseum at its heart.
@@ -223,7 +223,7 @@ Hades takes turns between two tricks: he vanishes and comes back behind you, glo
 South of the city, Zeus's colosseum (`zeus.ts`) stands at the foot of Mount Olympus with its back against the bottom step; the back is a gap in the batch filled by `backWall` blocks, and beating him knocks them out and opens it in `pushOut`.
 Zeus parries from the front, throws bolts at a hero who keeps away, and calls a storm — rings on the floor, one under the hero, then lightning — that leaves him spent and open.
 His whole kit makes the hero's sword a lightning bolt (`armHero`) and hits three times as hard.
-The stairs climb to Olympia on the summit: a monument whose door is shut with no lock on it (a mystery the kids left for later), the angels' houses, and angels who walk or fly in circles and are only drawn when the hero is near the mountain.
+The stairs climb to Olympia on the summit: a monument whose door bursts open the moment the hero reaches the top, and Kronos (`kronos.ts`) strides out — his scythe sweeps all the way round, and his trick slows the hero's whole world (`SLOW`, applied to the hero's own step) until it wears off and leaves him tired and open; the angels' houses, and angels who walk or fly in circles and are only drawn when the hero is near the mountain.
 
 On the dev server `window.gods` can read state, teleport the hero and add coins, so a recording can reach the colosseum without walking the road.
 Progress is under the `gods:save` storage key.

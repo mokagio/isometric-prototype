@@ -265,6 +265,7 @@ export const OUTFIT_NAMES: Record<Outfit, string> = {
   poseidon: "Armor of Poseidon",
   hades: "Armor of Hades",
   zeus: "Armor of Zeus",
+  kronos: "Armor of Kronos",
 };
 
 function div(className: string): HTMLElement {

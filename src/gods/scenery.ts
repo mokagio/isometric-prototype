@@ -232,6 +232,8 @@ export interface Scenery {
   zeusGate: THREE.Group;
   /** The blocks filling the back of Zeus's colosseum, which break when he does. */
   zeusBack: BackWall;
+  /** The monument's door, left and right, closed at rotation 0. */
+  doors: THREE.Group[];
   /** The last staircase, which the fire monster breaks. */
   hellStairs: HellStairs;
   /** Smoke puffs over the volcano, drifted up every frame. */
@@ -313,6 +315,8 @@ export function buildScenery(): Scenery {
   root.add(statue(ZEUS_BUILD, 0xe8b83e, { x: ZEUS_RING.x + GATE_HALF + 7, y: 1.6, z: ZEUS_RING.z - ZEUS_RING.r - ZEUS_RING.thick - 4 }, Math.PI - 0.4, 1.6));
   const zeusBack = backWall(ZEUS_LOOK);
   root.add(zeusBack.group);
+  const doors = monumentDoors();
+  root.add(...doors);
   const stairs = hellStairs();
   root.add(stairs.steps, stairs.edges);
   root.add(below);
@@ -334,7 +338,7 @@ export function buildScenery(): Scenery {
   root.add(flood);
   const clouds = cloudLayer();
   root.add(clouds);
-  return { root, gate, flames, clouds, grass: grass.material, water, sea: sea.material as THREE.ShaderMaterial, seaGate, hadesGate, zeusGate, zeusBack, hellStairs: stairs, flood, smoke: fire.smoke, lava: fire.lava, portals: [volcanoPortal, homePortal], sky: (root.getObjectByName("sky") as THREE.Mesh).material as THREE.ShaderMaterial };
+  return { root, gate, flames, clouds, grass: grass.material, water, sea: sea.material as THREE.ShaderMaterial, seaGate, hadesGate, zeusGate, zeusBack, doors, hellStairs: stairs, flood, smoke: fire.smoke, lava: fire.lava, portals: [volcanoPortal, homePortal], sky: (root.getObjectByName("sky") as THREE.Mesh).material as THREE.ShaderMaterial };
 }
 
 /** A figure cast in one material, struck in a pose and set on a plinth. */
@@ -1395,6 +1399,31 @@ function olympus(b: Batch): Array<{ x: number; y: number; z: number }> {
   return torches;
 }
 
+/** The monument's two door leaves, each on a hinge at its outer edge; turn `rotation.y` to open them. */
+function monumentDoors(): THREE.Group[] {
+  const { x: mx, z: mz, d } = MONUMENT;
+  const dz = mz - d / 2 + 1.45;
+  const y = OLYMPUS.h + 1.8;
+  const wood = toon(0x8a5a22);
+  const gold = toon(C.gold, { emissive: 0x302008 });
+  return [-1, 1].map((side) => {
+    const hinge = new THREE.Group();
+    hinge.position.set(mx + side * 1.85, y, dz - 0.12);
+    const leaf = new THREE.Mesh(G.box, wood);
+    leaf.scale.set(1.8, 6.0, 0.14);
+    leaf.position.set(-side * 0.9, 3.1, 0);
+    leaf.castShadow = true;
+    hinge.add(leaf);
+    for (let k = 0; k < 4; k++) {
+      const stud = new THREE.Mesh(G.blob, gold);
+      stud.scale.setScalar(0.11);
+      stud.position.set(-side * 0.9, 1.0 + k * 1.4, -0.1);
+      hinge.add(stud);
+    }
+    return hinge;
+  });
+}
+
 export interface BackWall {
   group: THREE.Group;
   blocks: THREE.InstancedMesh;
@@ -1454,10 +1483,8 @@ function olympia(b: Batch): void {
   // The door: two tall leaves in a gold frame, studded, closed. No lock — it is shut by something else.
   const dz = mz - d / 2 + 1.45;
   b.add(G.box, C.gold, { x: mx, y: 3.4, z: dz }, {}, { x: 4.4, y: 6.8, z: 0.2 });
-  for (const side of [-1, 1]) {
-    b.add(G.box, 0x8a5a22, { x: mx + side * 0.95, y: 3.1, z: dz - 0.08 }, {}, { x: 1.8, y: 6.0, z: 0.14 });
-    for (let k = 0; k < 4; k++) b.add(G.blob, C.gold, { x: mx + side * 0.95, y: 1.0 + k * 1.4, z: dz - 0.18 }, {}, 0.11);
-  }
+  // Darkness behind the door, for when it opens; the leaves themselves are `monumentDoors`, so they can swing.
+  b.add(G.box, 0x0a0810, { x: mx, y: 3.1, z: dz - 0.02 }, {}, { x: 3.8, y: 6.0, z: 0.1 });
   b.add(G.halfDisc, C.gold, { x: mx, y: 6.8, z: dz - 0.05 }, { x: Math.PI / 2 }, { x: 2.2, y: 0.2, z: 2.2 });
   b.setFrame(0, 0, 0, h);
 
