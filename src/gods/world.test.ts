@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dist } from "./bearing";
+import { ZEUS_RING } from "./zeus";
 import {
   ARENA_R,
   BLACKSMITH,
@@ -115,5 +116,11 @@ describe("the world", () => {
       expect(dist(h.x, h.z, SEA_ARENA.x, SEA_ARENA.z) - Math.max(h.w, h.d) / 2).toBeGreaterThan(SEA_ARENA.r + SEA_ARENA.thick);
     }
     for (const c of CAMPS) expect(Math.abs(c.z - EAST_ROAD_Z)).toBeGreaterThan(6);
+  });
+
+  it("keeps Zeus's back wall shut until it breaks, then lets you through to the stairs", () => {
+    const back = { x: ZEUS_RING.x, z: ZEUS_RING.z + ZEUS_RING.r + 1 };
+    expect(pushOut(world, back.x, back.z, 0.45, false, false, false, false, false)).not.toEqual(back);
+    expect(pushOut(world, back.x, back.z, 0.45, false, false, false, false, true)).toEqual(back);
   });
 });

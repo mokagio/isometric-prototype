@@ -1,6 +1,7 @@
 import { dist } from "./bearing";
 import { HADES_RING, inTartarus } from "./hades";
 import { inVolcano, VOLCANO } from "./volcano";
+import { MONUMENT, OLYMPUS, olympiaHouses, onOlympus, ZEUS_RING } from "./zeus";
 
 /**
  * Where everything stands, in metres. The city sits at the origin and the road
@@ -72,6 +73,10 @@ export const SEA_STATUE = { x: EAST_ROAD_END - 5, z: VILLAGE.z + 7 };
 /** Everywhere the hero can walk: the meadow, the road east, the village, and out along the piers. */
 export const REGIONS: readonly Box[] = [
   BOUNDS,
+  // The path south to Zeus's gate, his arena, and the way out of its back to the foot of Olympus's stairs.
+  { x0: OLYMPUS.x - 6, z0: BOUNDS.z1 - 2, x1: OLYMPUS.x + 6, z1: ZEUS_RING.z - ZEUS_RING.r + 1 },
+  { x0: ZEUS_RING.x - ZEUS_RING.r, z0: ZEUS_RING.z - ZEUS_RING.r, x1: ZEUS_RING.x + ZEUS_RING.r, z1: ZEUS_RING.z + ZEUS_RING.r },
+  { x0: OLYMPUS.x - 3, z0: ZEUS_RING.z + ZEUS_RING.r - 1, x1: OLYMPUS.x + 3, z1: OLYMPUS.z - OLYMPUS.r + 2 },
   // The path west to the foot of the volcano's stairs.
   { x0: VOLCANO.x + VOLCANO.r - 1, z0: VOLCANO.z - 6, x1: BOUNDS.x0 + 2, z1: VOLCANO.z + 6 },
   { x0: BOUNDS.x1 - 2, z0: EAST_ROAD_Z - 8, x1: VILLAGE.x - VILLAGE.r + 4, z1: EAST_ROAD_Z + 8 },
@@ -237,6 +242,9 @@ export function trees(): Tree[] {
       if (nearColosseum(x, z, 8)) continue;
       if (inVillage(x, z, VILLAGE.r + 5)) continue;
       if (dist(x, z, VOLCANO.x, VOLCANO.z) < VOLCANO.r + 8) continue;
+      if (dist(x, z, OLYMPUS.x, OLYMPUS.z) < OLYMPUS.r + 8) continue;
+      if (dist(x, z, ZEUS_RING.x, ZEUS_RING.z) < ZEUS_RING.r + ZEUS_RING.thick + 8) continue;
+      if (z > BOUNDS.z1 - 6 && Math.abs(x - OLYMPUS.x) < 8) continue;
       if (x < BOUNDS.x0 + 6 && Math.abs(z - VOLCANO.z) < 8) continue;
       if (CAMPS.some((c) => dist(x, z, c.x, c.z) < 9)) continue;
       out.push({ x, z, size: 0.8 + hash(gx, gz, 4) * 0.7 });
@@ -248,7 +256,9 @@ export function trees(): Tree[] {
 export const TRUNK_R = 0.5;
 
 export function layoutWorld(): World {
-  const boxes: Box[] = [...houses(), ...huts()].map((h) => ({ x0: h.x - h.w / 2, z0: h.z - h.d / 2, x1: h.x + h.w / 2, z1: h.z + h.d / 2 }));
+  const boxes: Box[] = [...houses(), ...huts(), ...olympiaHouses()].map((h) => ({ x0: h.x - h.w / 2, z0: h.z - h.d / 2, x1: h.x + h.w / 2, z1: h.z + h.d / 2 }));
+  // The monument, steps and all.
+  boxes.push({ x0: MONUMENT.x - MONUMENT.w / 2 - 2, z0: MONUMENT.z - MONUMENT.d / 2 - 2, x1: MONUMENT.x + MONUMENT.w / 2 + 2, z1: MONUMENT.z + MONUMENT.d / 2 + 2 });
   // The forge and counter, with the smith behind them.
   boxes.push({ x0: BLACKSMITH.x - 0.5, z0: BLACKSMITH.z - 3, x1: BLACKSMITH.x + 3.5, z1: BLACKSMITH.z + 3 });
   const circles: Circle[] = [
@@ -284,12 +294,13 @@ export function inGateway(x: number, z: number, ring: Ring = ARES_RING): boolean
   return Math.abs(across) < GATE_HALF && along > 0;
 }
 
-/** Keep a body of radius `r` on one side of a colosseum's wall, or let it through the open gate. */
-function wall(ring: Ring, x: number, z: number, r: number, closed: boolean): { x: number; z: number } {
+/** Keep a body of radius `r` on one side of a colosseum's wall, or let it through the open gate (or a broken-open back). */
+function wall(ring: Ring, x: number, z: number, r: number, closed: boolean, backOpen = false): { x: number; z: number } {
   const dc = dist(x, z, ring.x, ring.z);
   const inner = ring.r - r;
   const outer = ring.r + ring.thick + r;
-  if (dc > inner && dc < outer && dc > 1e-6 && (closed || !inGateway(x, z, ring))) {
+  const throughBack = backOpen && inGateway(x, z, { ...ring, yaw: ring.yaw + Math.PI });
+  if (dc > inner && dc < outer && dc > 1e-6 && (closed || !inGateway(x, z, ring)) && !throughBack) {
     const to = dc < ring.r + ring.thick / 2 ? inner : outer;
     return { x: ring.x + ((x - ring.x) / dc) * to, z: ring.z + ((z - ring.z) / dc) * to };
   }
@@ -305,12 +316,15 @@ export function pushOut(
   gateClosed: boolean,
   seaGateClosed = false,
   hadesGateClosed = false,
+  zeusGateClosed = false,
+  zeusBackOpen = false,
 ): { x: number; z: number } {
   // Up on the volcano nothing holds you in: stepping off the path is a fall.
   if (inVolcano(x, z)) return { x, z };
   // In Tartarus only Hades's wall holds you; the rest is open to the drop.
   if (inTartarus(x, z)) return wall(HADES_RING, x, z, r, hadesGateClosed);
-  ({ x, z } = clampToRegions(x, z, r));
+  // Up Olympus the same: no ground to be pulled back onto, only Olympia's houses to bump into.
+  if (!onOlympus(x, z)) ({ x, z } = clampToRegions(x, z, r));
 
   for (const c of world.circles) {
     const d = dist(x, z, c.x, c.z);
@@ -337,6 +351,7 @@ export function pushOut(
 
   ({ x, z } = wall(ARES_RING, x, z, r, gateClosed));
   ({ x, z } = wall(SEA_ARENA, x, z, r, seaGateClosed));
+  ({ x, z } = wall(ZEUS_RING, x, z, r, zeusGateClosed, zeusBackOpen));
   return { x, z };
 }
 

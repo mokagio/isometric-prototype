@@ -218,6 +218,11 @@ A third of the way up that last staircase (`COLLAPSE_AT`) a fire monster rises a
 The colosseum is the same `colosseum()` as the other two, lifted by `ArenaLook.y` and given a roof hung with stalactites.
 Hades takes turns between two tricks: he vanishes and comes back behind you, glowing green before he strikes, then stands open; or he strikes the floor, red rings mark where stalactites will land (one under the hero), and they come down after `QUAKE_WARN`. He raises skeletons at each line in `RAISE_AT`.
 
+South of the city, Zeus's colosseum (`zeus.ts`) stands at the foot of Mount Olympus with its back against the bottom step; the back is a gap in the batch filled by `backWall` blocks, and beating him knocks them out and opens it in `pushOut`.
+Zeus parries from the front, throws bolts at a hero who keeps away, and calls a storm — rings on the floor, one under the hero, then lightning — that leaves him spent and open.
+His whole kit makes the hero's sword a lightning bolt (`armHero`) and hits three times as hard.
+The stairs climb to Olympia on the summit: a monument whose door is shut with no lock on it (a mystery the kids left for later), the angels' houses, and angels who walk or fly in circles and are only drawn when the hero is near the mountain.
+
 On the dev server `window.gods` can read state, teleport the hero and add coins, so a recording can reach the colosseum without walking the road.
 Progress is under the `gods:save` storage key.
 

@@ -63,7 +63,7 @@ describe("the save", () => {
   });
 
   it("drops a kit it has never heard of rather than wearing it", () => {
-    const save = decodeSave(JSON.stringify({ coins: 3, armor: { helmet: "zeus", legs: "bronze" } }));
+    const save = decodeSave(JSON.stringify({ coins: 3, armor: { helmet: "apollo", legs: "bronze" } }));
     expect(save.armor.helmet).toBe("none");
     expect(save.armor.legs).toBe("bronze");
   });

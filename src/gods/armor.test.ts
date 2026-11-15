@@ -25,6 +25,9 @@ describe("armour", () => {
     expect(swordPower(bronze)).toBe(1);
     expect(swordPower({ ...godKit("ares"), legs: "bronze" })).toBe(1);
     expect(swordPower(godKit("ares"))).toBe(2);
+    // Zeus's whole kit turns the sword into a lightning bolt, harder still.
+    expect(swordPower(godKit("zeus"))).toBe(3);
+    expect(swordPower({ ...godKit("zeus"), arms: "bronze" })).toBe(1);
   });
 });
 

@@ -11,7 +11,7 @@ import {
   updatePoseidon,
   type Poseidon,
 } from "./poseidon";
-import { buy, damageTaken, godKit, shieldStops, swordPower, type Kit } from "./armor";
+import { buy, damageTaken, godKit, shieldStops, swordPower, wearsFullKit, type Kit } from "./armor";
 import { dist, inArc, yawTo } from "./bearing";
 import { createControls } from "./controls";
 import {
@@ -25,6 +25,9 @@ import {
   BANDIT_BUILD,
   FISHER_BUILD,
   HADES_BUILD,
+  ZEUS_BUILD,
+  ANGEL_BUILD,
+  boltGeometry,
   LAVA_SKELETON_BUILD,
   SKELETON_BUILD,
   POSEIDON_BUILD,
@@ -67,6 +70,24 @@ import { createHud } from "./hud";
 import { loadSave, storeSave } from "./save";
 import { toon } from "./toon";
 import { buildScenery, HORIZON, placeStep, SKY_TOP } from "./scenery";
+import {
+  BODY as ZEUS_BODY,
+  inZeusArena,
+  makeZeus,
+  OLYMPUS,
+  OLYMPUS_STAIR_HALF,
+  olympusFooting,
+  olympusSlope,
+  onOlympus,
+  STORM_R,
+  STORM_WARN,
+  strikeZeus,
+  updateZeus,
+  DOOR,
+  ZEUS_HP,
+  ZEUS_RING,
+  type Zeus,
+} from "./zeus";
 import {
   ARRIVAL,
   BODY as HADES_BODY,
@@ -551,10 +572,184 @@ let wasInVillage = false;
 let heroY = 0;
 let shownY = 0;
 /** A fall off the volcano in progress: how fast, and where it ends. */
-let falling: { vy: number; y: number; lava: boolean; landed: boolean } | null = null;
+let falling: { vy: number; y: number; lava: boolean; landed: boolean; slide?: { x: number; z: number; r: number; slope: (d: number) => number } } | null = null;
 let hadesFight: Fight = save.beaten.includes("hades") ? "won" : "waiting";
 let hades: { h: Hades; fig: Figure; shadow: THREE.Mesh; flash: number } | null = null;
 let hadesGateClosed = false;
+let triedDoor = false;
+
+// ---------------------------------------------------------------------------
+// Zeus
+
+let zeusFight: Fight = save.beaten.includes("zeus") ? "won" : "waiting";
+let zeusGateClosed = false;
+let zeus: { z: Zeus; fig: Figure; shadow: THREE.Mesh; flash: number; bolt: THREE.Mesh } | null = null;
+const boltGlow = new THREE.MeshBasicMaterial({ color: 0xfff27a });
+/** Lightning on its way: a ring on the floor, then a bolt from the sky for a moment. */
+let strikes: Array<{ ring: THREE.Mesh; flash: THREE.Mesh; t: number }> = [];
+const strikeRing = new THREE.RingGeometry(STORM_R - 0.4, STORM_R, 28).rotateX(-Math.PI / 2);
+const strikeBeam = new THREE.CylinderGeometry(0.25, 0.5, 40, 6);
+
+function warnStrikes(spots: Array<{ x: number; z: number }>): void {
+  for (const p of spots) {
+    const ring = new THREE.Mesh(strikeRing, new THREE.MeshBasicMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0.8 }));
+    ring.position.set(p.x, 0.05, p.z);
+    const flashBeam = new THREE.Mesh(strikeBeam, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 }));
+    flashBeam.position.set(p.x, 20, p.z);
+    flashBeam.visible = false;
+    scene.add(ring, flashBeam);
+    strikes.push({ ring, flash: flashBeam, t: 0 });
+  }
+}
+function clearStrikes(): void {
+  for (const s of strikes) scene.remove(s.ring, s.flash);
+  strikes = [];
+}
+
+function startZeusFight(): void {
+  zeusFight = "on";
+  zeusGateClosed = true;
+  const fig = buildFigure(ZEUS_BUILD);
+  fig.root.scale.setScalar(1.8);
+  scene.add(fig.root);
+  const bolt = new THREE.Mesh(boltGeometry(), boltGlow);
+  bolt.scale.setScalar(2.4);
+  bolt.visible = false;
+  scene.add(bolt);
+  zeus = { z: makeZeus(ZEUS_RING.x, ZEUS_RING.z + 7, Math.PI), fig, shadow: blob(2.4), flash: 0, bolt };
+  hud.banner("ZEUS", "King of the Gods", 2.6);
+  hud.setBoss("Zeus, King of the Gods", 1);
+  shake = 0.4;
+}
+
+function clearZeus(): void {
+  if (!zeus) return;
+  scene.remove(zeus.fig.root, zeus.shadow, zeus.bolt);
+  zeus = null;
+}
+
+function endZeusFight(): void {
+  clearZeus();
+  clearStrikes();
+  zeusGateClosed = false;
+  if (zeusFight === "on") zeusFight = "waiting";
+}
+
+function zeusFalls(): void {
+  if (!zeus) return;
+  zeusFight = "won";
+  zeusGateClosed = false;
+  clearStrikes();
+  hud.banner("Zeus is beaten!", "Claim his armor", 3.5);
+  hud.setBoss(null, 0);
+  shake = 0.8;
+  stop = 0.25;
+  burst(zeus.z.x, 2, zeus.z.z, 0xfff27a, 50, 11, 1.6);
+  spawnReward(zeus.z.x, zeus.z.z, "zeus");
+  breakBack();
+}
+
+// The back of Zeus's colosseum: shut until he falls, then knocked out toward the mountain.
+let backFall = -1;
+const backVel = scenery.zeusBack.homes.map((_, i) => new THREE.Vector3(((i * 7919) % 100) / 25 - 2, 3 + ((i * 104729) % 100) / 20, -4 - ((i * 1299709) % 100) / 14));
+if (zeusFight === "won") scenery.zeusBack.group.visible = false;
+function breakBack(): void {
+  backFall = clock;
+  window.setTimeout(() => hud.banner("The back wall broke!", "Stairs up Mount Olympus!", 3), 1200);
+}
+function stepBack(): void {
+  if (backFall < 0) return;
+  const t = clock - backFall;
+  const { blocks, homes } = scenery.zeusBack;
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  homes.forEach((home, i) => {
+    const v = backVel[i]!;
+    const p = new THREE.Vector3(home.x + v.x * t, Math.max(0.6, home.y + v.y * t - 9 * t * t), home.z + v.z * t);
+    q.setFromEuler(new THREE.Euler(t * v.z * 0.4, 0, t * v.x * 0.5));
+    m.compose(p, q, new THREE.Vector3(1.2, 1.2, ZEUS_RING.thick + 0.4));
+    blocks.setMatrixAt(i, m);
+  });
+  blocks.instanceMatrix.needsUpdate = true;
+  if (t > 3.5) {
+    scenery.zeusBack.group.visible = false;
+    backFall = -1;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The angels of Olympia: some walk the square, some fly over it.
+
+interface Angel {
+  fig: Figure;
+  wings: THREE.Group[];
+  flying: boolean;
+  r: number;
+  a: number;
+  speed: number;
+  height: number;
+}
+const angelHalo = new THREE.MeshBasicMaterial({ color: 0xffe066 });
+const angelFeather = toon(0xffffff, { emissive: 0x202020 });
+const angels: Angel[] = [];
+for (let i = 0; i < 12; i++) {
+  const fig = buildFigure({ ...ANGEL_BUILD, hair: [0xf2c94c, 0x7a4421, 0x2b1d14, 0xe8e0d0][i % 4]!, skin: [0xf3d2b0, 0xc68a5a, 0x8a5a3a, 0xf1c27d][(i + 1) % 4]! });
+  fig.sword.visible = false;
+  const wings: THREE.Group[] = [];
+  for (const side of [-1, 1]) {
+    const pivot = new THREE.Group();
+    pivot.position.set(side * 0.12, 1.32, -0.16);
+    for (const [len, up, out] of [
+      [0.7, 0.18, 0.42],
+      [0.5, -0.05, 0.32],
+    ] as const) {
+      const feather = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), angelFeather);
+      feather.scale.set(len * 0.62, len * 0.32, 0.04);
+      feather.position.set(side * out, up, 0);
+      feather.rotation.z = side * 0.45;
+      pivot.add(feather);
+    }
+    fig.root.add(pivot);
+    wings.push(pivot);
+  }
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.03, 6, 20), angelHalo);
+  halo.rotation.x = Math.PI / 2;
+  halo.position.y = 2.08;
+  fig.root.add(halo);
+  scene.add(fig.root);
+  const flying = i % 3 === 0;
+  angels.push({ fig, wings, flying, r: flying ? 9 + i : 12 + (i % 4) * 2.5, a: i * 1.3, speed: (i % 2 ? 1 : -1) * (flying ? 0.25 : 0.12), height: flying ? 3 + (i % 3) : 0 });
+}
+
+function updateAngels(dt: number): void {
+  // A dozen winged figures are a lot to draw; only bother once the hero is on the way up.
+  const near = dist(hero.x, hero.z, OLYMPUS.x, OLYMPUS.z) < OLYMPUS.r + 10;
+  for (const g of angels) {
+    g.fig.root.visible = near;
+    if (!near) continue;
+    g.a += g.speed * dt;
+    const x = OLYMPUS.x + Math.sin(g.a) * g.r;
+    const z = OLYMPUS.z + Math.cos(g.a) * g.r;
+    const bob = g.flying ? Math.sin(clock * 2 + g.r) * 0.4 : 0;
+    g.fig.root.position.set(x, OLYMPUS.h + g.height + bob, z);
+    // Facing along the way round the circle.
+    g.fig.root.rotation.y = g.a + (g.speed > 0 ? Math.PI / 2 : -Math.PI / 2);
+    poseFigure(g.fig, dt, { speed: g.flying ? 0 : Math.abs(g.speed) * g.r });
+    const beat = g.flying ? Math.sin(clock * 9 + g.r) * 0.5 : Math.sin(clock * 1.5 + g.r) * 0.12;
+    g.wings[0]!.rotation.y = 0.35 + beat;
+    g.wings[1]!.rotation.y = -0.35 - beat;
+  }
+}
+
+/** With Zeus's whole kit on, the hero's sword is a lightning bolt. */
+const heroBolt = new THREE.Mesh(boltGeometry(), boltGlow);
+heroBolt.position.y = 0.05;
+heroFig.sword.add(heroBolt);
+function armHero(): void {
+  const lightning = wearsFullKit(save.armor, "zeus");
+  for (const c of heroFig.sword.children) c.visible = c === heroBolt ? lightning : !lightning;
+}
+armHero();
 
 // ---------------------------------------------------------------------------
 // The fire monster on the last staircase
@@ -857,6 +1052,22 @@ function swingLands(): void {
       if (result === "dead") aresFalls();
     }
   }
+  if (zeus && underBlade(hero, zeus.z.x, zeus.z.z, ZEUS_BODY)) {
+    const zz = zeus.z;
+    const result = strikeZeus(zz, power, hero.x, hero.z);
+    if (result === "clang") {
+      burst(zz.x + Math.sin(zz.yaw) * 1.2, 1.8, zz.z + Math.cos(zz.yaw) * 1.2, 0xfff27a, 14, 7);
+      shove(hero, zz.x, zz.z, 7);
+      stop = 0.07;
+      hitAny = true;
+    } else if (result !== "none") {
+      zeus.flash = 1;
+      hitAny = true;
+      burst(zz.x, 2.2, zz.z, 0x8fd8ff, 14, 7);
+      hud.setBoss("Zeus, King of the Gods", zz.hp / ZEUS_HP);
+      if (result === "dead") zeusFalls();
+    }
+  }
   if (hades && underBlade(hero, hades.h.x, hades.h.z, HADES_BODY)) {
     const h = hades.h;
     const result = strikeHades(h, power, hero.x, hero.z);
@@ -889,6 +1100,11 @@ function swingLands(): void {
       hud.setBoss("Poseidon, God of the Sea", p.hp / POSEIDON_HP);
       if (result === "dead") poseidonFalls();
     }
+  }
+  if (hitAny && wearsFullKit(save.armor, "zeus")) {
+    const tx = hero.x + Math.sin(hero.yaw) * 1.6;
+    const tz = hero.z + Math.cos(hero.yaw) * 1.6;
+    burst(tx, heroY + 1.2, tz, 0xfff27a, 12, 8, 0.9);
   }
   if (hitAny) {
     stop = Math.max(stop, 0.05);
@@ -923,6 +1139,12 @@ function claimReward(): void {
   storeSave(save);
   wearKit(heroFig, save.armor);
   hud.setArmor(save.armor);
+  armHero();
+  if (kit === "zeus") {
+    hud.banner("Armor of Zeus", "Your sword is a lightning bolt now!", 4);
+    clearZeus();
+    return;
+  }
   if (kit === "hades") {
     hud.banner("Armor of Hades", "The toughest of all, and your sword hits twice as hard", 4);
     clearHades();
@@ -946,6 +1168,7 @@ function claimReward(): void {
 function respawn(): void {
   endFight();
   mendStairs();
+  endZeusFight();
   heroY = 0;
   falling = null;
   clearHades();
@@ -972,6 +1195,7 @@ function openShop(): void {
       save.armor = sale.armor;
       storeSave(save);
       wearKit(heroFig, save.armor);
+      armHero();
       hud.setArmor(save.armor);
       hud.setCoins(save.coins);
       shopRedraw?.(save.coins, save.armor);
@@ -1007,6 +1231,7 @@ function update(dt: number): void {
   if (aresUp && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, ares!.a, dt);
   else if (seaUp && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, poseidon!.p, dt);
   else if (hades && hades.h.state !== "dead" && !hadesHidden(hades.h) && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, hades.h, dt);
+  else if (zeus && zeus.z.state !== "dead" && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, zeus.z, dt);
   else if (!blocking && standing(hero)) camYaw = autoTurn(camYaw, stick.x, dt);
   const move = moveFromStick(stick.x, stick.y, camYaw);
   // Wading through the flood is slow going.
@@ -1022,6 +1247,7 @@ function update(dt: number): void {
     if (ares && ares.a.state !== "dead") targets.push(ares.a);
     if (poseidon && poseidon.p.state !== "dead") targets.push(poseidon.p);
     if (hades && hades.h.state !== "dead" && !hadesHidden(hades.h)) targets.push(hades.h);
+    if (zeus && zeus.z.state !== "dead") targets.push(zeus.z);
     let best: { x: number; z: number } | null = null;
     let bestD = SWING_REACH + 2;
     for (const t of targets) {
@@ -1038,7 +1264,7 @@ function update(dt: number): void {
   stop = Math.max(0, stop - dt);
 
   if (stepHero(hero, sim, { move, block: blocking })) swingLands();
-  const p = pushOut(world, hero.x, hero.z, RADIUS, gateClosed, seaGateClosed, hadesGateClosed);
+  const p = pushOut(world, hero.x, hero.z, RADIUS, gateClosed, seaGateClosed, hadesGateClosed, zeusGateClosed, zeusFight === "won");
   hero.x = p.x;
   hero.z = p.z;
 
@@ -1047,12 +1273,13 @@ function update(dt: number): void {
     falling.vy -= 30 * dt;
     if (!falling.lava) {
       // Off the side of the stairs is a long tumble down the slope to the foot.
-      const d = dist(hero.x, hero.z, VOLCANO.x, VOLCANO.z);
-      if (d < VOLCANO.r && d > 1e-3) {
-        const step = Math.min(VOLCANO.r - d, 14 * dt);
-        hero.x += ((hero.x - VOLCANO.x) / d) * step;
-        hero.z += ((hero.z - VOLCANO.z) / d) * step;
-        falling.y = slopeY(d + step);
+      const m = falling.slide ?? { x: VOLCANO.x, z: VOLCANO.z, r: VOLCANO.r, slope: slopeY };
+      const d = dist(hero.x, hero.z, m.x, m.z);
+      if (d < m.r && d > 1e-3) {
+        const step = Math.min(m.r - d, 14 * dt);
+        hero.x += ((hero.x - m.x) / d) * step;
+        hero.z += ((hero.z - m.z) / d) * step;
+        falling.y = m.slope(d + step);
         if (Math.random() < 0.4) burst(hero.x, falling.y + 0.3, hero.z, 0x8a7a70, 2, 3);
       }
     }
@@ -1083,6 +1310,24 @@ function update(dt: number): void {
       hero.swing = -1;
       fallTimer = 0;
       hud.banner(end.lava ? "Into the lava!" : "You fell!", "Back to the city", 2.6);
+    }
+  } else if (onOlympus(hero.x, hero.z)) {
+    if (standing(hero)) {
+      let y = olympusFooting(hero.x, hero.z);
+      if (y === null && heroY < SAFE_DROP) {
+        // A stumble off the bottom steps puts you back on them.
+        hero.x = Math.min(OLYMPUS.x + OLYMPUS_STAIR_HALF - RADIUS, Math.max(OLYMPUS.x - OLYMPUS_STAIR_HALF + RADIUS, hero.x));
+        y = olympusFooting(hero.x, hero.z);
+      }
+      if (y !== null) heroY = y;
+      else {
+        falling = { vy: 2, y: olympusSlope(dist(hero.x, hero.z, OLYMPUS.x, OLYMPUS.z)), lava: false, landed: false, slide: { x: OLYMPUS.x, z: OLYMPUS.z, r: OLYMPUS.r, slope: olympusSlope } };
+        hero.hp = 0;
+        hero.fallen = 0;
+        hero.swing = -1;
+        fallTimer = 0;
+        hud.banner("You fell!", "Back to the city", 2.6);
+      }
     }
   } else if (inTartarus(hero.x, hero.z)) {
     if (standing(hero)) {
@@ -1281,6 +1526,52 @@ function update(dt: number): void {
   }
   stepCollapse(sim);
   crumble();
+  stepBack();
+
+  // Zeus.
+  if (zeusFight === "waiting" && inZeusArena(hero.x, hero.z, ZEUS_RING.r - 4) && standing(hero)) startZeusFight();
+  updateAngels(dt);
+  // Olympia's great door: shut, with no lock on it.
+  const atDoor = standing(hero) && heroY > OLYMPUS.h - 1 && dist(hero.x, hero.z, DOOR.x, DOOR.z) < 2.4;
+  if (atDoor && !triedDoor) hud.banner("The door is locked", "There's no lock and no keyhole… what opens it?", 3);
+  triedDoor = atDoor;
+  if (zeus) {
+    const zz = zeus.z;
+    const events = updateZeus(zz, sim, { x: hero.x, z: hero.z, alive: standing(hero) }, ZEUS_RING);
+    for (const e of events) {
+      if (e.kind === "blow") heroLoses(e);
+      else if (e.kind === "roar") shake = 0.35;
+      else if (e.kind === "throw") hud.banner("Lightning bolt!", "Block it!", 1.2);
+      else if (e.kind === "storm") {
+        warnStrikes(e.spots);
+        hud.banner("A storm is coming!", "Get out of the blue circles!", 1.6);
+      } else if (e.kind === "lightning") {
+        shake = 0.8;
+        for (const p of e.spots) burst(p.x, 0.4, p.z, 0xfff27a, 14, 8, 1.1);
+        for (const s of strikes) s.flash.visible = true;
+        hud.banner("He's worn out!", "Hit him now!", 1.6);
+      } else if (e.kind === "zap" && standing(hero)) {
+        hurtHero(hero, damageTaken(e.damage, save.armor), hero.x + 0.01, hero.z, true);
+        heroFlash = 1;
+        stop = 0.1;
+        if (!standing(hero)) {
+          fallTimer = 0;
+          hud.banner("Struck by lightning!", "Back to the city to heal up", 2.6);
+        }
+      }
+    }
+    if (zz.state !== "dead") {
+      const q = pushOut(world, zz.x, zz.z, ZEUS_BODY, true, true, true, true);
+      zz.x = q.x;
+      zz.z = q.z;
+      const d = dist(zz.x, zz.z, hero.x, hero.z);
+      const min = ZEUS_BODY + RADIUS;
+      if (d < min && d > 1e-4) {
+        hero.x = zz.x + ((hero.x - zz.x) / d) * min;
+        hero.z = zz.z + ((hero.z - zz.z) / d) * min;
+      }
+    }
+  }
 
   // Hades.
   if (hades) {
@@ -1377,18 +1668,22 @@ function update(dt: number): void {
   hud.setHealth(Math.ceil(hero.hp));
   hud.setCompass(
     camYaw,
-    fight === "on" || seaFight === "on" || inTartarus(hero.x, hero.z)
+    fight === "on" || seaFight === "on" || zeusFight === "on" || inTartarus(hero.x, hero.z)
       ? null
       : [
           { id: "colosseum", label: fight === "won" ? "Colosseum" : "Ares", yaw: yawTo(hero.x, hero.z, COLOSSEUM.x, COLOSSEUM.z) },
           { id: "city", label: "City", yaw: yawTo(hero.x, hero.z, 0, 0) },
           { id: "village", label: seaFight === "won" ? "Village" : "Poseidon", yaw: yawTo(hero.x, hero.z, VILLAGE.x, VILLAGE.z) },
           { id: "volcano", label: "Volcano", yaw: yawTo(hero.x, hero.z, VOLCANO.x, VOLCANO.z) },
+          zeusFight === "won"
+            ? { id: "olympus", label: "Olympia", yaw: yawTo(hero.x, hero.z, OLYMPUS.x, OLYMPUS.z) }
+            : { id: "olympus", label: "Zeus", yaw: yawTo(hero.x, hero.z, ZEUS_RING.x, ZEUS_RING.z) },
         ].filter(
           (m) =>
             (m.id !== "city" || !inCity(hero.x, hero.z)) &&
             (m.id !== "village" || !inVillage(hero.x, hero.z)) &&
-            (m.id !== "volcano" || !inVolcano(hero.x, hero.z)),
+            (m.id !== "volcano" || !inVolcano(hero.x, hero.z)) &&
+            (m.id !== "olympus" || !onOlympus(hero.x, hero.z)),
         ),
   );
 }
@@ -1527,6 +1822,39 @@ function draw(dt: number): void {
     hades.shadow.visible = fig.root.visible;
     hades.shadow.position.set(h.x, TARTARUS.y + 0.07, h.z);
   }
+  if (zeus) {
+    const zz = zeus.z;
+    const fig = zeus.fig;
+    fig.root.position.set(zz.x, 0, zz.z);
+    fig.root.rotation.y = zz.yaw;
+    let swing = -1;
+    if (zz.state === "windup") swing = 0.38 * Math.min(1, zz.t / 0.65);
+    else if (zz.state === "strike") swing = 0.38 + 0.24 * Math.min(1, zz.t / 0.2);
+    else if (zz.state === "recover") swing = 0.62 + 0.38 * Math.min(1, zz.t / 0.4);
+    poseFigure(fig, dt, { speed: zz.moving ? 2.8 : 0, swing, raise: zz.state === "storm" || zz.state === "aim" ? 1 : 0, daze: zz.state === "spent" ? 0.6 : 0, fallen: zz.state === "dead" ? zz.t : -1 });
+    if (zz.state === "aim" || zz.state === "storm") flash(fig, 0.4 + 0.4 * Math.sin(clock * 26), 0x8fd8ff);
+    else if (zz.state === "windup") flash(fig, 0.2 + 0.2 * Math.sin(clock * 30), 0xffaa40);
+    else flash(fig, zeus.flash, 0xffffff);
+    zeus.flash = Math.max(0, zeus.flash - dt * 6);
+    zeus.shadow.position.set(zz.x, 0.07, zz.z);
+    zeus.bolt.visible = zz.bolt !== null;
+    if (zz.bolt) {
+      zeus.bolt.position.set(zz.bolt.x, 1.8, zz.bolt.z);
+      // Laid flat with its point along the way it flies.
+      zeus.bolt.rotation.set(Math.PI / 2, zz.bolt.yaw, 0, "YXZ");
+      if (Math.random() < 0.6) burst(zz.bolt.x, 1.8, zz.bolt.z, 0xfff27a, 1, 3, 0.7);
+    }
+  }
+  for (const s of strikes) {
+    s.t += stop > 0 ? 0 : dt;
+    (s.ring.material as THREE.MeshBasicMaterial).opacity = 0.45 + 0.4 * Math.sin(clock * 22);
+  }
+  if (strikes.length > 0 && strikes[0]!.t >= STORM_WARN + 0.3) clearStrikes();
+  scenery.zeusGate.position.y += ((zeusGateClosed ? 0 : 6) - scenery.zeusGate.position.y) * Math.min(1, dt * (zeusGateClosed ? 10 : 2));
+  // The lightning sword crackles as it swings.
+  if (hero.swing >= 0 && wearsFullKit(save.armor, "zeus") && Math.random() < 0.7) {
+    burst(hero.x + Math.sin(hero.yaw) * 1.3, heroY + 1.3, hero.z + Math.cos(hero.yaw) * 1.3, 0xfff27a, 1, 4, 0.6);
+  }
   for (const p of scenery.portals) p.children[1]!.rotation.z = -clock * 2;
   stepFalls.forEach((start, i) => {
     if (start < 0 || clock < start) return;
@@ -1577,7 +1905,7 @@ function draw(dt: number): void {
   updateSparks(dt);
 
   // Camera: behind the hero, pulled back and up in the arena so the god fits in frame.
-  const fighting = (ares !== null && ares.a.state !== "dead") || (poseidon !== null && poseidon.p.state !== "dead") || (hades !== null && hades.h.state !== "dead");
+  const fighting = (ares !== null && ares.a.state !== "dead") || (poseidon !== null && poseidon.p.state !== "dead") || (hades !== null && hades.h.state !== "dead") || (zeus !== null && zeus.z.state !== "dead");
   const back = (fighting ? CAM_DIST + 2.5 : CAM_DIST) * devZoom;
   const up = LOOK_HEIGHT + ((fighting ? CAM_HEIGHT + 1.6 : CAM_HEIGHT) - LOOK_HEIGHT) * devZoom;
   const tx = hero.x;
@@ -1585,7 +1913,14 @@ function draw(dt: number): void {
   let cx = tx - Math.sin(camYaw) * back;
   let cz = tz - Math.cos(camYaw) * back;
   // Inside the colosseum the camera stays inside the wall.
-  if (inTartarus(hero.x, hero.z) && inHadesArena(hero.x, hero.z)) {
+  if (inZeusArena(hero.x, hero.z)) {
+    const d = dist(cx, cz, ZEUS_RING.x, ZEUS_RING.z);
+    const limit = ZEUS_RING.r - 0.8;
+    if (d > limit) {
+      cx = ZEUS_RING.x + ((cx - ZEUS_RING.x) / d) * limit;
+      cz = ZEUS_RING.z + ((cz - ZEUS_RING.z) / d) * limit;
+    }
+  } else if (inTartarus(hero.x, hero.z) && inHadesArena(hero.x, hero.z)) {
     const d = dist(cx, cz, TARTARUS.x, TARTARUS.z);
     const limit = TARTARUS.r - 0.8;
     if (d > limit) {
@@ -1611,6 +1946,8 @@ function draw(dt: number): void {
   let cy = up + heroY;
   const camFrom = dist(cx, cz, VOLCANO.x, VOLCANO.z);
   if (camFrom < VOLCANO.r + 2) cy = Math.max(cy, (camFrom < VOLCANO.rim ? LAVA_Y : slopeY(camFrom)) + 2.5);
+  const camFromOlympus = dist(cx, cz, OLYMPUS.x, OLYMPUS.z);
+  if (camFromOlympus < OLYMPUS.r + 2) cy = Math.max(cy, olympusSlope(camFromOlympus) + 2.5);
   const k = 1 - Math.exp(-dt * 9);
   camPos.lerp(new THREE.Vector3(cx, cy, cz), camPos.lengthSq() === 0 ? 1 : k);
   camLook.lerp(new THREE.Vector3(tx, LOOK_HEIGHT + heroY, tz), camLook.lengthSq() === 0 ? 1 : Math.min(1, k * 1.6));
@@ -1642,7 +1979,7 @@ hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods
 if (import.meta.env.DEV) {
   Object.assign(window, {
     gods: {
-      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, heroY, falling, stairsBroken, collapse, foes: foes.map((f) => f.g) }),
+      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, zeusFight, zeus: zeus?.z ?? null, heroY, falling, stairsBroken, collapse, foes: foes.map((f) => f.g) }),
       teleport(x: number, z: number, yaw = hero.yaw) {
         hero.x = x;
         hero.z = z;

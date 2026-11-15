@@ -2,7 +2,8 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Batch } from "./batch";
 import { dist } from "./bearing";
-import { ARES_BUILD, buildFigure, HERO_BUILD, POSEIDON_BUILD, poseFigure, wearKit, type Build } from "./figure";
+import { ARES_BUILD, boltGeometry, buildFigure, HERO_BUILD, POSEIDON_BUILD, poseFigure, wearKit, ZEUS_BUILD, type Build } from "./figure";
+import { MONUMENT, OLYMPUS, OLYMPUS_STAIR_HALF, OLYMPUS_STEP, olympiaHouses, olympusSlope, olympusStepY, ZEUS_RING } from "./zeus";
 import { godKit } from "./armor";
 import { BRIDGE_HALF as HELL_BRIDGE, BRIDGES, HADES_RING, HOME_PORTAL, ISLAND, ISLANDS, LOW_Y, stairStepY, STAIRS, TARTARUS } from "./hades";
 import { toon } from "./toon";
@@ -227,6 +228,10 @@ export interface Scenery {
   flood: THREE.Mesh;
   /** Hades's portcullis: up is open. */
   hadesGate: THREE.Group;
+  /** Zeus's portcullis: up is open. */
+  zeusGate: THREE.Group;
+  /** The blocks filling the back of Zeus's colosseum, which break when he does. */
+  zeusBack: BackWall;
   /** The last staircase, which the fire monster breaks. */
   hellStairs: HellStairs;
   /** Smoke puffs over the volcano, drifted up every frame. */
@@ -257,6 +262,9 @@ export function buildScenery(): Scenery {
   colosseum(batch, SEA_LOOK);
   const torches = volcano(batch);
   const pits = tartarusFloor(batch);
+  const olympusTorches = olympus(batch);
+  olympia(batch);
+  colosseum(batch, ZEUS_LOOK);
   colosseum(batch, HADES_LOOK);
   root.add(batch.build());
   const fire = volcanoFire();
@@ -296,6 +304,15 @@ export function buildScenery(): Scenery {
   for (const f of flameSpots(HADES_LOOK)) flames.push(flame(root, f.x, f.y, f.z, 0.7, 0x3fe07a, 0xc8ffd8));
   const hadesGate = portcullis(HADES_LOOK);
   root.add(hadesGate);
+  const zeusGate = portcullis(ZEUS_LOOK);
+  root.add(zeusGate);
+  for (const f of flameSpots(ZEUS_LOOK)) flames.push(flame(root, f.x, f.y, f.z, 0.7, 0x8fd8ff, 0xffffff));
+  for (const t of olympusTorches) flames.push(flame(root, t.x, t.y, t.z, 0.45));
+  root.add(olympusClouds());
+  // Zeus in gold outside his gate, bolt raised to the city.
+  root.add(statue(ZEUS_BUILD, 0xe8b83e, { x: ZEUS_RING.x + GATE_HALF + 7, y: 1.6, z: ZEUS_RING.z - ZEUS_RING.r - ZEUS_RING.thick - 4 }, Math.PI - 0.4, 1.6));
+  const zeusBack = backWall(ZEUS_LOOK);
+  root.add(zeusBack.group);
   const stairs = hellStairs();
   root.add(stairs.steps, stairs.edges);
   root.add(below);
@@ -317,7 +334,7 @@ export function buildScenery(): Scenery {
   root.add(flood);
   const clouds = cloudLayer();
   root.add(clouds);
-  return { root, gate, flames, clouds, grass: grass.material, water, sea: sea.material as THREE.ShaderMaterial, seaGate, hadesGate, hellStairs: stairs, flood, smoke: fire.smoke, lava: fire.lava, portals: [volcanoPortal, homePortal], sky: (root.getObjectByName("sky") as THREE.Mesh).material as THREE.ShaderMaterial };
+  return { root, gate, flames, clouds, grass: grass.material, water, sea: sea.material as THREE.ShaderMaterial, seaGate, hadesGate, zeusGate, zeusBack, hellStairs: stairs, flood, smoke: fire.smoke, lava: fire.lava, portals: [volcanoPortal, homePortal], sky: (root.getObjectByName("sky") as THREE.Mesh).material as THREE.ShaderMaterial };
 }
 
 /** A figure cast in one material, struck in a pose and set on a plinth. */
@@ -688,11 +705,13 @@ interface ArenaLook {
   rake: number;
   banner: number;
   accent: number;
-  device: "spear" | "trident" | "bident";
+  device: "spear" | "trident" | "bident" | "bolt";
   /** Floor height, for a colosseum that is not on the ground. */
   y?: number;
   /** A roof over the seats, hung with stalactites. */
   roof?: boolean;
+  /** A gap in the back wall as wide as the gate, filled by something that can break. */
+  back?: boolean;
 }
 
 const ARES_LOOK: ArenaLook = {
@@ -726,6 +745,22 @@ const SEA_LOOK: ArenaLook = {
   banner: 0x1f4f9a,
   accent: 0x3fc6c0,
   device: "trident",
+};
+
+const ZEUS_LOOK: ArenaLook = {
+  ...ZEUS_RING,
+  back: true,
+  stone: 0xeee9dd,
+  light: 0xfbf8f0,
+  dark: 0xc9c0ac,
+  arch: 0x2a3a5a,
+  seats: 0xf6f2e8,
+  seatsShade: 0xe2dccb,
+  floor: 0xe8e0c8,
+  rake: 0x8fb8e8,
+  banner: 0x2a4fb0,
+  accent: 0xe8b83e,
+  device: "bolt",
 };
 
 const HADES_LOOK: ArenaLook = {
@@ -798,7 +833,7 @@ function colosseum(b: Batch, L: ArenaLook): void {
     const a = (i / segments) * Math.PI * 2;
     const sx = Math.sin(a);
     const sz = Math.cos(a);
-    if (Math.abs(sx * (R + T / 2)) < GATE_HALF + span / 2 && sz > 0) continue;
+    if (Math.abs(sx * (R + T / 2)) < GATE_HALF + span / 2 && (sz > 0 || L.back)) continue;
     const at = (r: number, y: number): { x: number; y: number; z: number } => ({ x: sx * r, y, z: sz * r });
     const shade = i % 2 ? L.stone : L.light;
 
@@ -855,6 +890,8 @@ function colosseum(b: Batch, L: ArenaLook): void {
       // A gold spear-and-shield device on each banner.
       b.add(G.cyl, L.accent, { x: tx, y: 7.6, z: front + 0.9 }, { x: Math.PI / 2 }, { x: 0.5, y: 0.05, z: 0.5 });
       b.add(G.box, L.banner, { x: tx, y: 7.6, z: front + 0.94 }, { z: Math.PI / 4 }, { x: 0.1, y: 1.3, z: 0.04 });
+    } else if (L.device === "bolt") {
+      b.add(boltGeometry(), L.accent, { x: tx, y: 6.0, z: front + 0.92 }, { z: 0.15 }, 3.2);
     } else {
       tridentDevice(b, L.accent, { x: tx, y: 7.2, z: front + 0.92 }, 1.3, L.device === "bident" ? [-0.2, 0.2] : undefined);
       // Waves along the foot of the banner.
@@ -882,6 +919,9 @@ function colosseum(b: Batch, L: ArenaLook): void {
       b.add(G.cyl8, C.wood, { x, y: 0.9, z }, { x: 0.25, z: 0.2 }, { x: 0.035, y: 2, z: 0.035 });
       b.add(G.cone, C.iron, { x: x + 0.05, y: 1.95, z: z + 0.22 }, { x: 0.25, z: 0.2 }, { x: 0.07, y: 0.32, z: 0.07 });
       if (i % 3 === 0) b.add(G.cyl, 0xc8913a, { x: x + 1.2, y: 0.08, z: z - 0.6 }, { x: 0.12, z: 0.1 }, { x: 0.4, y: 0.06, z: 0.4 });
+    } else if (L.device === "bolt") {
+      // Scorch marks where lightning has struck the sand before.
+      b.add(G.cyl, 0x8a8478, { x, y: 0.065, z }, {}, { x: 0.9, y: 0.01, z: 0.9 });
     } else if (L.device === "bident") {
       // Bones, and the rubble of stalactites that came down before.
       b.add(G.cyl8, 0xe9e1c9, { x, y: 0.05, z }, { z: Math.PI / 2, y: a }, { x: 0.05, y: 0.7, z: 0.05 });
@@ -1292,6 +1332,169 @@ function volcanoFire(): { group: THREE.Group; smoke: THREE.Group; lava: THREE.Me
 }
 
 // ---------------------------------------------------------------------------
+// Mount Olympus
+
+/** The mountain, its marble stairs with gold edges, and statues of the gods along the way. Returns torch spots. */
+function olympus(b: Batch): Array<{ x: number; y: number; z: number }> {
+  const { x: ox, z: oz, r, h, top } = OLYMPUS;
+  const mountain = flat(
+    lathe(
+      [
+        [r + 3, -1],
+        [r, 0],
+        [top + (r - top) * 0.5, h * 0.5],
+        [top + 0.5, h],
+        [0, h],
+      ],
+      40,
+    ),
+  );
+  b.add(mountain, 0x9a9890, { x: ox, y: 0, z: oz });
+  // Snow on the upper slopes, in drifts.
+  for (let k = 0; k < 26; k++) {
+    const a = (k / 26) * Math.PI * 2;
+    if (Math.abs(Math.cos(a) + 1) < 0.05) continue; // the stairs, on the north face
+    const d = top + 2 + hash(k, 1, 90) * 10;
+    b.add(G.rock, C.snow, { x: ox + Math.sin(a) * d, y: olympusSlope(d) + 0.2, z: oz + Math.cos(a) * d }, { y: a }, { x: 2.2, y: 0.7, z: 3 });
+  }
+  for (let k = 0; k < 16; k++) {
+    const a = (k / 16) * Math.PI * 2 + 0.2;
+    if (Math.abs(Math.cos(a) + 1) < 0.08) continue;
+    const d = top + 14 + hash(k, 2, 90) * 18;
+    b.add(G.rock, 0x8a8880, { x: ox + Math.sin(a) * d, y: olympusSlope(d) + 0.3, z: oz + Math.cos(a) * d }, { y: a }, { x: 1.8, y: 1.0, z: 2.6 });
+  }
+  // A ring of marble round the summit.
+  b.add(G.cyl, C.marbleShade, { x: ox, y: h - 0.2, z: oz }, {}, { x: top + 0.3, y: 0.4, z: top + 0.3 });
+
+  const torches: Array<{ x: number; y: number; z: number }> = [];
+  let i = 0;
+  for (let d = top; d < r; d += OLYMPUS_STEP, i++) {
+    const topY = olympusStepY(d + OLYMPUS_STEP / 2);
+    const z = oz - d - OLYMPUS_STEP / 2;
+    b.add(G.box, i % 2 ? C.marble : C.marbleShade, { x: ox, y: topY - 0.75, z }, {}, { x: OLYMPUS_STAIR_HALF * 2, y: 1.5, z: OLYMPUS_STEP });
+    b.add(G.box, C.gold, { x: ox, y: topY - 0.04, z: z - OLYMPUS_STEP / 2 + 0.06 }, {}, { x: OLYMPUS_STAIR_HALF * 2 + 0.02, y: 0.08, z: 0.12 });
+    if (i % 6 === 3) {
+      for (const side of [-1, 1]) {
+        const tx = ox + side * (OLYMPUS_STAIR_HALF + 0.4);
+        const ty = olympusSlope(d + OLYMPUS_STEP / 2);
+        b.add(G.fluted, C.marble, { x: tx, y: ty + 1.0, z }, {}, { x: 0.16, y: 2.0, z: 0.16 });
+        b.add(G.dome, C.gold, { x: tx, y: ty + 2.1, z }, { x: Math.PI }, { x: 0.3, y: 0.18, z: 0.3 });
+        torches.push({ x: tx, y: ty + 2.1, z });
+      }
+    }
+  }
+  // A marble arch at the foot, gold on top, so the way up can be seen from town.
+  const fz = oz - r - 1;
+  for (const side of [-1, 1]) column(b, ox + side * 3.2, fz, 6, 0.5);
+  b.add(G.box, C.marble, { x: ox, y: 6.3, z: fz }, {}, { x: 8, y: 0.6, z: 1.4 });
+  b.add(prism(8.2, 1.4, 1.5), C.gold, { x: ox, y: 6.6, z: fz });
+  b.add(boltGeometry(), C.gold, { x: ox, y: 6.75, z: fz - 0.8 }, { z: 0.15 }, 1.3);
+  // A path out to Zeus's gate from the city.
+  const gateZ = ZEUS_RING.z - ZEUS_RING.r - ZEUS_RING.thick;
+  b.add(G.box, C.dirt, { x: ox, y: 0.02, z: (BOUNDS.z1 - 2 + gateZ) / 2 }, {}, { x: 4.5, y: 0.03, z: gateZ - BOUNDS.z1 + 2 });
+  return torches;
+}
+
+export interface BackWall {
+  group: THREE.Group;
+  blocks: THREE.InstancedMesh;
+  /** Each block's place, in the colosseum's own frame. */
+  homes: THREE.Vector3[];
+}
+
+/** Stone blocks filling the gap in a colosseum's back wall, in its own frame so they can be knocked outward. */
+function backWall(L: ArenaLook): BackWall {
+  const homes: THREE.Vector3[] = [];
+  const size = 1.2;
+  const half = GATE_HALF + 1.4;
+  for (let y = size / 2; y < WALL_H; y += size) {
+    for (let x = -half + size / 2; x < half; x += size) homes.push(new THREE.Vector3(x, y, -(L.r + L.thick / 2)));
+  }
+  const blocks = new THREE.InstancedMesh(G.box, toon(0xffffff), homes.length);
+  const c = new THREE.Color();
+  const m = new THREE.Matrix4();
+  homes.forEach((p, i) => {
+    m.compose(p, new THREE.Quaternion(), new THREE.Vector3(size, size, L.thick + 0.4));
+    blocks.setMatrixAt(i, m);
+    blocks.setColorAt(i, c.setHex(i % 3 === 0 ? L.stone : L.light));
+  });
+  blocks.castShadow = blocks.receiveShadow = true;
+  blocks.frustumCulled = false;
+  const group = new THREE.Group();
+  group.position.set(L.x, L.y ?? 0, L.z);
+  group.rotation.y = L.yaw;
+  group.add(blocks);
+  return { group, blocks, homes };
+}
+
+/** Olympia, on the summit: a marble square, a great monument with a shut door, and the angels' houses round it. */
+function olympia(b: Batch): void {
+  const { x: ox, z: oz, h, top } = OLYMPUS;
+  b.setFrame(0, 0, 0, h);
+  b.add(G.cyl, C.plaza, { x: ox, y: 0.03, z: oz }, {}, { x: top - 0.6, y: 0.06, z: top - 0.6 });
+  for (const ring of [9, 15]) b.add(new THREE.TorusGeometry(1, 0.08, 3, 64), C.gold, { x: ox, y: 0.07, z: oz }, { x: Math.PI / 2 }, { x: ring, y: ring, z: 1 });
+
+  // The monument: three marble steps, a hall ringed by columns, a gold roof, and a great door that will not open.
+  const { x: mx, z: mz, w, d } = MONUMENT;
+  for (let k = 0; k < 3; k++) b.add(G.box, k % 2 ? C.marbleShade : C.marble, { x: mx, y: 0.3 + k * 0.6, z: mz }, {}, { x: w + 4 - k * 1.4, y: 0.6, z: d + 4 - k * 1.4 });
+  const floor = 1.8;
+  b.add(G.box, C.marble, { x: mx, y: floor + 4.5, z: mz }, {}, { x: w - 3, y: 9, z: d - 3 });
+  for (let i = 0; i <= 4; i++) {
+    const t = i / 4;
+    for (const side of [-1, 1]) {
+      column(b, mx + side * (w / 2 - 0.4), mz - d / 2 + 0.4 + t * (d - 0.8), 9, 0.42);
+      // Leave the middle of the front row open, in front of the door.
+      if (i > 0 && i < 4 && !(side < 0 && i === 2)) column(b, mx - w / 2 + 0.4 + t * (w - 0.8), mz + side * (d / 2 - 0.4), 9, 0.42);
+    }
+  }
+  b.setFrame(0, 0, 0, h + floor);
+  b.add(G.box, C.marble, { x: mx, y: 9.3, z: mz }, {}, { x: w + 0.6, y: 0.8, z: d + 0.6 });
+  b.add(prism(w + 1, 3.2, d + 0.8), C.gold, { x: mx, y: 9.7, z: mz }, { y: Math.PI / 2 });
+  b.add(boltGeometry(), C.gold, { x: mx, y: 10.2, z: mz - d / 2 - 0.5 }, { z: 0.15 }, 2.2);
+  // The door: two tall leaves in a gold frame, studded, closed. No lock — it is shut by something else.
+  const dz = mz - d / 2 + 1.45;
+  b.add(G.box, C.gold, { x: mx, y: 3.4, z: dz }, {}, { x: 4.4, y: 6.8, z: 0.2 });
+  for (const side of [-1, 1]) {
+    b.add(G.box, 0x8a5a22, { x: mx + side * 0.95, y: 3.1, z: dz - 0.08 }, {}, { x: 1.8, y: 6.0, z: 0.14 });
+    for (let k = 0; k < 4; k++) b.add(G.blob, C.gold, { x: mx + side * 0.95, y: 1.0 + k * 1.4, z: dz - 0.18 }, {}, 0.11);
+  }
+  b.add(G.halfDisc, C.gold, { x: mx, y: 6.8, z: dz - 0.05 }, { x: Math.PI / 2 }, { x: 2.2, y: 0.2, z: 2.2 });
+  b.setFrame(0, 0, 0, h);
+
+  for (const hs of olympiaHouses()) house(b, hs.x, hs.z, hs.w, hs.d, hs.yaw, hs.dome);
+  // Cypresses and olives between the houses.
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * Math.PI * 2 + 0.26;
+    if (Math.cos(a) < -0.9) continue;
+    const r = 13 + (k % 2) * 13;
+    if (r > top - 2) continue;
+    const tx = ox + Math.sin(a) * r;
+    const tz = oz + Math.cos(a) * r;
+    if (k % 3 === 0) olive(b, tx, tz, 0.8, a);
+    else cypress(b, tx, tz, 0.8);
+  }
+  b.setFrame();
+}
+
+/** A belt of cloud round Olympus's middle, white and unlit like the sky's. */
+function olympusClouds(): THREE.Group {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+  const puff = new THREE.IcosahedronGeometry(1, 1);
+  for (let k = 0; k < 14; k++) {
+    const a = (k / 14) * Math.PI * 2;
+    if (Math.abs(Math.cos(a) + 1) < 0.1) continue; // clear of the stairs
+    const d = OLYMPUS.top + 18 + hash(k, 3, 91) * 6;
+    const m = new THREE.Mesh(puff, mat);
+    m.position.set(OLYMPUS.x + Math.sin(a) * d, olympusSlope(d) + 3 + hash(k, 4, 91) * 4, OLYMPUS.z + Math.cos(a) * d);
+    m.scale.set(6 + hash(k, 5, 91) * 4, 2.5, 4 + hash(k, 6, 91) * 3);
+    m.rotation.y = a;
+    g.add(m);
+  }
+  return g;
+}
+
+// ---------------------------------------------------------------------------
 // Portals and Tartarus
 
 export interface HellStairs {
@@ -1510,7 +1713,8 @@ function ground(): THREE.Mesh {
     // Rolling hills past the edge of the world, flat where anyone walks, easing down to the shore and under the sea.
     const out = Math.min(outside(x, z), 60);
     const coast = Math.min(1, Math.max(0, (SHORE_X - 4 - x) / 24));
-    const clear = Math.min(1, Math.max(0, (fromVolcano - VOLCANO.r - 4) / 20));
+    const fromOlympus = dist(x, z, OLYMPUS.x, OLYMPUS.z);
+    const clear = Math.min(1, Math.max(0, (fromVolcano - VOLCANO.r - 4) / 20)) * Math.min(1, Math.max(0, (fromOlympus - OLYMPUS.r - 4) / 20));
     const y = out * 0.25 * smoothNoise(x / 30, z / 30) * coast * clear;
     pos.setY(i, x > SHORE_X - 2 ? -Math.min(3, (x - SHORE_X + 2) * 0.3) : y);
   }

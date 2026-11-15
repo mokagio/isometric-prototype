@@ -26,7 +26,7 @@ export interface Build {
   /** How heavily built: 1 is the hero. */
   bulk: number;
   shield: { rim: number; face: number; emblem: number; sign: "star" | "lambda" | "spear" } | null;
-  weapon: "sword" | "hammer" | "trident" | "bident";
+  weapon: "sword" | "hammer" | "trident" | "bident" | "bolt";
   blade: number;
   cape: number | null;
 }
@@ -184,6 +184,58 @@ export const HADES_BUILD: Build = {
   cape: 0x3a1a4a,
 };
 
+export const ZEUS_BUILD: Build = {
+  body: "flesh",
+  skin: 0xf0c8a0,
+  hair: 0xf4f4f0,
+  hairStyle: "long",
+  beard: 0xf4f4f0,
+  band: null,
+  tunic: 0xf6f2e6,
+  sandals: 0xb88a2e,
+  eyes: 0x8fd8ff,
+  eyeGlow: true,
+  bulk: 1.3,
+  shield: null,
+  weapon: "bolt",
+  blade: 0xfff27a,
+  cape: 0x2a4fb0,
+};
+
+/** A lightning bolt held like a blade along +y: a zigzag, thick enough to read at a distance. */
+export function boltGeometry(): THREE.BufferGeometry {
+  const s = new THREE.Shape();
+  const pts: Array<[number, number]> = [
+    [0.03, -0.12], [0.1, 0.25], [-0.02, 0.27], [0.12, 0.62], [0.0, 0.64], [0.08, 1.02],
+    [-0.1, 0.56], [0.02, 0.54], [-0.1, 0.2], [0.02, 0.18], [-0.05, -0.12],
+  ];
+  s.moveTo(pts[0]![0], pts[0]![1]);
+  for (const [x, y] of pts.slice(1)) s.lineTo(x, y);
+  s.closePath();
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.05, bevelEnabled: false });
+  g.translate(0, 0, -0.025);
+  return g;
+}
+
+/** The people of Olympia. Wings and a halo are added by the game; this is the person under them. */
+export const ANGEL_BUILD: Build = {
+  body: "flesh",
+  skin: 0xf3d2b0,
+  hair: 0xf2c94c,
+  hairStyle: "long",
+  beard: null,
+  band: null,
+  tunic: 0xfbf8f0,
+  sandals: 0xe8b83e,
+  eyes: 0x3a7cc2,
+  eyeGlow: false,
+  bulk: 0.95,
+  shield: null,
+  weapon: "hammer",
+  blade: 0xe8b83e,
+  cape: null,
+};
+
 export const FISHER_BUILD: Build = {
   body: "flesh",
   skin: 0xc98a58,
@@ -208,6 +260,7 @@ export const KIT_PAINT: Record<Exclude<Kit, "none">, { metal: number; trim: numb
   ares: { metal: 0x8e1b16, trim: 0xe8b83e, crest: 0x1a0a08 },
   poseidon: { metal: 0x2f9a92, trim: 0xe8b83e, crest: 0xf2f8f8 },
   hades: { metal: 0x2a2430, trim: 0x5fe08a, crest: 0x5fe08a },
+  zeus: { metal: 0xf2ecd8, trim: 0xe8b83e, crest: 0x4ab0ff },
 };
 
 export interface Figure {
@@ -590,6 +643,8 @@ export function buildFigure(b: Build): Figure {
     sword.add(part(BOX, mat(0xb88a2e), [0.18, 0.035, 0.05], [0, 0.09, 0]));
     sword.add(part(CYL, leather, [0.024, 0.15, 0.024], [0, 0.0, 0]));
     sword.add(part(SPHERE, mat(0xb88a2e), [0.035, 0.035, 0.035], [0, -0.09, 0]));
+  } else if (b.weapon === "bolt") {
+    sword.add(part(boltGeometry(), mat(b.blade), [1, 1, 1], [0, 0.05, 0]));
   } else if (b.weapon === "trident" || b.weapon === "bident") {
     // A long shaft held near the middle, a crossbar and barbed prongs: three for the sea, two for the dead.
     const metal = mat(b.blade);
@@ -782,7 +837,7 @@ export function wearKit(fig: Figure, armor: Record<Slot, Kit>): void {
   for (const m of fig.hairline) m.visible = armor.helmet === "none";
   // One paint for the whole figure: the god's if any piece is the god's.
   const kits = Object.values(armor);
-  const kit: Kit = kits.includes("hades") ? "hades" : kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
+  const kit: Kit = kits.includes("zeus") ? "zeus" : kits.includes("hades") ? "hades" : kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
   if (kit !== "none") {
     const paint = KIT_PAINT[kit];
     fig.metal.color.setHex(paint.metal);
