@@ -4,7 +4,7 @@ import { Batch } from "./batch";
 import { dist } from "./bearing";
 import { ARES_BUILD, buildFigure, HERO_BUILD, POSEIDON_BUILD, poseFigure, wearKit, type Build } from "./figure";
 import { godKit } from "./armor";
-import { HOME_PORTAL, TARTARUS } from "./hades";
+import { HADES_RING, HOME_PORTAL, ISLAND, LOW_Y, STAIRS, TARTARUS } from "./hades";
 import { toon } from "./toon";
 import {
   BRIDGE_HALF,
@@ -224,6 +224,8 @@ export interface Scenery {
   seaGate: THREE.Group;
   /** The water he floods his arena with, raised by the fight. */
   flood: THREE.Mesh;
+  /** Hades's portcullis: up is open. */
+  hadesGate: THREE.Group;
   /** Smoke puffs over the volcano, drifted up every frame. */
   smoke: THREE.Group;
   lava: THREE.MeshBasicMaterial;
@@ -252,6 +254,7 @@ export function buildScenery(): Scenery {
   colosseum(batch, SEA_LOOK);
   const torches = volcano(batch);
   const pits = tartarusFloor(batch);
+  colosseum(batch, HADES_LOOK);
   root.add(batch.build());
   const fire = volcanoFire();
   root.add(fire.group);
@@ -287,6 +290,9 @@ export function buildScenery(): Scenery {
   flames.push(flame(root, LIGHTHOUSE.x, LIGHTHOUSE_TOP + 0.2, LIGHTHOUSE.z, 1.1));
   for (const t of torches) flames.push(flame(root, t.x, t.y, t.z, 0.45));
   for (const t of pits) flames.push(flame(root, t.x, t.y, t.z, 0.8, 0x3fe07a, 0xc8ffd8));
+  for (const f of flameSpots(HADES_LOOK)) flames.push(flame(root, f.x, f.y, f.z, 0.7, 0x3fe07a, 0xc8ffd8));
+  const hadesGate = portcullis(HADES_LOOK);
+  root.add(hadesGate);
   root.add(below);
   const volcanoPortal = portal(VOLCANO.x, ISLAND_Y, VOLCANO.z, Math.PI / 2);
   const homePortal = portal(HOME_PORTAL.x, TARTARUS.y, HOME_PORTAL.z, Math.PI / 2);
@@ -306,7 +312,7 @@ export function buildScenery(): Scenery {
   root.add(flood);
   const clouds = cloudLayer();
   root.add(clouds);
-  return { root, gate, flames, clouds, grass: grass.material, water, sea: sea.material as THREE.ShaderMaterial, seaGate, flood, smoke: fire.smoke, lava: fire.lava, portals: [volcanoPortal, homePortal], sky: (root.getObjectByName("sky") as THREE.Mesh).material as THREE.ShaderMaterial };
+  return { root, gate, flames, clouds, grass: grass.material, water, sea: sea.material as THREE.ShaderMaterial, seaGate, hadesGate, flood, smoke: fire.smoke, lava: fire.lava, portals: [volcanoPortal, homePortal], sky: (root.getObjectByName("sky") as THREE.Mesh).material as THREE.ShaderMaterial };
 }
 
 /** A figure cast in one material, struck in a pose and set on a plinth. */
@@ -677,7 +683,11 @@ interface ArenaLook {
   rake: number;
   banner: number;
   accent: number;
-  device: "spear" | "trident";
+  device: "spear" | "trident" | "bident";
+  /** Floor height, for a colosseum that is not on the ground. */
+  y?: number;
+  /** A roof over the seats, hung with stalactites. */
+  roof?: boolean;
 }
 
 const ARES_LOOK: ArenaLook = {
@@ -713,6 +723,23 @@ const SEA_LOOK: ArenaLook = {
   device: "trident",
 };
 
+const HADES_LOOK: ArenaLook = {
+  ...HADES_RING,
+  y: TARTARUS.y,
+  stone: 0x3a3038,
+  light: 0x4a3e48,
+  dark: 0x241c24,
+  arch: 0x0a080c,
+  seats: 0x2e262e,
+  seatsShade: 0x262028,
+  floor: 0x2a2228,
+  rake: 0x2f8a4e,
+  banner: 0x3a1a4a,
+  accent: 0x5fe08a,
+  device: "bident",
+  roof: true,
+};
+
 /** A spot in a colosseum's own frame, out in the world. */
 function arenaToWorld(L: ArenaLook, lx: number, lz: number): { x: number; z: number } {
   const c = Math.cos(L.yaw);
@@ -733,10 +760,10 @@ function brazierSpots(L: ArenaLook): Array<{ x: number; z: number }> {
 }
 
 /** A trident standing on its butt at the origin of `at`, facing +z. */
-function tridentDevice(b: Batch, color: number, at: { x: number; y: number; z: number }, size: number): void {
+function tridentDevice(b: Batch, color: number, at: { x: number; y: number; z: number }, size: number, prongs = [-0.3, 0, 0.3]): void {
   b.add(G.box, color, { x: at.x, y: at.y, z: at.z }, {}, { x: 0.1 * size, y: 1.5 * size, z: 0.04 });
   b.add(G.box, color, { x: at.x, y: at.y + 0.45 * size, z: at.z }, {}, { x: 0.7 * size, y: 0.1 * size, z: 0.04 });
-  for (const x of [-0.3, 0, 0.3]) {
+  for (const x of prongs) {
     const h = x === 0 ? 0.55 : 0.4;
     b.add(G.box, color, { x: at.x + x * size, y: at.y + (0.5 + h / 2) * size, z: at.z }, {}, { x: 0.08 * size, y: h * size, z: 0.04 });
     b.add(G.pyramid, color, { x: at.x + x * size, y: at.y + (0.5 + h + 0.08) * size, z: at.z }, { y: Math.PI / 4 }, { x: 0.12 * size, y: 0.18 * size, z: 0.04 });
@@ -744,7 +771,7 @@ function tridentDevice(b: Batch, color: number, at: { x: number; y: number; z: n
 }
 
 function colosseum(b: Batch, L: ArenaLook): void {
-  b.setFrame(L.x, L.z, L.yaw);
+  b.setFrame(L.x, L.z, L.yaw, L.y ?? 0);
   const R = L.r;
   const T = L.thick;
   const segments = Math.max(28, Math.round((44 * R) / 20));
@@ -759,7 +786,7 @@ function colosseum(b: Batch, L: ArenaLook): void {
   b.add(G.cyl, L.floor, { x: 0, y: 0.03, z: 0 }, {}, { x: R + 0.5, y: 0.06, z: R + 0.5 });
   // Rake marks in the sand.
   for (let r = 4; r < R - 1; r += 3.2) {
-    b.add(new THREE.TorusGeometry(1, L.device === "trident" ? 0.05 : 0.012, 3, 64), L.rake, { x: 0, y: 0.065, z: 0 }, { x: Math.PI / 2 }, { x: r, y: r, z: 1 });
+    b.add(new THREE.TorusGeometry(1, L.device === "spear" ? 0.012 : 0.05, 3, 64), L.rake, { x: 0, y: 0.065, z: 0 }, { x: Math.PI / 2 }, { x: r, y: r, z: 1 });
   }
 
   for (let i = 0; i < segments; i++) {
@@ -824,7 +851,7 @@ function colosseum(b: Batch, L: ArenaLook): void {
       b.add(G.cyl, L.accent, { x: tx, y: 7.6, z: front + 0.9 }, { x: Math.PI / 2 }, { x: 0.5, y: 0.05, z: 0.5 });
       b.add(G.box, L.banner, { x: tx, y: 7.6, z: front + 0.94 }, { z: Math.PI / 4 }, { x: 0.1, y: 1.3, z: 0.04 });
     } else {
-      tridentDevice(b, L.accent, { x: tx, y: 7.2, z: front + 0.92 }, 1.3);
+      tridentDevice(b, L.accent, { x: tx, y: 7.2, z: front + 0.92 }, 1.3, L.device === "bident" ? [-0.2, 0.2] : undefined);
       // Waves along the foot of the banner.
       for (let w = -1; w <= 1; w++) b.add(G.halfDisc, L.accent, { x: tx + w * 0.55, y: 4.6, z: front + 0.9 }, { x: Math.PI / 2 }, { x: 0.27, y: 0.04, z: 0.27 });
     }
@@ -850,9 +877,26 @@ function colosseum(b: Batch, L: ArenaLook): void {
       b.add(G.cyl8, C.wood, { x, y: 0.9, z }, { x: 0.25, z: 0.2 }, { x: 0.035, y: 2, z: 0.035 });
       b.add(G.cone, C.iron, { x: x + 0.05, y: 1.95, z: z + 0.22 }, { x: 0.25, z: 0.2 }, { x: 0.07, y: 0.32, z: 0.07 });
       if (i % 3 === 0) b.add(G.cyl, 0xc8913a, { x: x + 1.2, y: 0.08, z: z - 0.6 }, { x: 0.12, z: 0.1 }, { x: 0.4, y: 0.06, z: 0.4 });
+    } else if (L.device === "bident") {
+      // Bones, and the rubble of stalactites that came down before.
+      b.add(G.cyl8, 0xe9e1c9, { x, y: 0.05, z }, { z: Math.PI / 2, y: a }, { x: 0.05, y: 0.7, z: 0.05 });
+      b.add(G.rock, 0x3a3038, { x: x + 1.3, y: 0.15, z: z - 0.7 }, { y: a }, 0.45);
     } else {
       b.add(G.dome, i % 2 ? 0xf6c6c0 : 0xfff4e6, { x, y: 0.05, z }, { y: a }, { x: 0.22, y: 0.12, z: 0.28 });
       b.add(G.dome, 0xf2a9a0, { x: x + 1.4, y: 0.05, z: z - 0.8 }, { y: -a }, { x: 0.16, y: 0.1, z: 0.2 });
+    }
+  }
+  if (L.roof) {
+    // A ceiling over the whole thing, its underside bristling with stalactites, and a dome on top.
+    const top = WALL_H + 0.6;
+    b.add(G.cyl, L.dark, { x: 0, y: top, z: 0 }, {}, { x: R + T + 0.4, y: 1.2, z: R + T + 0.4 });
+    b.add(G.dome, L.stone, { x: 0, y: top + 0.6, z: 0 }, {}, { x: R + T, y: 5, z: R + T });
+    b.add(G.dome, L.dark, { x: 0, y: top + 5.4, z: 0 }, {}, { x: 3, y: 1.4, z: 3 });
+    for (let k = 0; k < 44; k++) {
+      const a = hash(k, 5, 82) * Math.PI * 2;
+      const d = Math.sqrt(hash(k, 6, 82)) * (R + 1);
+      const len = 0.8 + hash(k, 7, 82) * 1.8;
+      b.add(G.cone, k % 3 ? L.stone : L.light, { x: Math.sin(a) * d, y: top - 0.6 - len / 2, z: Math.cos(a) * d }, { x: Math.PI }, { x: 0.25 + len * 0.12, y: len, z: 0.25 + len * 0.12 });
     }
   }
   if (L.device === "trident") {
@@ -868,7 +912,7 @@ function colosseum(b: Batch, L: ArenaLook): void {
 
 /** Where a colosseum's braziers burn, out in the world. */
 function flameSpots(L: ArenaLook): Array<{ x: number; y: number; z: number }> {
-  return brazierSpots(L).map((p) => ({ ...arenaToWorld(L, p.x, p.z), y: 1.95 }));
+  return brazierSpots(L).map((p) => ({ ...arenaToWorld(L, p.x, p.z), y: (L.y ?? 0) + 1.95 }));
 }
 
 export function colosseumFlameSpots(): Array<{ x: number; y: number; z: number }> {
@@ -1271,33 +1315,49 @@ function portal(x: number, y: number, z: number, yaw: number): THREE.Group {
   return g;
 }
 
-/** The floor of Tartarus: black rock hanging in the dark, ringed by broken columns and green fire. Returns where the fires burn. */
+/** Tartarus's rock: the island you land on, the staircase up, the crag under the colosseum, and Hades's throne. Returns where the green fires burn. */
 function tartarusFloor(b: Batch): Array<{ x: number; y: number; z: number }> {
   const { x, y, z, r } = TARTARUS;
-  b.add(G.cyl, 0x2a2228, { x, y: y - 0.5, z }, {}, { x: r + 0.6, y: 1, z: r + 0.6 });
-  b.add(G.cone, 0x1e181c, { x, y: y - 9, z }, { x: Math.PI }, { x: r + 0.6, y: 16, z: r + 0.6 });
-  // A ring of green tiles round a dark star in the middle.
-  b.add(new THREE.TorusGeometry(1, 0.03, 3, 64), 0x3fe07a, { x, y: y + 0.02, z }, { x: Math.PI / 2 }, { x: r - 2, y: r - 2, z: 1 });
-  for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2;
-    b.add(G.box, 0x3a2a44, { x: x + Math.sin(a) * 3, y: y + 0.02, z: z + Math.cos(a) * 3 }, { y: a }, { x: 0.6, y: 0.03, z: 5.5 });
-  }
   const fires: Array<{ x: number; y: number; z: number }> = [];
-  for (let k = 0; k < 10; k++) {
-    const a = (k / 10) * Math.PI * 2 + 0.3;
-    const cx = x + Math.sin(a) * (r - 0.6);
-    const cz = z + Math.cos(a) * (r - 0.6);
-    // Leave the arrival and the way home clear.
-    if (Math.sin(a) > 0.9) continue;
-    const h = 3 + hash(k, 0, 80) * 5;
-    b.add(G.fluted, 0x3a3038, { x: cx, y: y + h / 2, z: cz }, { z: (hash(k, 1, 80) - 0.5) * 0.1 }, { x: 0.55, y: h, z: 0.55 });
-    b.add(G.box, 0x3a3038, { x: cx, y: y + 0.15, z: cz }, {}, { x: 1.4, y: 0.3, z: 1.4 });
+  // The crag the colosseum stands on, tapering down into the dark.
+  const outer = r + HADES_RING.thick + 1;
+  b.add(G.cyl, 0x2a2228, { x, y: y - 0.6, z }, {}, { x: outer, y: 1.2, z: outer });
+  b.add(G.cone, 0x1e181c, { x, y: y - 14, z }, { x: Math.PI }, { x: outer, y: 26, z: outer });
+
+  // The island: a slab of black rock with a ragged rim and the same taper beneath.
+  b.add(G.cyl8, 0x2e2428, { x: ISLAND.x, y: LOW_Y - 0.6, z: ISLAND.z }, { y: 0.2 }, { x: ISLAND.r + 0.4, y: 1.2, z: ISLAND.r + 0.4 });
+  b.add(G.cone, 0x1e181c, { x: ISLAND.x, y: LOW_Y - 11, z: ISLAND.z }, { x: Math.PI }, { x: ISLAND.r + 0.4, y: 20, z: ISLAND.r + 0.4 });
+  for (let k = 0; k < 16; k++) {
+    const a = (k / 16) * Math.PI * 2;
+    if (Math.sin(a) < -0.85) continue; // the way to the stairs
+    b.add(G.rock, 0x3a3038, { x: ISLAND.x + Math.sin(a) * ISLAND.r, y: LOW_Y + 0.2, z: ISLAND.z + Math.cos(a) * ISLAND.r }, { y: a }, 0.8 + hash(k, 1, 83) * 0.6);
+  }
+  // Broken columns and green fires on the island.
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * Math.PI * 2 + 0.6;
+    const cx = ISLAND.x + Math.sin(a) * (ISLAND.r - 3);
+    const cz = ISLAND.z + Math.cos(a) * (ISLAND.r - 3);
+    const h = 2 + hash(k, 2, 83) * 4;
+    b.add(G.fluted, 0x3a3038, { x: cx, y: LOW_Y + h / 2, z: cz }, { z: (hash(k, 3, 83) - 0.5) * 0.15 }, { x: 0.5, y: h, z: 0.5 });
     if (k % 2 === 0) {
-      b.add(G.dome, C.iron, { x: cx, y: y + h + 0.2, z: cz }, { x: Math.PI }, { x: 0.5, y: 0.3, z: 0.5 });
-      fires.push({ x: cx, y: y + h + 0.2, z: cz });
+      b.add(G.dome, C.iron, { x: cx, y: LOW_Y + h + 0.2, z: cz }, { x: Math.PI }, { x: 0.5, y: 0.3, z: 0.5 });
+      fires.push({ x: cx, y: LOW_Y + h + 0.2, z: cz });
     }
   }
-  // His throne, at the far side from where you arrive.
+
+  // The staircase: a block per step, with nothing either side.
+  const run = 1.2;
+  let i = 0;
+  for (let sx = STAIRS.x0; sx < STAIRS.x1; sx += run, i++) {
+    const top = y + (LOW_Y - y) * ((sx - STAIRS.x0) / (STAIRS.x1 - STAIRS.x0));
+    b.add(G.box, i % 2 ? 0x4a3e48 : 0x3e343c, { x: sx + run / 2, y: top - 1, z }, {}, { x: run, y: 2, z: STAIRS.half * 2 });
+    b.add(G.box, 0x5fe08a, { x: sx + run - 0.05, y: top - 0.03, z }, {}, { x: 0.06, y: 0.06, z: STAIRS.half * 2 + 0.02 });
+    if (i % 6 === 3) {
+      for (const side of [-1, 1]) b.add(G.cone, 0x2a2228, { x: sx + run / 2, y: top - 4, z: z + side * (STAIRS.half - 0.4) }, { x: Math.PI }, { x: 0.5, y: 4, z: 0.5 });
+    }
+  }
+
+  // His throne, at the far side of the sand from the gate.
   const tx = x - r + 3;
   b.add(G.box, 0x1a1420, { x: tx, y: y + 0.6, z }, {}, { x: 2.4, y: 1.2, z: 3 });
   b.add(G.box, 0x1a1420, { x: tx - 1.0, y: y + 2.8, z }, {}, { x: 0.5, y: 4.4, z: 3 });
@@ -1313,12 +1373,12 @@ function tartarus(): THREE.Group {
   const g = new THREE.Group();
   const sea = new THREE.Mesh(new THREE.CircleGeometry(160, 48), new THREE.MeshBasicMaterial({ color: 0x8a1e08, fog: false }));
   sea.rotation.x = -Math.PI / 2;
-  sea.position.set(TARTARUS.x, TARTARUS.y - 40, TARTARUS.z);
+  sea.position.set((TARTARUS.x + ISLAND.x) / 2, LOW_Y - 30, TARTARUS.z);
   g.add(sea);
   const rock = toon(0x241c20);
   for (let k = 0; k < 14; k++) {
     const a = (k / 14) * Math.PI * 2;
-    const d = TARTARUS.r + 12 + hash(k, 2, 81) * 30;
+    const d = TARTARUS.r + 30 + hash(k, 2, 81) * 40;
     const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), rock);
     m.position.set(TARTARUS.x + Math.sin(a) * d, TARTARUS.y - 8 + hash(k, 3, 81) * 20, TARTARUS.z + Math.cos(a) * d);
     m.scale.set(2 + hash(k, 4, 81) * 4, 2 + hash(k, 5, 81) * 3, 2 + hash(k, 6, 81) * 4);
@@ -1524,7 +1584,7 @@ function portcullis(L: ArenaLook): THREE.Group {
   }
   // Stood in the gate's frame inside a group of its own, so `position.y` still raises and lowers it.
   const frame = new THREE.Group();
-  frame.position.set(L.x, 0, L.z);
+  frame.position.set(L.x, L.y ?? 0, L.z);
   frame.rotation.y = L.yaw;
   frame.add(g);
   const lift = new THREE.Group();

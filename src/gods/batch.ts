@@ -21,9 +21,9 @@ export class Batch {
   private frame: THREE.Matrix4 | null = null;
   private readonly w = new THREE.Vector3();
 
-  /** Draw what follows as if `(x, z)` were the origin and +z pointed along `yaw`; no arguments goes back to world space. */
-  setFrame(x?: number, z?: number, yaw = 0): void {
-    this.frame = x === undefined || z === undefined ? null : new THREE.Matrix4().makeRotationY(yaw).setPosition(x, 0, z);
+  /** Draw what follows as if `(x, y, z)` were the origin and +z pointed along `yaw`; no arguments goes back to world space. */
+  setFrame(x?: number, z?: number, yaw = 0, y = 0): void {
+    this.frame = x === undefined || z === undefined ? null : new THREE.Matrix4().makeRotationY(yaw).setPosition(x, y, z);
   }
 
   add(

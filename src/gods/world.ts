@@ -1,5 +1,5 @@
 import { dist } from "./bearing";
-import { inTartarus, TARTARUS } from "./hades";
+import { HADES_RING, inTartarus } from "./hades";
 import { inVolcano, VOLCANO } from "./volcano";
 
 /**
@@ -297,15 +297,19 @@ function wall(ring: Ring, x: number, z: number, r: number, closed: boolean): { x
 }
 
 /** Slide a body of radius `r` back out of whatever it walked into. */
-export function pushOut(world: World, x: number, z: number, r: number, gateClosed: boolean, seaGateClosed = false): { x: number; z: number } {
+export function pushOut(
+  world: World,
+  x: number,
+  z: number,
+  r: number,
+  gateClosed: boolean,
+  seaGateClosed = false,
+  hadesGateClosed = false,
+): { x: number; z: number } {
   // Up on the volcano nothing holds you in: stepping off the path is a fall.
   if (inVolcano(x, z)) return { x, z };
-  // Tartarus is one round floor with nothing round it.
-  if (inTartarus(x, z)) {
-    const d = dist(x, z, TARTARUS.x, TARTARUS.z);
-    const limit = TARTARUS.r - r;
-    return d > limit ? { x: TARTARUS.x + ((x - TARTARUS.x) / d) * limit, z: TARTARUS.z + ((z - TARTARUS.z) / d) * limit } : { x, z };
-  }
+  // In Tartarus only Hades's wall holds you; the rest is open to the drop.
+  if (inTartarus(x, z)) return wall(HADES_RING, x, z, r, hadesGateClosed);
   ({ x, z } = clampToRegions(x, z, r));
 
   for (const c of world.circles) {

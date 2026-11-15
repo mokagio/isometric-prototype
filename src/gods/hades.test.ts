@@ -6,6 +6,14 @@ import {
   EXPOSED_TIME,
   HADES_HP,
   INTRO_TIME,
+  CRUSH_DAMAGE,
+  ISLAND,
+  LOW_Y,
+  QUAKE_COUNT,
+  QUAKE_WARN,
+  STAIRS,
+  TARTARUS,
+  tartarusFooting,
   makeHades,
   RAISE_AT,
   RAISE_COUNT,
@@ -78,5 +86,46 @@ describe("Hades", () => {
     h.hp = Math.floor(HADES_HP * RAISE_AT[0]!);
     const raises = run(h, 4, { x: 0, z: 30, yaw: Math.PI, alive: true }).filter((e) => e.kind === "raise");
     expect(raises).toEqual([{ kind: "raise", count: RAISE_COUNT }]);
+  });
+
+  it("takes turns: vanishing first, then bringing the roof down", () => {
+    const h = stalking();
+    h.tricks = 1;
+    const events = run(h, STALK_MIN + 0.1, { x: 0, z: VANISH_FROM + 6, yaw: Math.PI, alive: true });
+    const quake = events.find((e) => e.kind === "quake") as { spots: Array<{ x: number; z: number }> };
+    expect(quake.spots).toHaveLength(QUAKE_COUNT);
+    expect(quake.spots[0]).toEqual({ x: 0, z: VANISH_FROM + 6 });
+  });
+
+  it("crushes a hero who stays under a stalactite, and not one who moves", () => {
+    const stay = stalking();
+    stay.tricks = 1;
+    const hero = { x: 0, z: 10, yaw: Math.PI, alive: true };
+    const events = run(stay, STALK_MIN + QUAKE_WARN + 0.2, hero);
+    expect(events).toContainEqual({ kind: "crush", damage: CRUSH_DAMAGE });
+
+    const move = stalking();
+    move.tricks = 1;
+    run(move, STALK_MIN + 0.1, hero);
+    const later = run(move, QUAKE_WARN, { ...hero, x: -6, z: -10 }).filter((e) => e.kind === "crush");
+    // Moved off the marked spot; only an unlucky random one could still land there.
+    expect(later.length).toBeLessThanOrEqual(1);
+    expect(move.spots).toEqual([]);
+  });
+
+  it("climbs from the island up the stairs to the colosseum without a gap", () => {
+    expect(tartarusFooting(ISLAND.x, ISLAND.z)).toBe(LOW_Y);
+    let last = LOW_Y;
+    for (let x = ISLAND.x; x > TARTARUS.x; x -= 0.25) {
+      const y = tartarusFooting(x, TARTARUS.z);
+      expect(y).not.toBeNull();
+      expect(Math.abs(y! - last)).toBeLessThan(0.4);
+      last = y!;
+    }
+    expect(last).toBe(TARTARUS.y);
+  });
+
+  it("has nothing beside the stairs but the drop", () => {
+    expect(tartarusFooting((STAIRS.x0 + STAIRS.x1) / 2, TARTARUS.z + STAIRS.half + 0.5)).toBeNull();
   });
 });

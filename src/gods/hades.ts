@@ -1,13 +1,42 @@
 import { dist, inArc, turnToward, yawTo } from "./bearing";
 
-/** Tartarus: a round floor of black rock hanging over a sea of fire, far below the world. */
+/**
+ * Tartarus, far below the world: a rock island hanging over a sea of fire,
+ * and a staircase up from it to Hades's roofed colosseum. Its centre and floor
+ * height are `TARTARUS`; its gate faces east, down the stairs.
+ */
 export const TARTARUS = { x: 0, z: 360, y: -60, r: 18 };
+export const HADES_RING = { x: TARTARUS.x, z: TARTARUS.z, r: TARTARUS.r, thick: 3.5, yaw: Math.PI / 2 };
+export const GATE_HALF = 3.2;
+/** The island you land on, well below the colosseum. */
+export const LOW_Y = TARTARUS.y - 30;
+export const FIRE_Y = LOW_Y - 30;
+export const STAIRS = { x0: TARTARUS.x + TARTARUS.r + 3.5, x1: TARTARUS.x + TARTARUS.r + 3.5 + 36, half: 2 };
+export const ISLAND = { x: STAIRS.x1 + 13, z: TARTARUS.z, r: 15 };
 /** Where the portal from the volcano sets you down, and where the way home stands once he is beaten. */
-export const ARRIVAL = { x: TARTARUS.x + TARTARUS.r - 4, z: TARTARUS.z, yaw: -Math.PI / 2 };
-export const HOME_PORTAL = { x: TARTARUS.x + TARTARUS.r - 1.5, z: TARTARUS.z };
+export const ARRIVAL = { x: ISLAND.x + 9, z: ISLAND.z, yaw: -Math.PI / 2 };
+export const HOME_PORTAL = { x: TARTARUS.x - 10, z: TARTARUS.z };
+/** Step this far inside and the gate drops behind you. */
+export const HADES_TRIGGER = TARTARUS.r - 4;
 
-export function inTartarus(x: number, z: number, within = TARTARUS.r + 20): boolean {
+export function inTartarus(x: number, z: number): boolean {
+  return z > TARTARUS.z - 80 && z < TARTARUS.z + 80 && x > TARTARUS.x - 60 && x < ISLAND.x + 60;
+}
+
+export function inHadesArena(x: number, z: number, within = TARTARUS.r): boolean {
   return dist(x, z, TARTARUS.x, TARTARUS.z) < within;
+}
+
+/** How high the ground is in Tartarus, or null over the drop into the fire. */
+export function tartarusFooting(x: number, z: number): number | null {
+  const fromArena = dist(x, z, TARTARUS.x, TARTARUS.z);
+  if (fromArena < TARTARUS.r + HADES_RING.thick && (fromArena < TARTARUS.r || Math.abs(z - TARTARUS.z) < GATE_HALF + 2)) return TARTARUS.y;
+  // The top step tucks a little into the gateway, so the corner where curve meets straight is never a gap.
+  if (x >= STAIRS.x0 - 0.6 && x <= STAIRS.x1 && Math.abs(z - TARTARUS.z) < STAIRS.half) {
+    return TARTARUS.y + (LOW_Y - TARTARUS.y) * Math.max(0, (x - STAIRS.x0) / (STAIRS.x1 - STAIRS.x0));
+  }
+  if (dist(x, z, ISLAND.x, ISLAND.z) < ISLAND.r) return LOW_Y;
+  return null;
 }
 
 export const HADES_HP = 20;
@@ -35,11 +64,17 @@ export const AMBUSH_TIME = 0.9;
 export const AMBUSH_DAMAGE = 26;
 /** After the blow from behind he stands open this long — the opening. */
 export const EXPOSED_TIME = 2.4;
+/** The other trick: he strikes the floor and stalactites come down from the roof. */
+export const QUAKE_WARN = 1.2;
+export const QUAKE_TIME = 2.0;
+export const QUAKE_COUNT = 7;
+export const CRUSH_R = 1.5;
+export const CRUSH_DAMAGE = 22;
 export const GUARD_ARC = Math.PI * 0.6;
 export const BODY = 1.1;
 const TURN = 3;
 
-export type HadesState = "intro" | "stalk" | "windup" | "strike" | "recover" | "vanish" | "ambush" | "exposed" | "raise" | "dead";
+export type HadesState = "intro" | "stalk" | "windup" | "strike" | "recover" | "vanish" | "ambush" | "exposed" | "quake" | "raise" | "dead";
 
 export interface Hades {
   x: number;
@@ -49,6 +84,10 @@ export interface Hades {
   state: HadesState;
   t: number;
   raises: number;
+  /** How many tricks he has played, so he takes turns between vanishing and the stalactites. */
+  tricks: number;
+  /** Where the stalactites are coming down. */
+  spots: Array<{ x: number; z: number }>;
   moving: boolean;
 }
 
@@ -57,10 +96,13 @@ export type HadesEvent =
   | { kind: "vanish" }
   | { kind: "appear"; x: number; z: number }
   | { kind: "raise"; count: number }
+  | { kind: "quake"; spots: Array<{ x: number; z: number }> }
+  | { kind: "crash"; spots: Array<{ x: number; z: number }> }
+  | { kind: "crush"; damage: number }
   | { kind: "roar" };
 
 export function makeHades(x: number, z: number, yaw: number): Hades {
-  return { x, z, yaw, hp: HADES_HP, state: "intro", t: 0, raises: 0, moving: false };
+  return { x, z, yaw, hp: HADES_HP, state: "intro", t: 0, raises: 0, tricks: 0, spots: [], moving: false };
 }
 
 function enter(h: Hades, state: HadesState): void {
@@ -75,7 +117,7 @@ export function raiseDue(h: Hades): boolean {
 
 /** Holding his bident he turns aside what comes from in front. */
 export function guarding(h: Hades): boolean {
-  return h.state === "intro" || h.state === "stalk" || h.state === "windup" || h.state === "raise";
+  return h.state === "intro" || h.state === "stalk" || h.state === "windup" || h.state === "raise" || h.state === "quake";
 }
 
 /** Gone: wearing the helmet, nothing can find him. */
@@ -88,6 +130,7 @@ export function updateHades(
   dt: number,
   hero: { x: number; z: number; yaw: number; alive: boolean },
   arena: { x: number; z: number; r: number },
+  rand: () => number = Math.random,
 ): HadesEvent[] {
   const events: HadesEvent[] = [];
   h.t += dt;
@@ -124,8 +167,21 @@ export function updateHades(
       }
       if (h.t >= STALK_MIN && toHero <= STRIKE_RANGE) enter(h, "windup");
       else if ((h.t >= STALK_MIN && toHero > VANISH_FROM) || h.t >= STALK_MAX) {
-        enter(h, "vanish");
-        events.push({ kind: "vanish" });
+        h.tricks += 1;
+        if (h.tricks % 2 === 1) {
+          enter(h, "vanish");
+          events.push({ kind: "vanish" });
+        } else {
+          // One right where the hero stands, the rest anywhere on the sand.
+          h.spots = [{ x: hero.x, z: hero.z }];
+          for (let i = 1; i < QUAKE_COUNT; i++) {
+            const a = rand() * Math.PI * 2;
+            const d = Math.sqrt(rand()) * (arena.r - 2);
+            h.spots.push({ x: arena.x + Math.sin(a) * d, z: arena.z + Math.cos(a) * d });
+          }
+          enter(h, "quake");
+          events.push({ kind: "quake", spots: h.spots });
+        }
       }
       break;
     case "windup":
@@ -168,6 +224,14 @@ export function updateHades(
       break;
     case "exposed":
       if (h.t >= EXPOSED_TIME) enter(h, "stalk");
+      break;
+    case "quake":
+      if (h.spots.length > 0 && h.t >= QUAKE_WARN) {
+        events.push({ kind: "crash", spots: h.spots });
+        if (hero.alive && h.spots.some((p) => dist(p.x, p.z, hero.x, hero.z) < CRUSH_R)) events.push({ kind: "crush", damage: CRUSH_DAMAGE });
+        h.spots = [];
+      }
+      if (h.t >= QUAKE_TIME) enter(h, "stalk");
       break;
     case "raise":
       face(TURN);

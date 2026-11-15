@@ -71,8 +71,13 @@ import {
   BODY as HADES_BODY,
   HADES_HP,
   hidden as hadesHidden,
+  HADES_TRIGGER,
   HOME_PORTAL,
+  inHadesArena,
   inTartarus,
+  FIRE_Y,
+  QUAKE_WARN,
+  tartarusFooting,
   makeHades,
   strikeHades,
   TARTARUS,
@@ -331,7 +336,7 @@ stockStairs();
 /** How high a foe stands: up the volcano's stairs, down in Tartarus, or on the ground. */
 function foeY(f: Foe): number {
   if (f.camp === STAIR_CAMP) return slopeY(f.g.x - VOLCANO.x);
-  return inTartarus(f.g.x, f.g.z) ? TARTARUS.y : 0;
+  return inTartarus(f.g.x, f.g.z) ? (tartarusFooting(f.g.x, f.g.z) ?? TARTARUS.y) : 0;
 }
 
 /** Keep a stair skeleton on its stairs, whatever it is chasing. */
@@ -524,6 +529,29 @@ let heroY = 0;
 let falling: { vy: number; y: number; lava: boolean; landed: boolean } | null = null;
 let hadesFight: Fight = save.beaten.includes("hades") ? "won" : "waiting";
 let hades: { h: Hades; fig: Figure; shadow: THREE.Mesh; flash: number } | null = null;
+let hadesGateClosed = false;
+
+/** Stalactites on their way down: a warning ring on the floor, then the rock itself. */
+const ROOF_Y = TARTARUS.y + 10.5;
+const dropGeo = new THREE.ConeGeometry(0.55, 2.4, 7).rotateX(Math.PI);
+const dropMat = toon(0x4a3e48);
+const ringGeo = new THREE.RingGeometry(1.0, 1.5, 28).rotateX(-Math.PI / 2);
+let drops: Array<{ ring: THREE.Mesh; rock: THREE.Mesh; t: number }> = [];
+function warnDrops(spots: Array<{ x: number; z: number }>): void {
+  for (const p of spots) {
+    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xff3a2a, transparent: true, opacity: 0.8 }));
+    ring.position.set(p.x, TARTARUS.y + 0.04, p.z);
+    const rock = new THREE.Mesh(dropGeo, dropMat);
+    rock.position.set(p.x, ROOF_Y, p.z);
+    rock.castShadow = true;
+    scene.add(ring, rock);
+    drops.push({ ring, rock, t: 0 });
+  }
+}
+function clearDrops(): void {
+  for (const d of drops) scene.remove(d.ring, d.rock);
+  drops = [];
+}
 
 /** Down below the light changes: a red-black sky and close, dark air. */
 function underworld(on: boolean): void {
@@ -543,13 +571,12 @@ function intoTartarus(): void {
   hero.yaw = ARRIVAL.yaw;
   hero.vx = hero.vz = 0;
   camYaw = ARRIVAL.yaw;
-  heroY = TARTARUS.y;
+  heroY = tartarusFooting(hero.x, hero.z) ?? TARTARUS.y;
   camPos.set(0, 0, 0);
   camLook.set(0, 0, 0);
   underworld(true);
   burst(hero.x, heroY + 1.5, hero.z, 0xb88aff, 30, 6, 1.2);
-  if (hadesFight === "waiting") startHadesFight();
-  else hud.banner("Tartarus", "Hades is beaten. The portal leads home", 2.6);
+  hud.banner("Tartarus", hadesFight === "won" ? "Hades is beaten. His portal leads home" : "Climb the stairs to Hades's colosseum", 2.8);
 }
 
 function outOfTartarus(): void {
@@ -566,6 +593,7 @@ function outOfTartarus(): void {
 
 function startHadesFight(): void {
   hadesFight = "on";
+  hadesGateClosed = true;
   const fig = buildFigure(HADES_BUILD);
   fig.root.scale.setScalar(1.8);
   scene.add(fig.root);
@@ -585,6 +613,8 @@ function clearHades(): void {
 function hadesFalls(): void {
   if (!hades) return;
   hadesFight = "won";
+  hadesGateClosed = false;
+  clearDrops();
   hud.banner("Hades is beaten!", "Claim his armor", 3.5);
   hud.setBoss(null, 0);
   shake = 0.7;
@@ -746,6 +776,8 @@ function respawn(): void {
   heroY = 0;
   falling = null;
   clearHades();
+  clearDrops();
+  hadesGateClosed = false;
   if (hadesFight === "on") hadesFight = "waiting";
   underworld(false);
   if (fight === "on") fight = "waiting";
@@ -833,7 +865,7 @@ function update(dt: number): void {
   stop = Math.max(0, stop - dt);
 
   if (stepHero(hero, sim, { move, block: blocking })) swingLands();
-  const p = pushOut(world, hero.x, hero.z, RADIUS, gateClosed, seaGateClosed);
+  const p = pushOut(world, hero.x, hero.z, RADIUS, gateClosed, seaGateClosed, hadesGateClosed);
   hero.x = p.x;
   hero.z = p.z;
 
@@ -855,7 +887,7 @@ function update(dt: number): void {
     if (heroY <= falling.y && !falling.landed && (falling.lava || falling.y < 0.1)) {
       falling.landed = true;
       shake = 0.5;
-      if (falling.lava) burst(hero.x, LAVA_Y + 0.3, hero.z, 0xff6a1e, 30, 8, 1.4);
+      if (falling.lava) burst(hero.x, falling.y + 0.3, hero.z, 0xff6a1e, 30, 8, 1.4);
       else burst(hero.x, heroY + 0.3, hero.z, 0x8a7a70, 16, 5);
     }
   } else if (inVolcano(hero.x, hero.z) && standing(hero)) {
@@ -880,8 +912,20 @@ function update(dt: number): void {
       hud.banner(end.lava ? "Into the lava!" : "You fell!", "Back to the city", 2.6);
     }
   } else if (inTartarus(hero.x, hero.z)) {
-    heroY = TARTARUS.y;
-    if (hadesFight === "won" && dist(hero.x, hero.z, HOME_PORTAL.x, HOME_PORTAL.z) < 1.4 && standing(hero)) outOfTartarus();
+    if (standing(hero)) {
+      const y = tartarusFooting(hero.x, hero.z);
+      if (y !== null) heroY = y;
+      else {
+        falling = { vy: 2, y: FIRE_Y, lava: true, landed: false };
+        hero.hp = 0;
+        hero.fallen = 0;
+        hero.swing = -1;
+        fallTimer = 0;
+        hud.banner("Into the fire!", "Back to the city", 2.6);
+      }
+      if (hadesFight === "waiting" && inHadesArena(hero.x, hero.z, HADES_TRIGGER)) startHadesFight();
+      if (hadesFight === "won" && dist(hero.x, hero.z, HOME_PORTAL.x, HOME_PORTAL.z) < 1.4) outOfTartarus();
+    }
   } else if (!inVolcano(hero.x, hero.z)) {
     heroY = onIsland(hero.x, hero.z) ? ISLAND_H : 0;
   }
@@ -924,7 +968,7 @@ function update(dt: number): void {
     }
     if (f.camp === STAIR_CAMP) onStairs(f.g);
     else if (f.g.state !== "dead") {
-      const q = pushOut(world, f.g.x, f.g.z, 0.45, gateClosed || f.camp === -1);
+      const q = pushOut(world, f.g.x, f.g.z, 0.45, gateClosed || f.camp === -1, seaGateClosed || f.camp === -1, hadesGateClosed || f.camp === -1);
       f.g.x = q.x;
       f.g.z = q.z;
       // Never stand inside the hero.
@@ -1048,6 +1092,22 @@ function update(dt: number): void {
         burst(h.x, TARTARUS.y + 1.5, h.z, 0x3a2a44, 24, 5, 1.4);
         hud.banner("He vanished!", "Watch your back", 1.4);
       } else if (e.kind === "appear") burst(e.x, TARTARUS.y + 1.5, e.z, 0x5fe08a, 20, 5, 1.2);
+      else if (e.kind === "quake") {
+        shake = 0.5;
+        warnDrops(e.spots);
+        hud.banner("The roof is falling!", "Get out of the red circles!", 1.6);
+      } else if (e.kind === "crash") {
+        shake = 0.7;
+        for (const p of e.spots) burst(p.x, TARTARUS.y + 0.4, p.z, 0x5a4e58, 14, 6, 1.2);
+      } else if (e.kind === "crush" && standing(hero)) {
+        hurtHero(hero, damageTaken(e.damage, save.armor), hero.x + 0.01, hero.z, true);
+        heroFlash = 1;
+        stop = 0.08;
+        if (!standing(hero)) {
+          fallTimer = 0;
+          hud.banner("Crushed!", "Back to the city to heal up", 2.6);
+        }
+      }
       else if (e.kind === "raise") {
         for (let i = 0; i < e.count; i++) {
           const a = yawTo(TARTARUS.x, TARTARUS.z, hero.x, hero.z) + Math.PI + (i - 1) * 0.9;
@@ -1061,7 +1121,7 @@ function update(dt: number): void {
       }
     }
     if (h.state !== "dead" && !hadesHidden(h)) {
-      const q = pushOut(world, h.x, h.z, HADES_BODY, true);
+      const q = pushOut(world, h.x, h.z, HADES_BODY, true, true, true);
       h.x = q.x;
       h.z = q.z;
       const d = dist(h.x, h.z, hero.x, hero.z);
@@ -1265,6 +1325,16 @@ function draw(dt: number): void {
     hades.shadow.position.set(h.x, TARTARUS.y + 0.07, h.z);
   }
   for (const p of scenery.portals) p.children[1]!.rotation.z = -clock * 2;
+  // Stalactites: hang and shiver while the rings glow, drop in the last moment, and are gone on impact.
+  for (const d of drops) {
+    d.t += stop > 0 ? 0 : dt;
+    const fall = QUAKE_WARN - 0.3;
+    (d.ring.material as THREE.MeshBasicMaterial).opacity = 0.45 + 0.4 * Math.sin(clock * 20);
+    if (d.t < fall) d.rock.position.x += Math.sin(clock * 60) * 0.01;
+    else d.rock.position.y = Math.max(TARTARUS.y + 1.2, ROOF_Y - ((d.t - fall) / 0.3) * (ROOF_Y - TARTARUS.y));
+  }
+  if (drops.length > 0 && drops[0]!.t >= QUAKE_WARN + 0.05) clearDrops();
+  scenery.hadesGate.position.y += ((hadesGateClosed ? 0 : 6) - scenery.hadesGate.position.y) * Math.min(1, dt * (hadesGateClosed ? 10 : 2));
   scenery.portals[1]!.visible = hadesFight === "won";
 
   if (reward) {
@@ -1307,7 +1377,14 @@ function draw(dt: number): void {
   let cx = tx - Math.sin(camYaw) * back;
   let cz = tz - Math.cos(camYaw) * back;
   // Inside the colosseum the camera stays inside the wall.
-  if (inSeaArena(hero.x, hero.z)) {
+  if (inTartarus(hero.x, hero.z) && inHadesArena(hero.x, hero.z)) {
+    const d = dist(cx, cz, TARTARUS.x, TARTARUS.z);
+    const limit = TARTARUS.r - 0.8;
+    if (d > limit) {
+      cx = TARTARUS.x + ((cx - TARTARUS.x) / d) * limit;
+      cz = TARTARUS.z + ((cz - TARTARUS.z) / d) * limit;
+    }
+  } else if (inSeaArena(hero.x, hero.z)) {
     const d = dist(cx, cz, SEA_ARENA.x, SEA_ARENA.z);
     const limit = SEA_ARENA.r - 0.8;
     if (d > limit) {
