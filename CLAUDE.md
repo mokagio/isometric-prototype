@@ -202,8 +202,6 @@ Headings follow three.js: yaw 0 faces +z, forward is `(sin yaw, cos yaw)`, and `
 
 Ares is beaten by not standing in front of him: his shield rings off frontal blows while he is on guard, and the opening is the charge — sidestep it and he runs into the wall and is dazed.
 He calls in Spartans at each line in `SUMMON_AT`.
-Once his armour is claimed, his sons Phobos and Deimos march on the city from opposite ends of the meadow, each with five hoplites; their `homeX/homeZ` is the city, which is what makes an idle grunt march there, and their low `aggro` is what keeps them marching rather than chasing the hero across the map.
-While any of them is in the city the houses burn and the city stops healing; beating them all is saved as `invasion` in `beaten`, and they come back every `WAVE_GAP` (15 minutes) at the same strength.
 A bandit knocked flat gets back up unless struck again while down; the camps restock whenever the hero is in the city, which also heals.
 
 The road forks just past the city: north to Ares, east to a fishing village on the coast with Poseidon's colosseum at its heart.

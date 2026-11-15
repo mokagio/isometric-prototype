@@ -1,7 +1,7 @@
 import { dist, inArc, turnToward, yawTo } from "./bearing";
 
 /** The rank and file: bandits on the road, skeletons on the volcano's stairs, and the soldiers Ares calls in. */
-export type GruntKind = "bandit" | "skeleton" | "lava" | "drowned" | "spartan" | "hoplite" | "phobos" | "deimos";
+export type GruntKind = "bandit" | "skeleton" | "lava" | "drowned" | "spartan";
 
 /** The ones that, felled, lie still a while and get back up unless struck again. */
 export const RISES: ReadonlySet<GruntKind> = new Set(["bandit", "skeleton", "lava", "drowned"]);
@@ -23,10 +23,6 @@ export const GRUNTS: Record<GruntKind, GruntStats> = {
   skeleton: { hp: 3, speed: 2.2, reach: 1.7, damage: 12, windup: 0.6, recover: 0.7, aggro: 9 },
   lava: { hp: 3, speed: 2.5, reach: 1.7, damage: 14, windup: 0.55, recover: 0.7, aggro: 16 },
   drowned: { hp: 3, speed: 2.3, reach: 1.7, damage: 12, windup: 0.6, recover: 0.7, aggro: 40 },
-  // Ares's sons and the soldiers they march on the city with: they only turn on the hero close by, so they keep marching.
-  hoplite: { hp: 2, speed: 3.2, reach: 1.8, damage: 10, windup: 0.5, recover: 0.6, aggro: 12 },
-  phobos: { hp: 16, speed: 3.4, reach: 2.5, damage: 26, windup: 0.5, recover: 0.45, aggro: 14 },
-  deimos: { hp: 16, speed: 3.4, reach: 2.5, damage: 26, windup: 0.5, recover: 0.45, aggro: 14 },
   bandit: { hp: 3, speed: 2.4, reach: 1.7, damage: 12, windup: 0.6, recover: 0.7, aggro: 13 },
   spartan: { hp: 2, speed: 3.6, reach: 1.8, damage: 10, windup: 0.45, recover: 0.55, aggro: 60 },
 };
@@ -188,4 +184,4 @@ export function strikeGrunt(g: Grunt, power: number, fromX: number, fromZ: numbe
 }
 
 /** How many coins a grunt leaves behind when it is finished for good. */
-export const BOUNTY: Record<GruntKind, number> = { bandit: 3, skeleton: 4, lava: 5, drowned: 4, hoplite: 2, phobos: 15, deimos: 15, spartan: 2 };
+export const BOUNTY: Record<GruntKind, number> = { bandit: 3, skeleton: 4, lava: 5, drowned: 4, spartan: 2 };

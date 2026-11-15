@@ -125,35 +125,6 @@ export const SPARTAN_BUILD: Build = {
 /** Every god's eyes glow the same gold. */
 export const GOD_EYES = 0xffc81e;
 
-/** Ares's sons: Phobos, fear, in black and blood red; Deimos, dread, in black and ember orange. */
-export const PHOBOS_BUILD: Build = {
-  body: "flesh",
-  skin: 0xc08050,
-  hair: 0x1a0d08,
-  hairStyle: "long",
-  beard: 0x1a0d08,
-  band: null,
-  tunic: 0x2a0808,
-  sandals: 0x1a0d08,
-  eyes: 0xff3a1a,
-  eyeGlow: true,
-  bulk: 1.15,
-  shield: { rim: 0x2a2228, face: 0x8e1b16, emblem: 0x1a0a08, sign: "spear" },
-  weapon: "sword",
-  blade: 0xc9ced6,
-  cape: 0x8e1b16,
-};
-
-export const DEIMOS_BUILD: Build = {
-  ...PHOBOS_BUILD,
-  skin: 0xb07448,
-  beard: null,
-  tunic: 0x2a1408,
-  eyes: 0xffa21e,
-  shield: { rim: 0x2a2228, face: 0xd2691e, emblem: 0x1a0a08, sign: "lambda" },
-  cape: 0xd2691e,
-};
-
 export const ARES_BUILD: Build = {
   body: "flesh",
   skin: 0xb8784a,
