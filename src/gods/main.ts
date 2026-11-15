@@ -74,6 +74,7 @@ import {
   hidden as hadesHidden,
   BREAK_BEHIND,
   COLLAPSE_AT,
+  CRUMBLE_SPEED,
   HADES_TRIGGER,
   LOW_Y,
   STAIRS,
@@ -564,6 +565,9 @@ let stairsBroken = Infinity;
 let stepFalls: number[] = [];
 const LAVA_CAMP = 300;
 let collapse: { t: number; at: number; broke: boolean; spawned: boolean } | null = null;
+/** When the bottom step went, so the break can run up from there. */
+let crumbleStart = -1;
+let crumbleTo = Infinity;
 let collapsedThisVisit = false;
 
 /** A giant of black rock split by fire, built facing -z, toward the stairs. Its right arm is `userData.arm`. */
@@ -625,19 +629,29 @@ function startCollapse(): void {
   collapsedThisVisit = true;
   collapse = { t: 0, at: hero.x + BREAK_BEHIND, broke: false, spawned: false };
   monster.visible = true;
-  monster.position.set(collapse.at + 3, FIRE_Y - 16, MONSTER_Z);
+  monster.position.set(STAIRS.x1 - 3, FIRE_Y - 16, MONSTER_Z);
   shake = 0.4;
   hud.banner("Something is coming out of the fire!", "Keep climbing!", 2);
 }
 
+/** Start the break at the foot of the stairs; it runs up to `at`, and each step falls as it reaches it. */
 function breakStairs(at: number): void {
-  stairsBroken = at;
-  const stairs = scenery.hellStairs;
-  stepFalls = stairs.xs.map((x) => (x > at ? clock + (x - at) * 0.035 : -1));
+  crumbleStart = clock;
+  crumbleTo = at;
+  stairsBroken = STAIRS.x1;
+  stepFalls = scenery.hellStairs.xs.map((x) => (x > at ? clock + (STAIRS.x1 - x) / CRUMBLE_SPEED : -1));
+}
+
+/** Where the break has got to by now, climbing from the foot toward the hero. */
+function crumble(): void {
+  if (crumbleStart < 0) return;
+  stairsBroken = Math.max(crumbleTo, STAIRS.x1 - (clock - crumbleStart) * CRUMBLE_SPEED);
 }
 
 function mendStairs(): void {
   stairsBroken = Infinity;
+  crumbleStart = -1;
+  crumbleTo = Infinity;
   stepFalls = [];
   scenery.hellStairs.xs.forEach((_, i) => placeStep(scenery.hellStairs, i));
   monster.visible = false;
@@ -651,7 +665,8 @@ function stepCollapse(dt: number): void {
   if (!collapse) return;
   const c = collapse;
   c.t += dt;
-  const stairY = tartarusFooting(c.at - 1, TARTARUS.z) ?? LOW_Y;
+  // It stands by the foot of the stairs, and that is where the blow lands.
+  const stairY = tartarusFooting(STAIRS.x1 - 2, TARTARUS.z) ?? LOW_Y;
   // Stood so the fist comes down on the top of the steps.
   const standY = stairY - 6.5;
   const arm = monster.userData.arm as THREE.Group;
@@ -668,8 +683,8 @@ function stepCollapse(dt: number): void {
     breakStairs(c.at);
     shake = 0.9;
     stop = 0.12;
-    burst(c.at + 1, stairY + 0.5, TARTARUS.z, 0xff6a1e, 30, 9, 1.5);
-    hud.banner("It smashed the stairs!", "No way back now", 1.6);
+    burst(STAIRS.x1 - 2, stairY + 0.5, TARTARUS.z, 0xff6a1e, 30, 9, 1.5);
+    hud.banner("The stairs are falling!", "Run up!", 1.6);
   }
   if (!c.spawned && c.t >= 2.9) {
     c.spawned = true;
@@ -1265,6 +1280,7 @@ function update(dt: number): void {
     }
   }
   stepCollapse(sim);
+  crumble();
 
   // Hades.
   if (hades) {

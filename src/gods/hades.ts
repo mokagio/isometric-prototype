@@ -50,8 +50,10 @@ export function inHadesArena(x: number, z: number, within = TARTARUS.r): boolean
   return dist(x, z, TARTARUS.x, TARTARUS.z) < within;
 }
 
-/** Halfway up the last staircase, the fire monster comes up and smashes the steps below you. */
-export const COLLAPSE_AT = (STAIRS.x0 + STAIRS.x1) / 2;
+/** A third of the way up the last staircase (which climbs toward -x), the fire monster comes up and smashes its foot. */
+export const COLLAPSE_AT = STAIRS.x1 - (STAIRS.x1 - STAIRS.x0) / 3;
+/** How fast the break runs up the stairs from the bottom, in metres a second. */
+export const CRUMBLE_SPEED = 7;
 /** It breaks the stairs this far below where you stand, so the blow never lands under your feet. */
 export const BREAK_BEHIND = 2.5;
 
