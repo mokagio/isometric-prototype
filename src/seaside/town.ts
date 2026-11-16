@@ -56,7 +56,6 @@ export function townProps(): PlacedProp[] {
   const out: PlacedProp[] = [
     { id: "cottage-blue", col: 10, row: 11 },
     { id: "well", col: 15, row: 10 },
-    { id: "lamp", col: 9, row: 11 },
     { id: "bench", col: 21, row: 16 },
     { id: "stall-red", col: STALL.col, row: STALL.row },
     { id: "barrel", col: 22, row: 21 },
