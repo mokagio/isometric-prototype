@@ -247,6 +247,11 @@ export function weaponModel(kind: string): THREE.Group {
   } else if (kind === "bow") {
     g.add(part(new THREE.TorusGeometry(0.7, 0.03, 6, 20, Math.PI * 0.8), m(0xdfe8f0), [0.5, 1, 1], [0, 0.1, 0], [0, 0, Math.PI * 0.6]));
     g.add(part(CYL, m(0xf4f4f0), [0.006, 1.1, 0.006], [-0.18, 0.1, 0]));
+  } else if (kind === "fang") {
+    // A Hydra fang made a blade: curved, pale, dripping green.
+    g.add(part(CYL, m(0x2a5a3a), [0.03, 0.22, 0.03], [0, 0, 0]));
+    g.add(part(new THREE.ConeGeometry(0.07, 0.9, 6), m(0xf2ecd8), [1, 1, 0.5], [0.04, 0.55, 0], [0, 0, -0.12]));
+    g.add(part(SPHERE, m(0x7cff5a, 0x205010), [0.04, 0.04, 0.04], [0.09, 0.95, 0]));
   } else if (kind === "club") {
     // The Hammer of Kratos: a long haft and a great iron head bound in bronze, far bigger than a smith's.
     const iron = m(0x4a4a52);
@@ -380,6 +385,7 @@ export const KIT_PAINT: Record<Exclude<Kit, "none">, { metal: number; trim: numb
   kronos: { metal: 0x5a4a7a, trim: 0xe8b83e, crest: 0xe8e0d0 },
   artemis: { metal: 0xcfd8dc, trim: 0x6fbf6a, crest: 0x3f8a4a },
   kratos: { metal: 0x5a5a62, trim: 0xc8913a, crest: 0xc8913a },
+  hydra: { metal: 0x3f8a5a, trim: 0xb8e05a, crest: 0x2a5a3a },
 };
 
 export interface Figure {
@@ -964,7 +970,7 @@ export function wearKit(fig: Figure, armor: Record<Slot, Kit>): void {
   for (const m of fig.hairline) m.visible = armor.helmet === "none";
   // One paint for the whole figure: the god's if any piece is the god's.
   const kits = Object.values(armor);
-  const kit: Kit = kits.includes("kratos") ? "kratos" : kits.includes("artemis") ? "artemis" : kits.includes("kronos") ? "kronos" : kits.includes("zeus") ? "zeus" : kits.includes("hades") ? "hades" : kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
+  const kit: Kit = kits.includes("hydra") ? "hydra" : kits.includes("kratos") ? "kratos" : kits.includes("artemis") ? "artemis" : kits.includes("kronos") ? "kronos" : kits.includes("zeus") ? "zeus" : kits.includes("hades") ? "hades" : kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
   if (kit !== "none") {
     const paint = KIT_PAINT[kit];
     fig.metal.color.setHex(paint.metal);

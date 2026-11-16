@@ -9,6 +9,7 @@ import { BRIDGE_HALF as HELL_BRIDGE, BRIDGES, HADES_RING, HOME_PORTAL, ISLAND, I
 import { groundY, heightAt } from "./terrain";
 import { ARTEMIS } from "./artemis";
 import { KRATOS } from "./kratos";
+import { ledgeAt, LEDGE_HALF, PEAK, peakSlope, STEPS } from "./hydra";
 import { toon } from "./toon";
 import {
   BRIDGE_HALF,
@@ -274,6 +275,7 @@ export function buildScenery(): Scenery {
   colosseum(batch, ZEUS_LOOK);
   colosseum(batch, ARTEMIS_LOOK);
   colosseum(batch, KRATOS_LOOK);
+  hydraPeak(batch);
   // Boulders strewn round Kratos's colosseum, the bare rock it stands on.
   for (let k = 0; k < 40; k++) {
     const a = hash(k, 1, 95) * Math.PI * 2;
@@ -1542,6 +1544,52 @@ function olympia(b: Batch): void {
     else cypress(b, tx, tz, 0.8);
   }
   b.setFrame();
+}
+
+/** Hydra's Peak: grey-green rock, a ledge of steps winding round it, and a murky pool on top. */
+function hydraPeak(b: Batch): void {
+  const { x: px, z: pz, r, h, top } = PEAK;
+  const mountain = flat(lathe([[r + 3, -1], [r, 0], [top + (r - top) * 0.5, h * 0.5], [top + 0.4, h], [0, h]], 40));
+  b.add(mountain, 0x7a8478, { x: px, y: 0, z: pz });
+  // Moss and rock along the flanks.
+  for (let k = 0; k < 30; k++) {
+    const a = hash(k, 1, 96) * Math.PI * 2;
+    const d = top + 3 + hash(k, 2, 96) * (r - top - 6);
+    b.add(G.rock, k % 3 ? 0x5e6e5a : 0x8a9480, { x: px + Math.sin(a) * d, y: peakSlope(d) + 0.2, z: pz + Math.cos(a) * d }, { y: a }, { x: 1.4, y: 0.6, z: 1.8 });
+  }
+  // The stairs: a block per step, turned to follow the ledge, its top level with where you stand.
+  for (let i = 0; i < STEPS; i++) {
+    const u0 = i / STEPS;
+    const u1 = (i + 1) / STEPS;
+    const a = ledgeAt(u0);
+    const c = ledgeAt(u1);
+    const yaw = Math.atan2(c.x - a.x, c.z - a.z);
+    const len = Math.hypot(c.x - a.x, c.z - a.z) + 0.05;
+    const mx = (a.x + c.x) / 2;
+    const mz = (a.z + c.z) / 2;
+    b.add(G.box, i % 2 ? 0x9a9488 : 0x8a8478, { x: mx, y: a.y - 1, z: mz }, { y: yaw }, { x: LEDGE_HALF * 2, y: 2, z: len });
+    if (i % 12 === 6) {
+      // A stone post on the outer edge now and then, with a skull on it.
+      const out = Math.atan2(mx - px, mz - pz);
+      const ox = mx + Math.sin(out) * (LEDGE_HALF + 0.3);
+      const oz = mz + Math.cos(out) * (LEDGE_HALF + 0.3);
+      b.add(G.box, 0x6a6a62, { x: ox, y: a.y + 0.5, z: oz }, {}, { x: 0.4, y: 1, z: 0.4 });
+      b.add(G.blob, 0xe9e1c9, { x: ox, y: a.y + 1.15, z: oz }, {}, { x: 0.2, y: 0.18, z: 0.22 });
+    }
+  }
+  // The top: rock, a murky pool, and the bones of those who came before.
+  b.add(G.cyl, 0x6a7466, { x: px, y: h - 0.1, z: pz }, {}, { x: top + 0.2, y: 0.2, z: top + 0.2 });
+  b.add(G.cyl, 0x2f4a32, { x: px, y: h + 0.02, z: pz }, {}, { x: 6, y: 0.06, z: 6 });
+  for (let k = 0; k < 14; k++) {
+    const a = (k / 14) * Math.PI * 2;
+    b.add(G.rock, 0x5a6458, { x: px + Math.sin(a) * 6.2, y: h + 0.2, z: pz + Math.cos(a) * 6.2 }, { y: a }, 0.6);
+  }
+  for (let k = 0; k < 8; k++) {
+    const a = hash(k, 3, 96) * Math.PI * 2;
+    const d = 8 + hash(k, 4, 96) * 6;
+    b.add(G.cyl8, 0xe9e1c9, { x: px + Math.sin(a) * d, y: h + 0.08, z: pz + Math.cos(a) * d }, { z: Math.PI / 2, y: a }, { x: 0.05, y: 0.7, z: 0.05 });
+    if (k % 3 === 0) b.add(G.blob, 0xe9e1c9, { x: px + Math.sin(a + 0.2) * d, y: h + 0.15, z: pz + Math.cos(a + 0.2) * d }, {}, { x: 0.2, y: 0.18, z: 0.22 });
+  }
 }
 
 /** A belt of cloud round Olympus's middle, white and unlit like the sky's. */

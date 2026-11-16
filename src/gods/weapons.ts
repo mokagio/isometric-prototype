@@ -3,7 +3,7 @@
  * weapon once that god is beaten. Each has its own power and reach; the bow
  * alone fights at a distance, by loosing an arrow instead of swinging.
  */
-export type WeaponId = "sword" | "spear" | "iron" | "ares" | "trident" | "bident" | "bolt" | "scythe" | "bow" | "club";
+export type WeaponId = "sword" | "spear" | "iron" | "ares" | "trident" | "bident" | "bolt" | "scythe" | "bow" | "club" | "fang";
 
 export interface WeaponStats {
   name: string;
@@ -24,6 +24,7 @@ export const WEAPONS: Record<WeaponId, WeaponStats> = {
   scythe: { name: "Scythe of Kronos", power: 3, reach: 3.0 },
   bow: { name: "Bow of Artemis", power: 2, reach: 2.4, ranged: true },
   club: { name: "Hammer of Kratos", power: 3, reach: 3.0 },
+  fang: { name: "Hydra Fang", power: 3, reach: 2.4 },
 };
 
 /** Which god's weapon is which. */
@@ -35,6 +36,7 @@ export const WEAPON_OF: Record<string, WeaponId> = {
   kronos: "scythe",
   artemis: "bow",
   kratos: "club",
+  hydra: "fang",
 };
 
 export const WEAPON_IDS = Object.keys(WEAPONS) as WeaponId[];

@@ -233,6 +233,8 @@ Out in the open country stand two more colosseums: Artemis's (`artemis.ts`) in a
 Artemis keeps her distance, shoots volleys of arrows, leaps away from a hero who closes in and calls wolves when hurt; her opening is the reload. Kratos punches, throws boulders, and slams the ground so a shockwave rolls out; his opening is the stuck fist after a slam.
 The kids gave no tricks for either, so those are placeholders to revisit. `pushOut` takes their gates as its last two flags.
 
+Hydra's Peak (`hydra.ts`) stands in the north-east: its stairs are a ledge winding `TURNS` times round the cone, and `peakFooting` finds which pass of the spiral a point is on. The Hydra waits in a pool on top: cut off a head and two grow back after `REGROW_TIME` unless the body is struck first, which seals the stump; only with every head gone does the body take harm. It drops Hydra-scale armour and the Hydra Fang.
+
 On the dev server `window.gods` can read state, teleport the hero and add coins, so a recording can reach the colosseum without walking the road.
 Progress is under the `gods:save` storage key.
 

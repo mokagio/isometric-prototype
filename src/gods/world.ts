@@ -2,6 +2,7 @@ import { dist } from "./bearing";
 import { HADES_RING, inTartarus } from "./hades";
 import { ARTEMIS } from "./artemis";
 import { KRATOS } from "./kratos";
+import { onPeak, PEAK } from "./hydra";
 import { inVolcano, VOLCANO } from "./volcano";
 import { MONUMENT, OLYMPUS, olympiaHouses, onOlympus, ZEUS_RING } from "./zeus";
 
@@ -340,6 +341,7 @@ export function trees(): Tree[] {
       if (!inside && outside(x, z) > 45) continue;
       if (dist(x, z, VOLCANO.x, VOLCANO.z) < VOLCANO.r + 8) continue;
       if (dist(x, z, OLYMPUS.x, OLYMPUS.z) < OLYMPUS.r + 8) continue;
+      if (dist(x, z, PEAK.x, PEAK.z) < PEAK.r + 8) continue;
       if (dist(x, z, ZEUS_RING.x, ZEUS_RING.z) < ZEUS_RING.r + ZEUS_RING.thick + 8) continue;
       if (z > BOUNDS.z1 - 6 && Math.abs(x - OLYMPUS.x) < 8) continue;
       if (x < BOUNDS.x0 + 6 && Math.abs(z - VOLCANO.z) < 8) continue;
@@ -419,7 +421,7 @@ export function pushOut(
   kratosGateClosed = false,
 ): { x: number; z: number } {
   // Up on the volcano nothing holds you in: stepping off the path is a fall.
-  if (inVolcano(x, z)) return { x, z };
+  if (inVolcano(x, z) || onPeak(x, z)) return { x, z };
   // In Tartarus only Hades's wall holds you; the rest is open to the drop.
   if (inTartarus(x, z)) return wall(HADES_RING, x, z, r, hadesGateClosed);
   // Up Olympus the same: no ground to be pulled back onto, only Olympia's houses to bump into.

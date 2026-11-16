@@ -7,13 +7,13 @@ export const SLOTS: readonly Slot[] = ["helmet", "chest", "arms", "legs"];
  * What a slot is wearing. Bronze is what the blacksmith sells; a god's kit is
  * only ever won, a whole set at once, by beating that god.
  */
-export type Kit = "none" | "bronze" | "ares" | "poseidon" | "hades" | "zeus" | "kronos" | "artemis" | "kratos";
+export type Kit = "none" | "bronze" | "ares" | "poseidon" | "hades" | "zeus" | "kronos" | "artemis" | "kratos" | "hydra";
 export type Armor = Record<Slot, Kit>;
 
 export const NO_ARMOR: Armor = { helmet: "none", chest: "none", arms: "none", legs: "none" };
 
 /** The share of every blow a piece of each kit soaks up. */
-export const GUARD: Record<Kit, number> = { none: 0, bronze: 0.12, ares: 0.18, poseidon: 0.2, hades: 0.22, zeus: 0.24, kronos: 0.26, artemis: 0.2, kratos: 0.24 };
+export const GUARD: Record<Kit, number> = { none: 0, bronze: 0.12, ares: 0.18, poseidon: 0.2, hades: 0.22, zeus: 0.24, kronos: 0.26, artemis: 0.2, kratos: 0.24, hydra: 0.22 };
 
 export const PRICES: Record<Slot, number> = { helmet: 15, chest: 25, arms: 10, legs: 12 };
 
@@ -40,7 +40,7 @@ export function wearsFullKit(armor: Armor, kit: Kit): boolean {
 /** A god's whole kit is the one thing that makes the sword hit harder; Zeus's turns it into a lightning bolt, harder still. */
 export function swordPower(armor: Armor): number {
   if (wearsFullKit(armor, "zeus") || wearsFullKit(armor, "kronos") || wearsFullKit(armor, "kratos")) return 3;
-  if (wearsFullKit(armor, "artemis")) return 2;
+  if (wearsFullKit(armor, "artemis") || wearsFullKit(armor, "hydra")) return 2;
   return wearsFullKit(armor, "ares") || wearsFullKit(armor, "poseidon") || wearsFullKit(armor, "hades") ? 2 : 1;
 }
 
@@ -73,7 +73,7 @@ export function godKit(kit: Exclude<Kit, "none" | "bronze">): Armor {
 
 /** What the wardrobe offers: nothing, the bronze bought so far, or a whole god's kit. */
 export type Outfit = Kit;
-export const GOD_KITS: ReadonlyArray<Exclude<Kit, "none" | "bronze">> = ["ares", "poseidon", "hades", "zeus", "kronos", "artemis", "kratos"];
+export const GOD_KITS: ReadonlyArray<Exclude<Kit, "none" | "bronze">> = ["ares", "poseidon", "hades", "zeus", "kronos", "artemis", "kratos", "hydra"];
 
 /** Every outfit the hero owns: always none, bronze once a piece is bought, and each god's kit once that god is beaten. */
 export function outfits(beaten: readonly string[], bronze: readonly Slot[]): Outfit[] {
