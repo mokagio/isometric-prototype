@@ -59,6 +59,8 @@ import {
 } from "./world";
 
 export const SKY_TOP = 0x3f8fd8;
+/** The middle of the world, north to south: the ground, the sea and the mountains are all laid round it. */
+const WORLD_Z = -20;
 export const HORIZON = 0xcfe6f2;
 
 const C = {
@@ -1199,10 +1201,10 @@ function seaPlane(): THREE.Mesh {
         #include <colorspace_fragment>
       }`,
   });
-  const g = new THREE.PlaneGeometry(500, 900, 1, 1);
+  const g = new THREE.PlaneGeometry(600, 1200, 1, 1);
   g.rotateX(-Math.PI / 2);
   const mesh = new THREE.Mesh(g, material);
-  mesh.position.set(SHORE_X - 2 + 250, -0.25, -75);
+  mesh.position.set(SHORE_X - 2 + 300, -0.25, WORLD_Z);
   return mesh;
 }
 
@@ -1702,7 +1704,8 @@ function sky(): THREE.Mesh {
     fragmentShader: `uniform vec3 top; uniform vec3 horizon; varying vec3 vDir;
       void main() { float h = clamp(vDir.y * 1.6, 0.0, 1.0); gl_FragColor = vec4(mix(horizon, top, pow(h, 0.7)), 1.0); }`,
   });
-  const s = new THREE.Mesh(new THREE.SphereGeometry(480, 24, 12), m);
+  // Big enough to hold the far mountains; the game keeps it centred on the camera.
+  const s = new THREE.Mesh(new THREE.SphereGeometry(900, 24, 12), m);
   s.renderOrder = -1;
   s.frustumCulled = false;
   s.name = "sky";
@@ -1711,11 +1714,12 @@ function sky(): THREE.Mesh {
 
 /** The meadow, mottled by a value hash so it is never one flat green. */
 function ground(): THREE.Mesh {
-  const size = 700;
-  const seg = 175;
+  const size = 900;
+  // A vertex every 4 m, which lands one exactly on the shoreline.
+  const seg = 225;
   const g = new THREE.PlaneGeometry(size, size, seg, seg);
   g.rotateX(-Math.PI / 2);
-  g.translate(0, 0, -75);
+  g.translate(0, 0, WORLD_Z);
   const pos = g.attributes.position!;
   const colors = new Float32Array(pos.count * 3);
   const a = new THREE.Color(C.grassDark);
@@ -1841,9 +1845,9 @@ function mountains(): THREE.Group {
   const b = new Batch();
   for (let i = 0; i < 28; i++) {
     const a = (i / 28) * Math.PI * 2 + hash(i, 0, 20) * 0.2;
-    const r = 250 + hash(i, 1, 20) * 60;
+    const r = 400 + hash(i, 1, 20) * 60;
     const x = Math.sin(a) * r;
-    const z = -75 + Math.cos(a) * r;
+    const z = WORLD_Z + Math.cos(a) * r;
     if (x > SHORE_X - 40) continue;
     const h = 45 + hash(i, 2, 20) * 50;
     const w = 60 + hash(i, 3, 20) * 50;
@@ -1914,7 +1918,7 @@ function cloudLayer(): THREE.Group {
       parts.push(puff.clone().applyMatrix4(m));
     }
     const cloud = new THREE.Mesh(mergeGeometries(parts)!, mat);
-    cloud.position.set((hash(i, 1, 34) - 0.5) * 500, 110 + hash(i, 2, 34) * 40, -75 + (hash(i, 3, 34) - 0.5) * 500);
+    cloud.position.set((hash(i, 1, 34) - 0.5) * 800, 110 + hash(i, 2, 34) * 40, WORLD_Z + (hash(i, 3, 34) - 0.5) * 800);
     g.add(cloud);
   }
   return g;

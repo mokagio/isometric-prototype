@@ -5,7 +5,7 @@ import { dist, inArc, turnToward, yawTo } from "./bearing";
  * and a staircase up from it to Hades's roofed colosseum. Its centre and floor
  * height are `TARTARUS`; its gate faces east, down the stairs.
  */
-export const TARTARUS = { x: 0, z: 360, y: -60, r: 18 };
+export const TARTARUS = { x: 0, z: 560, y: -60, r: 18 };
 export const HADES_RING = { x: TARTARUS.x, z: TARTARUS.z, r: TARTARUS.r, thick: 3.5, yaw: Math.PI / 2 };
 export const GATE_HALF = 3.2;
 /** The island you land on, well below the colosseum. */

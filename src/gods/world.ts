@@ -29,7 +29,7 @@ export const BLACKSMITH = { x: 11, z: 5 };
 /** How close to the blacksmith counts as being at the counter. */
 export const SHOP_RANGE = 4.2;
 
-export const COLOSSEUM = { x: 0, z: -150 };
+export const COLOSSEUM = { x: 0, z: -220 };
 export const ARENA_R = 20;
 export const WALL_THICK = 4;
 export const GATE_HALF = 3.2;
@@ -40,14 +40,14 @@ export const ROAD_HALF = 3.5;
 export const ROAD_START = CITY_GATE_Z;
 export const ROAD_END = COLOSSEUM.z + ARENA_R + WALL_THICK;
 
-export const BOUNDS: Box = { x0: -62, z0: -192, x1: 62, z1: 42 };
+export const BOUNDS: Box = { x0: -62, z0: -262, x1: 62, z1: 42 };
 
 /** The fishing village, east of the city on the coast, round Poseidon's colosseum. */
-export const VILLAGE: Circle = { x: 122, z: -40, r: 30 };
+export const VILLAGE: Circle = { x: 182, z: -40, r: 30 };
 /** Poseidon's colosseum, at the heart of the village. Its gate faces west, down the road. */
-export const SEA_ARENA = { x: 122, z: -40, r: 16, thick: 3.5, yaw: -Math.PI / 2 };
+export const SEA_ARENA = { x: VILLAGE.x, z: VILLAGE.z, r: 16, thick: 3.5, yaw: -Math.PI / 2 };
 /** Past this the land shelves into the sea. */
-export const SHORE_X = 162;
+export const SHORE_X = 222;
 /** The road east branches off the road to Ares here and runs straight to Poseidon's gate. */
 export const EAST_ROAD_Z = VILLAGE.z;
 export const EAST_ROAD_END = SEA_ARENA.x - SEA_ARENA.r - SEA_ARENA.thick;
@@ -127,9 +127,12 @@ export interface Camp {
 export const CAMPS: readonly Camp[] = [
   { x: -4, z: -50, count: 2 },
   { x: 48, z: EAST_ROAD_Z + 9, count: 2 },
+  { x: 112, z: EAST_ROAD_Z - 9, count: 3 },
   { x: 6, z: -68, count: 3 },
   { x: -6, z: -90, count: 3 },
   { x: 4, z: -110, count: 3 },
+  { x: -5, z: -140, count: 3 },
+  { x: 5, z: -172, count: 3 },
 ];
 
 export interface World {

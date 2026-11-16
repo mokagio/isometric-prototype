@@ -73,6 +73,8 @@ export class Batch {
       mesh.matrixAutoUpdate = false;
       mesh.castShadow = opts.shadows ?? true;
       mesh.receiveShadow = opts.shadows ?? true;
+      // Fogged tiles vanish into the haze past a distance, so the game can skip drawing them out there.
+      if (opts.fog ?? true) mesh.userData.tile = true;
       group.add(mesh);
       for (const g of list) g.dispose();
     }

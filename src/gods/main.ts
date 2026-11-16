@@ -173,6 +173,15 @@ scene.add(sun, sun.target);
 
 const scenery = buildScenery();
 scene.add(scenery.root);
+/** The sky goes wherever the camera does, so no corner of the world is ever outside it. */
+const skyDome = scenery.root.getObjectByName("sky")!;
+const PEOPLE_FAR = 110;
+/** Scenery tiles, each culled once it is wholly inside the fog, since it would draw as nothing but haze. */
+const tiles: THREE.Mesh[] = [];
+scenery.root.traverse((o) => {
+  if ((o as THREE.Mesh).isMesh && o.userData.tile) tiles.push(o as THREE.Mesh);
+});
+for (const t of tiles) t.geometry.computeBoundingSphere();
 const world = layoutWorld();
 
 function resize(): void {
@@ -2063,7 +2072,7 @@ function draw(dt: number): void {
   scenery.seaGate.position.y += ((seaGateClosed ? 0 : 6) - scenery.seaGate.position.y) * Math.min(1, dt * (seaGateClosed ? 10 : 2));
   for (const c of scenery.clouds.children) {
     c.position.x += dt * 2;
-    if (c.position.x > 260) c.position.x -= 520;
+    if (c.position.x > 400) c.position.x -= 800;
   }
   updateSparks(dt);
 
@@ -2122,6 +2131,20 @@ function draw(dt: number): void {
     camPos.z + (Math.random() - 0.5) * jolt,
   );
   camera.lookAt(camLook);
+  skyDome.position.copy(camera.position);
+  const far = (scene.fog as THREE.Fog).far;
+  for (const t of tiles) {
+    const s = t.geometry.boundingSphere!;
+    t.visible = Math.hypot(s.center.x - camera.position.x, s.center.z - camera.position.z) - s.radius < far;
+  }
+  // People go sooner: past this a figure is a few pixels tall, and each one is a dozen draws.
+  const seen = (x: number, z: number): boolean => Math.hypot(x - camera.position.x, z - camera.position.z) < Math.min(far, PEOPLE_FAR);
+  for (const f of foes) {
+    f.fig.root.visible = seen(f.g.x, f.g.z);
+    f.shadow.visible = f.fig.root.visible && f.g.state !== "dead";
+  }
+  for (const f of fishers) f.root.visible = seen(f.root.position.x, f.root.position.z);
+  smith.root.visible = seen(smith.root.position.x, smith.root.position.z);
 
   // Snap the shadow box to whole texels, or shadows shimmer as the hero walks.
   const texel = (SHADOW_REACH * 2) / sun.shadow.mapSize.x;
@@ -2159,6 +2182,19 @@ if (import.meta.env.DEV) {
           if ((o as THREE.Mesh).isMesh) sceneryMeshes++;
         });
         return { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, meshes, sceneryMeshes, hero: heroFig.root.children.length };
+      },
+      /** What is being drawn, grouped by what it hangs off, for finding where the draw calls go. */
+      heaviest() {
+        const counts = new Map<string, number>();
+        for (const top of scene.children) {
+          let n = 0;
+          top.traverseVisible((o) => {
+            if ((o as THREE.Mesh).isMesh || (o as THREE.InstancedMesh).isInstancedMesh) n++;
+          });
+          const key = `${top.type}:${top.name || top.children.length}`;
+          counts.set(key, (counts.get(key) ?? 0) + n);
+        }
+        return [...counts].sort((a, b) => b[1] - a[1]).slice(0, 12);
       },
       zoom(k: number) {
         devZoom = k;

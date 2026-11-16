@@ -5,7 +5,7 @@ import { dist } from "./bearing";
  * a crater of lava at the top, and a rock bridge out to an island with a portal
  * to Tartarus in the middle of it. There are no rails: whatever is not the path is a fall.
  */
-export const VOLCANO = { x: -125, z: -90, r: 50, h: 30, rim: 12 };
+export const VOLCANO = { x: -185, z: -90, r: 50, h: 30, rim: 12 };
 /** Where the stairs stop and the flat landing on the crater's lip begins, measured from the centre. */
 export const LANDING_OUT = VOLCANO.rim + 1.5;
 export const LANDING_IN = VOLCANO.rim - 1;
