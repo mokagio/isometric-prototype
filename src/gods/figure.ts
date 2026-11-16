@@ -26,7 +26,7 @@ export interface Build {
   /** How heavily built: 1 is the hero. */
   bulk: number;
   shield: { rim: number; face: number; emblem: number; sign: "star" | "lambda" | "spear" } | null;
-  weapon: "sword" | "hammer" | "trident" | "bident" | "bolt" | "scythe";
+  weapon: "sword" | "hammer" | "trident" | "bident" | "bolt" | "scythe" | "bow";
   blade: number;
   cape: number | null;
 }
@@ -268,6 +268,44 @@ export const KRONOS_BUILD: Build = {
   cape: 0x1a1a3a,
 };
 
+/** Artemis, goddess of the hunt and the moon: silver bow, a hunter's green, a crescent in her hair. */
+export const ARTEMIS_BUILD: Build = {
+  body: "flesh",
+  skin: 0xf0c8a0,
+  hair: 0x3a2418,
+  hairStyle: "long",
+  beard: null,
+  band: 0xcfd8dc,
+  tunic: 0x3f8a4a,
+  sandals: 0x5a3a22,
+  eyes: GOD_EYES,
+  eyeGlow: true,
+  bulk: 1.05,
+  shield: null,
+  weapon: "bow",
+  blade: 0xdfe8f0,
+  cape: 0x2a5a32,
+};
+
+/** Kratos, god of strength (the old myth, not anyone else's): huge, bare-armed, a great iron club. */
+export const KRATOS_BUILD: Build = {
+  body: "flesh",
+  skin: 0xb07a50,
+  hair: 0x1a0d08,
+  hairStyle: "short",
+  beard: 0x1a0d08,
+  band: null,
+  tunic: 0x5a5a62,
+  sandals: 0x3a2a1e,
+  eyes: GOD_EYES,
+  eyeGlow: true,
+  bulk: 1.55,
+  shield: null,
+  weapon: "hammer",
+  blade: 0x4a4a52,
+  cape: 0x8a5a22,
+};
+
 export const FISHER_BUILD: Build = {
   body: "flesh",
   skin: 0xc98a58,
@@ -294,6 +332,8 @@ export const KIT_PAINT: Record<Exclude<Kit, "none">, { metal: number; trim: numb
   hades: { metal: 0x2a2430, trim: 0x5fe08a, crest: 0x5fe08a },
   zeus: { metal: 0xf2ecd8, trim: 0xe8b83e, crest: 0x4ab0ff },
   kronos: { metal: 0x5a4a7a, trim: 0xe8b83e, crest: 0xe8e0d0 },
+  artemis: { metal: 0xcfd8dc, trim: 0x6fbf6a, crest: 0x3f8a4a },
+  kratos: { metal: 0x5a5a62, trim: 0xc8913a, crest: 0xc8913a },
 };
 
 export interface Figure {
@@ -676,6 +716,10 @@ export function buildFigure(b: Build): Figure {
     sword.add(part(BOX, mat(0xb88a2e), [0.18, 0.035, 0.05], [0, 0.09, 0]));
     sword.add(part(CYL, leather, [0.024, 0.15, 0.024], [0, 0.0, 0]));
     sword.add(part(SPHERE, mat(0xb88a2e), [0.035, 0.035, 0.035], [0, -0.09, 0]));
+  } else if (b.weapon === "bow") {
+    // A silver longbow held upright, its string taut.
+    sword.add(part(new THREE.TorusGeometry(0.7, 0.03, 6, 20, Math.PI * 0.8), mat(b.blade), [0.5, 1, 1], [0, 0.1, 0], [0, 0, Math.PI * 0.6]));
+    sword.add(part(CYL, mat(0xf4f4f0), [0.006, 1.1, 0.006], [-0.18, 0.1, 0]));
   } else if (b.weapon === "scythe") {
     // A long shaft and a great curved blade at the top, swept back.
     sword.add(part(CYL, mat(0x3a2a1e), [0.03, 2.2, 0.03], [0, 0.6, 0]));
@@ -874,7 +918,7 @@ export function wearKit(fig: Figure, armor: Record<Slot, Kit>): void {
   for (const m of fig.hairline) m.visible = armor.helmet === "none";
   // One paint for the whole figure: the god's if any piece is the god's.
   const kits = Object.values(armor);
-  const kit: Kit = kits.includes("kronos") ? "kronos" : kits.includes("zeus") ? "zeus" : kits.includes("hades") ? "hades" : kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
+  const kit: Kit = kits.includes("kratos") ? "kratos" : kits.includes("artemis") ? "artemis" : kits.includes("kronos") ? "kronos" : kits.includes("zeus") ? "zeus" : kits.includes("hades") ? "hades" : kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
   if (kit !== "none") {
     const paint = KIT_PAINT[kit];
     fig.metal.color.setHex(paint.metal);

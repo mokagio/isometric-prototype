@@ -1,5 +1,7 @@
 import { dist } from "./bearing";
 import { HADES_RING, inTartarus } from "./hades";
+import { ARTEMIS } from "./artemis";
+import { KRATOS } from "./kratos";
 import { inVolcano, VOLCANO } from "./volcano";
 import { MONUMENT, OLYMPUS, olympiaHouses, onOlympus, ZEUS_RING } from "./zeus";
 
@@ -294,7 +296,13 @@ export function trees(): Tree[] {
       const z = gz + (hash(gx, gz, 3) - 0.5) * step * 0.8;
       if (x > SHORE_X - 16) continue;
       const inside = inRegions(x, z);
-      // Thick forest past the edge of the world, open meadow with copses inside it.
+      // Clear round the two newest colosseums; Artemis's stands in a thick wood, Kratos's on bare rock.
+      const fromArtemis = dist(x, z, ARTEMIS.x, ARTEMIS.z);
+      if (fromArtemis < ARTEMIS.r + ARTEMIS.thick + 10 || dist(x, z, KRATOS.x, KRATOS.z) < KRATOS.r + KRATOS.thick + 50) continue;
+      if (fromArtemis < 90 && keep < 0.55 && !(Math.abs(Math.atan2(x - ARTEMIS.x, z - ARTEMIS.z) - ARTEMIS.yaw) < 0.25)) {
+        out.push({ x, z, size: 0.9 + hash(gx, gz, 4) * 0.8 });
+        continue;
+      }
       // Copses scattered over open country, thicker at the edge of the world.
       if (keep > (inside ? (hash(Math.floor(gx / 60), Math.floor(gz / 60), 5) > 0.5 ? 0.16 : 0.03) : 0.6)) continue;
       if (dist(x, z, CITY.x, CITY.z) < CITY.r + 6) continue;
@@ -381,6 +389,8 @@ export function pushOut(
   hadesGateClosed = false,
   zeusGateClosed = false,
   zeusBackOpen = false,
+  artemisGateClosed = false,
+  kratosGateClosed = false,
 ): { x: number; z: number } {
   // Up on the volcano nothing holds you in: stepping off the path is a fall.
   if (inVolcano(x, z)) return { x, z };
@@ -415,6 +425,8 @@ export function pushOut(
   ({ x, z } = wall(ARES_RING, x, z, r, gateClosed));
   ({ x, z } = wall(SEA_ARENA, x, z, r, seaGateClosed));
   ({ x, z } = wall(ZEUS_RING, x, z, r, zeusGateClosed, zeusBackOpen));
+  ({ x, z } = wall(ARTEMIS, x, z, r, artemisGateClosed));
+  ({ x, z } = wall(KRATOS, x, z, r, kratosGateClosed));
   return { x, z };
 }
 

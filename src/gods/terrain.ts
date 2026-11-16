@@ -2,6 +2,8 @@ import { dist } from "./bearing";
 import { HAMLET_R, HAMLETS, CAMPS, CITY, COLOSSEUM, ARENA_R, WALL_THICK, VILLAGE, hash } from "./world";
 import { VOLCANO } from "./volcano";
 import { OLYMPUS, ZEUS_RING } from "./zeus";
+import { ARTEMIS } from "./artemis";
+import { KRATOS } from "./kratos";
 
 /**
  * The lie of the open land: rolling hills you can walk up and over, flattened
@@ -35,6 +37,8 @@ function places(): Array<{ x: number; z: number; r: number }> {
     { x: VILLAGE.x, z: VILLAGE.z, r: VILLAGE.r + 12 },
     { x: VOLCANO.x, z: VOLCANO.z, r: VOLCANO.r + 12 },
     { x: OLYMPUS.x, z: OLYMPUS.z, r: OLYMPUS.r + 12 },
+    { x: ARTEMIS.x, z: ARTEMIS.z, r: ARTEMIS.r + ARTEMIS.thick + 12 },
+    { x: KRATOS.x, z: KRATOS.z, r: KRATOS.r + KRATOS.thick + 12 },
     ...CAMPS.map((c) => ({ x: c.x, z: c.z, r: 9 })),
   ];
 }

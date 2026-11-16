@@ -27,6 +27,8 @@ import {
   HADES_BUILD,
   ZEUS_BUILD,
   KRONOS_BUILD,
+  ARTEMIS_BUILD,
+  KRATOS_BUILD,
   ANGEL_BUILD,
   boltGeometry,
   LAVA_SKELETON_BUILD,
@@ -73,6 +75,21 @@ import { loadSave, SAVE_KEY, storeSave } from "./save";
 import { toon } from "./toon";
 import { buildScenery, HORIZON, placeStep, SKY_TOP } from "./scenery";
 import { groundY } from "./terrain";
+import {
+  ARTEMIS,
+  ARTEMIS_HP,
+  BODY as ARTEMIS_BODY,
+  makeArtemis,
+  makeWolf,
+  stepWolf,
+  strikeArtemis,
+  strikeWolf,
+  updateArtemis,
+  WOLF_DAMAGE,
+  type Artemis,
+  type Wolf,
+} from "./artemis";
+import { BODY as KRATOS_BODY, KRATOS, KRATOS_HP, makeKratos, strikeKratos, updateKratos, type Kratos } from "./kratos";
 import { BODY as KRONOS_BODY, KRONOS_HP, makeKronos, SLOW, strikeKronos, updateKronos, type Kronos } from "./kronos";
 import {
   BODY as ZEUS_BODY,
@@ -821,6 +838,128 @@ function endKronosFight(): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Artemis in the forest, Kratos on the rock
+
+let artemisFight: Fight = save.beaten.includes("artemis") ? "won" : "waiting";
+let kratosFight: Fight = save.beaten.includes("kratos") ? "won" : "waiting";
+let artemisGateClosed = false;
+let kratosGateClosed = false;
+let artemis: { a: Artemis; fig: Figure; shadow: THREE.Mesh; flash: number; arrows: THREE.Mesh[] } | null = null;
+let kratos: { k: Kratos; fig: Figure; shadow: THREE.Mesh; flash: number; boulder: THREE.Mesh; wave: THREE.Mesh } | null = null;
+let wolves: Array<{ w: Wolf; mesh: THREE.Group }> = [];
+
+const arrowGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.1, 5).rotateX(Math.PI / 2);
+const arrowMat = toon(0xd8c8a0);
+
+function wolfMesh(): THREE.Group {
+  const g = new THREE.Group();
+  const fur = toon(0x7a7a80);
+  const dark = toon(0x4a4a50);
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.8, 4, 8).rotateX(Math.PI / 2), fur);
+  body.position.y = 0.7;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.6, 6).rotateX(Math.PI / 2), fur);
+  head.position.set(0, 0.92, 0.75);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.6, 5).rotateX(-Math.PI / 2.6), dark);
+  tail.position.set(0, 0.85, -0.7);
+  g.add(body, head, tail);
+  for (const ear of [-0.1, 0.1]) {
+    const e = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 4), dark);
+    e.position.set(ear, 1.1, 0.6);
+    g.add(e);
+  }
+  for (const [lx, lz] of [[-0.18, 0.4], [0.18, 0.4], [-0.18, -0.4], [0.18, -0.4]] as const) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.6, 5), dark);
+    leg.position.set(lx, 0.3, lz);
+    g.add(leg);
+  }
+  for (const eye of [-0.08, 0.08]) {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffd860 }));
+    e.position.set(eye, 0.98, 0.95);
+    g.add(e);
+  }
+  g.traverse((o) => (o.castShadow = true));
+  scene.add(g);
+  return g;
+}
+
+function startArtemis(): void {
+  artemisFight = "on";
+  artemisGateClosed = true;
+  const fig = buildFigure(ARTEMIS_BUILD);
+  fig.root.scale.setScalar(1.7);
+  scene.add(fig.root);
+  const inward = ARTEMIS.yaw + Math.PI;
+  const arrows = Array.from({ length: 6 }, () => {
+    const m = new THREE.Mesh(arrowGeo, arrowMat);
+    m.visible = false;
+    scene.add(m);
+    return m;
+  });
+  artemis = { a: makeArtemis(ARTEMIS.x + Math.sin(inward) * 9, ARTEMIS.z + Math.cos(inward) * 9, ARTEMIS.yaw), fig, shadow: blob(2.2), flash: 0, arrows };
+  hud.banner("ARTEMIS", "Goddess of the Hunt", 2.6);
+  hud.setBoss("Artemis, Goddess of the Hunt", 1);
+  shake = 0.3;
+}
+
+function startKratos(): void {
+  kratosFight = "on";
+  kratosGateClosed = true;
+  const fig = buildFigure(KRATOS_BUILD);
+  fig.root.scale.setScalar(2.1);
+  scene.add(fig.root);
+  const inward = KRATOS.yaw + Math.PI;
+  const boulder = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 0), toon(0x8a8478));
+  boulder.visible = false;
+  boulder.castShadow = true;
+  const wave = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xd8b878, transparent: true, opacity: 0.8 }));
+  wave.visible = false;
+  scene.add(boulder, wave);
+  kratos = { k: makeKratos(KRATOS.x + Math.sin(inward) * 8, KRATOS.z + Math.cos(inward) * 8, KRATOS.yaw), fig, shadow: blob(2.8), flash: 0, boulder, wave };
+  hud.banner("KRATOS", "God of Strength", 2.6);
+  hud.setBoss("Kratos, God of Strength", 1);
+  shake = 0.5;
+}
+
+function clearHunters(which: "artemis" | "kratos"): void {
+  if (which === "artemis" && artemis) {
+    scene.remove(artemis.fig.root, artemis.shadow, ...artemis.arrows);
+    artemis = null;
+    for (const w of wolves) scene.remove(w.mesh);
+    wolves = [];
+  }
+  if (which === "kratos" && kratos) {
+    scene.remove(kratos.fig.root, kratos.shadow, kratos.boulder, kratos.wave);
+    kratos = null;
+  }
+}
+
+function endHunterFights(): void {
+  clearHunters("artemis");
+  clearHunters("kratos");
+  artemisGateClosed = kratosGateClosed = false;
+  if (artemisFight === "on") artemisFight = "waiting";
+  if (kratosFight === "on") kratosFight = "waiting";
+}
+
+function hunterFalls(which: "artemis" | "kratos", x: number, z: number): void {
+  if (which === "artemis") {
+    artemisFight = "won";
+    artemisGateClosed = false;
+    for (const w of wolves) w.w.dead = Math.max(w.w.dead, 0);
+    hud.banner("Artemis is beaten!", "Claim her armor", 3.5);
+  } else {
+    kratosFight = "won";
+    kratosGateClosed = false;
+    hud.banner("Kratos is beaten!", "Claim his armor", 3.5);
+  }
+  hud.setBoss(null, 0);
+  shake = 0.8;
+  stop = 0.25;
+  burst(x, 2, z, which === "artemis" ? 0xe8eef0 : 0xc8913a, 45, 10, 1.6);
+  spawnReward(x, z, which);
+}
+
 function kronosFalls(): void {
   if (!kronos) return;
   kronosFight = "won";
@@ -1134,6 +1273,38 @@ function swingLands(): void {
       if (result === "dead") aresFalls();
     }
   }
+  for (const w of wolves) {
+    if (underBlade(hero, w.w.x, w.w.z, 0.5) && strikeWolf(w.w, power)) {
+      hitAny = true;
+      burst(w.w.x, 0.8, w.w.z, 0x9a9aa0, 10, 5);
+    }
+  }
+  if (artemis && underBlade(hero, artemis.a.x, artemis.a.z, ARTEMIS_BODY)) {
+    const result = strikeArtemis(artemis.a, power);
+    if (result !== "none") {
+      artemis.flash = 1;
+      hitAny = true;
+      burst(artemis.a.x, 2, artemis.a.z, 0xe8eef0, 14, 7);
+      hud.setBoss("Artemis, Goddess of the Hunt", artemis.a.hp / ARTEMIS_HP);
+      if (result === "dead") hunterFalls("artemis", artemis.a.x, artemis.a.z);
+    }
+  }
+  if (kratos && underBlade(hero, kratos.k.x, kratos.k.z, KRATOS_BODY)) {
+    const k = kratos.k;
+    const result = strikeKratos(k, power, hero.x, hero.z);
+    if (result === "clang") {
+      burst(k.x + Math.sin(k.yaw) * 1.3, 2, k.z + Math.cos(k.yaw) * 1.3, 0xfff2a0, 14, 7);
+      shove(hero, k.x, k.z, 8);
+      stop = 0.07;
+      hitAny = true;
+    } else if (result !== "none") {
+      kratos.flash = 1;
+      hitAny = true;
+      burst(k.x, 2.4, k.z, 0xc8913a, 14, 7);
+      hud.setBoss("Kratos, God of Strength", k.hp / KRATOS_HP);
+      if (result === "dead") hunterFalls("kratos", k.x, k.z);
+    }
+  }
   if (kronos && kronos.k.state !== "emerge" && underBlade(hero, kronos.k.x, kronos.k.z, KRONOS_BODY)) {
     const k = kronos.k;
     const result = strikeKronos(k, power, hero.x, hero.z);
@@ -1238,6 +1409,11 @@ function claimReward(): void {
   wearKit(heroFig, save.armor);
   hud.setArmor(save.armor);
   armHero();
+  if (kit === "artemis" || kit === "kratos") {
+    hud.banner(kit === "artemis" ? "Armor of Artemis" : "Armor of Kratos", kit === "artemis" ? "Swift as the hunt, and your sword hits twice as hard" : "Mighty — your sword hits three times as hard", 4);
+    clearHunters(kit);
+    return;
+  }
   if (kit === "kronos") {
     hud.banner("Armor of Kronos", "The Titan's own armor — the strongest there is", 4);
     clearKronos();
@@ -1273,6 +1449,7 @@ function respawn(): void {
   mendStairs();
   endZeusFight();
   endKronosFight();
+  endHunterFights();
   heroY = 0;
   falling = null;
   clearHades();
@@ -1351,6 +1528,8 @@ function update(dt: number): void {
   else if (hades && hades.h.state !== "dead" && !hadesHidden(hades.h) && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, hades.h, dt);
   else if (zeus && zeus.z.state !== "dead" && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, zeus.z, dt);
   else if (kronos && kronos.k.state !== "dead" && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, kronos.k, dt);
+  else if (artemis && artemis.a.state !== "dead" && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, artemis.a, dt);
+  else if (kratos && kratos.k.state !== "dead" && clock - lastDrag > 1.2) camYaw = lockOn(camYaw, hero, kratos.k, dt);
   else if (!blocking && standing(hero)) camYaw = autoTurn(camYaw, stick.x, dt);
   const move = moveFromStick(stick.x, stick.y, camYaw);
   // Wading through the flood is slow going.
@@ -1368,6 +1547,9 @@ function update(dt: number): void {
     if (hades && hades.h.state !== "dead" && !hadesHidden(hades.h)) targets.push(hades.h);
     if (zeus && zeus.z.state !== "dead") targets.push(zeus.z);
     if (kronos && kronos.k.state !== "dead") targets.push(kronos.k);
+    if (artemis && artemis.a.state !== "dead") targets.push(artemis.a);
+    if (kratos && kratos.k.state !== "dead") targets.push(kratos.k);
+    for (const w of wolves) if (w.w.dead < 0) targets.push(w.w);
     let best: { x: number; z: number } | null = null;
     let bestD = SWING_REACH + 2;
     for (const t of targets) {
@@ -1387,7 +1569,7 @@ function update(dt: number): void {
   const heroSim = kronos && kronos.k.slow > 0 ? sim * SLOW : sim;
   const was = { x: hero.x, z: hero.z };
   if (stepHero(hero, heroSim, { move, block: blocking })) swingLands();
-  const p = pushOut(world, hero.x, hero.z, RADIUS, gateClosed, seaGateClosed, hadesGateClosed, zeusGateClosed, zeusFight === "won");
+  const p = pushOut(world, hero.x, hero.z, RADIUS, gateClosed, seaGateClosed, hadesGateClosed, zeusGateClosed, zeusFight === "won", artemisGateClosed, kratosGateClosed);
   hero.x = p.x;
   hero.z = p.z;
   // The mountains stand in the open country with only their stairs to climb: walking up to
@@ -1668,6 +1850,64 @@ function update(dt: number): void {
   crumble();
   stepBack();
 
+  // Artemis and her wolves, and Kratos.
+  if (artemisFight === "waiting" && dist(hero.x, hero.z, ARTEMIS.x, ARTEMIS.z) < ARTEMIS.r - 4 && standing(hero)) startArtemis();
+  if (kratosFight === "waiting" && dist(hero.x, hero.z, KRATOS.x, KRATOS.z) < KRATOS.r - 4 && standing(hero)) startKratos();
+  if (artemis) {
+    const a = artemis.a;
+    for (const e of updateArtemis(a, sim, { x: hero.x, z: hero.z, alive: standing(hero) }, ARTEMIS)) {
+      if (e.kind === "blow") heroLoses(e);
+      else if (e.kind === "roar") shake = 0.3;
+      else if (e.kind === "leap") burst(a.x, 0.4, a.z, 0x7cae5a, 12, 5);
+      else if (e.kind === "wolves") {
+        for (let i = 0; i < e.count; i++) {
+          const ang = yawTo(ARTEMIS.x, ARTEMIS.z, hero.x, hero.z) + Math.PI + (i - 1) * 0.8;
+          const w = makeWolf(ARTEMIS.x + Math.sin(ang) * (ARTEMIS.r - 2), ARTEMIS.z + Math.cos(ang) * (ARTEMIS.r - 2));
+          wolves.push({ w, mesh: wolfMesh() });
+          burst(w.x, 0.8, w.z, 0x9a9aa0, 12, 5);
+        }
+        hud.banner("Wolves!", "Her hunting pack is here", 1.6);
+      }
+    }
+    if (a.state !== "dead") {
+      const q = pushOut(world, a.x, a.z, ARTEMIS_BODY, true, true, true, true, false, true, true);
+      a.x = q.x;
+      a.z = q.z;
+    }
+  }
+  for (const w of wolves) {
+    if (stepWolf(w.w, sim, { x: hero.x, z: hero.z, alive: standing(hero) })) heroLoses({ damage: WOLF_DAMAGE, x: w.w.x, z: w.w.z, heavy: false });
+    const q = pushOut(world, w.w.x, w.w.z, 0.5, true, true, true, true, false, true, true);
+    w.w.x = q.x;
+    w.w.z = q.z;
+  }
+  for (const w of wolves.filter((w) => w.w.dead > 1.2)) scene.remove(w.mesh);
+  wolves = wolves.filter((w) => w.w.dead <= 1.2);
+  if (kratos) {
+    const k = kratos.k;
+    for (const e of updateKratos(k, sim, { x: hero.x, z: hero.z, alive: standing(hero) }, KRATOS)) {
+      if (e.kind === "blow") heroLoses(e);
+      else if (e.kind === "roar") shake = 0.5;
+      else if (e.kind === "throw") hud.banner("A boulder!", "Block it or dodge it", 1.2);
+      else if (e.kind === "slam") {
+        shake = 1;
+        burst(e.x, 0.4, e.z, 0xb89a70, 30, 9, 1.4);
+        hud.banner("He smashed the ground!", "Get away from the shockwave!", 1.6);
+      }
+    }
+    if (k.state !== "dead") {
+      const q = pushOut(world, k.x, k.z, KRATOS_BODY, true, true, true, true, false, true, true);
+      k.x = q.x;
+      k.z = q.z;
+      const d = dist(k.x, k.z, hero.x, hero.z);
+      const min = KRATOS_BODY + RADIUS;
+      if (d < min && d > 1e-4) {
+        hero.x = k.x + ((hero.x - k.x) / d) * min;
+        hero.z = k.z + ((hero.z - k.z) / d) * min;
+      }
+    }
+  }
+
   // Kronos: reaching the top opens the door.
   const onSummit = onOlympus(hero.x, hero.z) && heroY > OLYMPUS.h - 0.5 && dist(hero.x, hero.z, OLYMPUS.x, OLYMPUS.z) < OLYMPUS.top;
   if (kronosFight === "waiting" && onSummit && standing(hero) && !falling) startKronos();
@@ -1840,7 +2080,7 @@ function update(dt: number): void {
   hud.setHealth(Math.ceil(hero.hp));
   hud.setCompass(
     camYaw,
-    fight === "on" || seaFight === "on" || zeusFight === "on" || kronosFight === "on" || inTartarus(hero.x, hero.z)
+    fight === "on" || seaFight === "on" || zeusFight === "on" || kronosFight === "on" || artemisFight === "on" || kratosFight === "on" || inTartarus(hero.x, hero.z)
       ? null
       : [
           { id: "colosseum", label: fight === "won" ? "Colosseum" : "Ares", yaw: yawTo(hero.x, hero.z, COLOSSEUM.x, COLOSSEUM.z) },
@@ -1850,6 +2090,8 @@ function update(dt: number): void {
           zeusFight === "won"
             ? { id: "olympus", label: "Olympia", yaw: yawTo(hero.x, hero.z, OLYMPUS.x, OLYMPUS.z) }
             : { id: "olympus", label: "Zeus", yaw: yawTo(hero.x, hero.z, ZEUS_RING.x, ZEUS_RING.z) },
+          { id: "artemis", label: "Artemis", yaw: yawTo(hero.x, hero.z, ARTEMIS.x, ARTEMIS.z) },
+          { id: "kratos", label: "Kratos", yaw: yawTo(hero.x, hero.z, KRATOS.x, KRATOS.z) },
         ].filter(
           (m) =>
             (m.id !== "city" || !inCity(hero.x, hero.z)) &&
@@ -2018,6 +2260,61 @@ function draw(dt: number): void {
     }
   }
   scenery.doors.forEach((door, i) => (door.rotation.y = (i === 0 ? 1 : -1) * 1.45 * doorsOpen));
+  scenery.artemisGate.position.y += ((artemisGateClosed ? 0 : 6) - scenery.artemisGate.position.y) * Math.min(1, dt * (artemisGateClosed ? 10 : 2));
+  scenery.kratosGate.position.y += ((kratosGateClosed ? 0 : 6) - scenery.kratosGate.position.y) * Math.min(1, dt * (kratosGateClosed ? 10 : 2));
+  if (artemis) {
+    const a = artemis.a;
+    const fig = artemis.fig;
+    fig.root.position.set(a.x, 0, a.z);
+    fig.root.rotation.y = a.yaw;
+    const drawing = a.state === "aim" || a.state === "loose";
+    poseFigure(fig, dt, { speed: a.moving ? (a.state === "leap" ? 14 : 3.4) : 0, raise: a.state === "call" ? 1 : drawing ? 0.6 : 0, fallen: a.state === "dead" ? a.t : -1 });
+    if (a.state === "leap") fig.root.position.y = Math.sin((a.t / 0.5) * Math.PI) * 2.2;
+    if (a.state === "aim") flash(fig, 0.3 + 0.3 * Math.sin(clock * 26), 0xe8eef0);
+    else flash(fig, artemis.flash, 0xffffff);
+    artemis.flash = Math.max(0, artemis.flash - dt * 6);
+    artemis.shadow.position.set(a.x, 0.07, a.z);
+    artemis.arrows.forEach((m, i) => {
+      const arrow = a.arrows[i];
+      m.visible = !!arrow;
+      if (arrow) {
+        m.position.set(arrow.x, 1.5, arrow.z);
+        m.rotation.y = arrow.yaw;
+      }
+    });
+  }
+  for (const w of wolves) {
+    const y = groundY(w.w.x, w.w.z);
+    w.mesh.position.set(w.w.x, y + (w.w.dead >= 0 ? -w.w.dead * 0.6 : Math.abs(Math.sin(clock * 14 + w.w.x)) * 0.12), w.w.z);
+    w.mesh.rotation.set(0, w.w.yaw, w.w.dead >= 0 ? Math.min(1.5, w.w.dead * 3) : 0);
+  }
+  if (kratos) {
+    const k = kratos.k;
+    const fig = kratos.fig;
+    fig.root.position.set(k.x, 0, k.z);
+    fig.root.rotation.y = k.yaw;
+    let swing = -1;
+    if (k.state === "windup") swing = 0.38 * Math.min(1, k.t / 0.9);
+    else if (k.state === "punch") swing = 0.38 + 0.24 * Math.min(1, k.t / 0.2);
+    else if (k.state === "recover" || k.state === "stuck") swing = k.state === "stuck" ? 0.62 : 0.62 + 0.38 * Math.min(1, k.t / 0.4);
+    poseFigure(fig, dt, { speed: k.moving ? 2.4 : 0, swing, raise: k.state === "lift" || k.state === "slamWindup" ? 1 : 0, daze: k.state === "stuck" ? 0.5 : 0, fallen: k.state === "dead" ? k.t : -1 });
+    if (k.state === "slamWindup") flash(fig, 0.4 + 0.4 * Math.sin(clock * 24), 0xff8a1e);
+    else if (k.state === "windup") flash(fig, 0.25 + 0.25 * Math.sin(clock * 30), 0xffaa40);
+    else flash(fig, kratos.flash, 0xffffff);
+    kratos.flash = Math.max(0, kratos.flash - dt * 6);
+    kratos.shadow.position.set(k.x, 0.07, k.z);
+    kratos.boulder.visible = k.boulder !== null || k.state === "lift";
+    if (k.boulder) {
+      kratos.boulder.position.set(k.boulder.x, 1.6, k.boulder.z);
+      kratos.boulder.rotation.x += dt * 8;
+    } else if (k.state === "lift") kratos.boulder.position.set(k.x, 5.2, k.z);
+    kratos.wave.visible = k.wave >= 0;
+    if (k.wave >= 0) {
+      kratos.wave.position.set(k.waveX, 0.12, k.waveZ);
+      kratos.wave.scale.setScalar(Math.max(0.1, k.wave));
+      (kratos.wave.material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - k.wave / 14);
+    }
+  }
   if (kronos) {
     const k = kronos.k;
     const fig = kronos.fig;
@@ -2097,7 +2394,7 @@ function draw(dt: number): void {
   updateSparks(dt);
 
   // Camera: behind the hero, pulled back and up in the arena so the god fits in frame.
-  const fighting = (ares !== null && ares.a.state !== "dead") || (poseidon !== null && poseidon.p.state !== "dead") || (hades !== null && hades.h.state !== "dead") || (zeus !== null && zeus.z.state !== "dead") || (kronos !== null && kronos.k.state !== "dead");
+  const fighting = (ares !== null && ares.a.state !== "dead") || (poseidon !== null && poseidon.p.state !== "dead") || (hades !== null && hades.h.state !== "dead") || (zeus !== null && zeus.z.state !== "dead") || (kronos !== null && kronos.k.state !== "dead") || (artemis !== null && artemis.a.state !== "dead") || (kratos !== null && kratos.k.state !== "dead");
   const back = (fighting ? CAM_DIST + 2.5 : CAM_DIST) * devZoom;
   const up = LOOK_HEIGHT + ((fighting ? CAM_HEIGHT + 1.6 : CAM_HEIGHT) - LOOK_HEIGHT) * devZoom;
   const tx = hero.x;
@@ -2105,6 +2402,16 @@ function draw(dt: number): void {
   let cx = tx - Math.sin(camYaw) * back;
   let cz = tz - Math.cos(camYaw) * back;
   // Inside the colosseum the camera stays inside the wall.
+  for (const ring of [ARTEMIS, KRATOS]) {
+    if (dist(hero.x, hero.z, ring.x, ring.z) < ring.r) {
+      const d = dist(cx, cz, ring.x, ring.z);
+      const limit = ring.r - 0.8;
+      if (d > limit) {
+        cx = ring.x + ((cx - ring.x) / d) * limit;
+        cz = ring.z + ((cz - ring.z) / d) * limit;
+      }
+    }
+  }
   if (inZeusArena(hero.x, hero.z)) {
     const d = dist(cx, cz, ZEUS_RING.x, ZEUS_RING.z);
     const limit = ZEUS_RING.r - 0.8;
@@ -2186,7 +2493,7 @@ hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods
 if (import.meta.env.DEV) {
   Object.assign(window, {
     gods: {
-      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, zeusFight, kronosFight, kronos: kronos?.k ?? null, zeus: zeus?.z ?? null, heroY, falling, stairsBroken, collapse, foes: foes.map((f) => f.g) }),
+      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, zeusFight, kronosFight, kronos: kronos?.k ?? null, artemis: artemis?.a ?? null, kratos: kratos?.k ?? null, wolves: wolves.map((w) => w.w), zeus: zeus?.z ?? null, heroY, falling, stairsBroken, collapse, foes: foes.map((f) => f.g) }),
       teleport(x: number, z: number, yaw = hero.yaw) {
         hero.x = x;
         hero.z = z;

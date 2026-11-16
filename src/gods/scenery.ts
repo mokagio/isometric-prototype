@@ -2,11 +2,13 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Batch } from "./batch";
 import { dist } from "./bearing";
-import { ARES_BUILD, boltGeometry, buildFigure, HERO_BUILD, POSEIDON_BUILD, poseFigure, wearKit, ZEUS_BUILD, type Build } from "./figure";
+import { ARES_BUILD, ARTEMIS_BUILD, boltGeometry, buildFigure, KRATOS_BUILD, HERO_BUILD, POSEIDON_BUILD, poseFigure, wearKit, ZEUS_BUILD, type Build } from "./figure";
 import { MONUMENT, OLYMPUS, OLYMPUS_STAIR_HALF, OLYMPUS_STEP, olympiaHouses, olympusSlope, olympusStepY, ZEUS_RING } from "./zeus";
 import { godKit } from "./armor";
 import { BRIDGE_HALF as HELL_BRIDGE, BRIDGES, HADES_RING, HOME_PORTAL, ISLAND, ISLANDS, LOW_Y, stairStepY, STAIRS, TARTARUS } from "./hades";
 import { groundY, heightAt } from "./terrain";
+import { ARTEMIS } from "./artemis";
+import { KRATOS } from "./kratos";
 import { toon } from "./toon";
 import {
   BRIDGE_HALF,
@@ -232,6 +234,8 @@ export interface Scenery {
   hadesGate: THREE.Group;
   /** Zeus's portcullis: up is open. */
   zeusGate: THREE.Group;
+  artemisGate: THREE.Group;
+  kratosGate: THREE.Group;
   /** The blocks filling the back of Zeus's colosseum, which break when he does. */
   zeusBack: BackWall;
   /** The monument's door, left and right, closed at rotation 0. */
@@ -268,6 +272,17 @@ export function buildScenery(): Scenery {
   const olympusTorches = olympus(batch);
   olympia(batch);
   colosseum(batch, ZEUS_LOOK);
+  colosseum(batch, ARTEMIS_LOOK);
+  colosseum(batch, KRATOS_LOOK);
+  // Boulders strewn round Kratos's colosseum, the bare rock it stands on.
+  for (let k = 0; k < 40; k++) {
+    const a = hash(k, 1, 95) * Math.PI * 2;
+    const d = KRATOS.r + KRATOS.thick + 6 + hash(k, 2, 95) * 40;
+    if (Math.abs(Math.atan2(Math.sin(a - KRATOS.yaw), Math.cos(a - KRATOS.yaw))) < 0.3) continue;
+    const bx = KRATOS.x + Math.sin(a) * d;
+    const bz = KRATOS.z + Math.cos(a) * d;
+    batch.add(G.rock, k % 3 ? C.rock : 0x8a8478, { x: bx, y: groundY(bx, bz) + 0.4, z: bz }, { y: a }, 1 + hash(k, 3, 95) * 2.5);
+  }
   colosseum(batch, HADES_LOOK);
   root.add(batch.build());
   const fire = volcanoFire();
@@ -309,6 +324,20 @@ export function buildScenery(): Scenery {
   root.add(hadesGate);
   const zeusGate = portcullis(ZEUS_LOOK);
   root.add(zeusGate);
+  const artemisGate = portcullis(ARTEMIS_LOOK);
+  const kratosGate = portcullis(KRATOS_LOOK);
+  root.add(artemisGate, kratosGate);
+  for (const f of flameSpots(ARTEMIS_LOOK)) flames.push(flame(root, f.x, f.y, f.z, 0.7, 0xb8f0c0, 0xffffff));
+  for (const f of flameSpots(KRATOS_LOOK)) flames.push(flame(root, f.x, f.y, f.z, 0.8));
+  // Each in their own colour outside their gate.
+  const statues: Array<[ArenaLook, Build, number]> = [
+    [ARTEMIS_LOOK, ARTEMIS_BUILD, 0xd8e0e4],
+    [KRATOS_LOOK, KRATOS_BUILD, 0x9c6a3a],
+  ];
+  for (const [L, build, color] of statues) {
+    const at = arenaToWorld(L, GATE_HALF + 7, L.r + L.thick + 4);
+    root.add(statue(build, color, { x: at.x, y: 1.6, z: at.z }, L.yaw + 0.4, 1.6));
+  }
   for (const f of flameSpots(ZEUS_LOOK)) flames.push(flame(root, f.x, f.y, f.z, 0.7, 0x8fd8ff, 0xffffff));
   for (const t of olympusTorches) flames.push(flame(root, t.x, t.y, t.z, 0.45));
   root.add(olympusClouds());
@@ -339,7 +368,7 @@ export function buildScenery(): Scenery {
   root.add(flood);
   const clouds = cloudLayer();
   root.add(clouds);
-  return { root, gate, flames, clouds, grass: grass.material, water, sea: sea.material as THREE.ShaderMaterial, seaGate, hadesGate, zeusGate, zeusBack, doors, hellStairs: stairs, flood, smoke: fire.smoke, lava: fire.lava, portals: [volcanoPortal, homePortal], sky: (root.getObjectByName("sky") as THREE.Mesh).material as THREE.ShaderMaterial };
+  return { root, gate, flames, clouds, grass: grass.material, water, sea: sea.material as THREE.ShaderMaterial, seaGate, hadesGate, zeusGate, artemisGate, kratosGate, zeusBack, doors, hellStairs: stairs, flood, smoke: fire.smoke, lava: fire.lava, portals: [volcanoPortal, homePortal], sky: (root.getObjectByName("sky") as THREE.Mesh).material as THREE.ShaderMaterial };
 }
 
 /** A figure cast in one material, struck in a pose and set on a plinth. */
@@ -719,7 +748,7 @@ interface ArenaLook {
   rake: number;
   banner: number;
   accent: number;
-  device: "spear" | "trident" | "bident" | "bolt";
+  device: "spear" | "trident" | "bident" | "bolt" | "moon" | "fist";
   /** Floor height, for a colosseum that is not on the ground. */
   y?: number;
   /** A roof over the seats, hung with stalactites. */
@@ -775,6 +804,36 @@ const ZEUS_LOOK: ArenaLook = {
   banner: 0x2a4fb0,
   accent: 0xe8b83e,
   device: "bolt",
+};
+
+const ARTEMIS_LOOK: ArenaLook = {
+  ...ARTEMIS,
+  stone: 0xc8d0cc,
+  light: 0xe4ebe6,
+  dark: 0x8a9a90,
+  arch: 0x1a2a1e,
+  seats: 0xdfe6e0,
+  seatsShade: 0xc4cec6,
+  floor: 0x7cae5a,
+  rake: 0x5e8e42,
+  banner: 0x2f6a3a,
+  accent: 0xe8eef0,
+  device: "moon",
+};
+
+const KRATOS_LOOK: ArenaLook = {
+  ...KRATOS,
+  stone: 0x6a6a72,
+  light: 0x84848c,
+  dark: 0x44444c,
+  arch: 0x141418,
+  seats: 0x7a7a82,
+  seatsShade: 0x62626a,
+  floor: 0x9a8a70,
+  rake: 0x7a6a50,
+  banner: 0x8a5a22,
+  accent: 0xc8913a,
+  device: "fist",
 };
 
 const HADES_LOOK: ArenaLook = {
@@ -906,6 +965,14 @@ function colosseum(b: Batch, L: ArenaLook): void {
       b.add(G.box, L.banner, { x: tx, y: 7.6, z: front + 0.94 }, { z: Math.PI / 4 }, { x: 0.1, y: 1.3, z: 0.04 });
     } else if (L.device === "bolt") {
       b.add(boltGeometry(), L.accent, { x: tx, y: 6.0, z: front + 0.92 }, { z: 0.15 }, 3.2);
+    } else if (L.device === "moon") {
+      // A crescent moon.
+      b.add(new THREE.TorusGeometry(0.7, 0.16, 6, 20, Math.PI * 1.25), L.accent, { x: tx, y: 7.4, z: front + 0.92 }, { z: Math.PI * 0.62 }, 1);
+    } else if (L.device === "fist") {
+      // A clenched fist: the hand, and a row of knuckles.
+      b.add(G.box, L.accent, { x: tx, y: 7.2, z: front + 0.92 }, {}, { x: 0.9, y: 1.0, z: 0.1 });
+      for (let k = 0; k < 4; k++) b.add(G.box, L.accent, { x: tx - 0.34 + k * 0.23, y: 7.82, z: front + 0.92 }, {}, { x: 0.2, y: 0.26, z: 0.12 });
+      b.add(G.box, L.accent, { x: tx + 0.55, y: 7.0, z: front + 0.92 }, { z: 0.5 }, { x: 0.22, y: 0.55, z: 0.1 });
     } else {
       tridentDevice(b, L.accent, { x: tx, y: 7.2, z: front + 0.92 }, 1.3, L.device === "bident" ? [-0.2, 0.2] : undefined);
       // Waves along the foot of the banner.

@@ -228,6 +228,10 @@ Zeus parries from the front, throws bolts at a hero who keeps away, and calls a 
 His whole kit makes the hero's sword a lightning bolt (`armHero`) and hits three times as hard.
 The stairs climb to Olympia on the summit: a monument whose door bursts open the moment the hero reaches the top, and Kronos (`kronos.ts`) strides out — his scythe sweeps all the way round, and his trick slows the hero's whole world (`SLOW`, applied to the hero's own step) until it wears off and leaves him tired and open; the angels' houses, and angels who walk or fly in circles and are only drawn when the hero is near the mountain.
 
+Out in the open country stand two more colosseums: Artemis's (`artemis.ts`) in a thick wood to the north-west, and Kratos's (`kratos.ts`, the god of strength from the myths, deliberately not the video-game character) on bare rock to the south-east.
+Artemis keeps her distance, shoots volleys of arrows, leaps away from a hero who closes in and calls wolves when hurt; her opening is the reload. Kratos punches, throws boulders, and slams the ground so a shockwave rolls out; his opening is the stuck fist after a slam.
+The kids gave no tricks for either, so those are placeholders to revisit. `pushOut` takes their gates as its last two flags.
+
 On the dev server `window.gods` can read state, teleport the hero and add coins, so a recording can reach the colosseum without walking the road.
 Progress is under the `gods:save` storage key.
 
