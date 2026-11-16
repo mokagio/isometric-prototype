@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Batch } from "./batch";
 import { dist } from "./bearing";
-import { ARES_BUILD, ARTEMIS_BUILD, boltGeometry, buildFigure, KRATOS_BUILD, HERO_BUILD, POSEIDON_BUILD, poseFigure, wearKit, ZEUS_BUILD, type Build } from "./figure";
+import { ARES_BUILD, SPARTAN_BUILD, ARTEMIS_BUILD, boltGeometry, buildFigure, KRATOS_BUILD, HERO_BUILD, POSEIDON_BUILD, poseFigure, wearKit, ZEUS_BUILD, type Build } from "./figure";
 import { MONUMENT, OLYMPUS, OLYMPUS_STAIR_HALF, OLYMPUS_STEP, olympiaHouses, olympusSlope, olympusStepY, ZEUS_RING } from "./zeus";
 import { godKit } from "./armor";
 import { BRIDGE_HALF as HELL_BRIDGE, BRIDGES, HADES_RING, HOME_PORTAL, ISLAND, ISLANDS, LOW_Y, stairStepY, STAIRS, TARTARUS } from "./hades";
@@ -10,6 +10,7 @@ import { groundY, heightAt } from "./terrain";
 import { ARTEMIS } from "./artemis";
 import { KRATOS } from "./kratos";
 import { ledgeAt, LEDGE_HALF, PEAK, peakSlope, SINK, STEPS } from "./hydra";
+import { LAIR } from "./medusa";
 import { toon } from "./toon";
 import {
   BRIDGE_HALF,
@@ -276,6 +277,7 @@ export function buildScenery(): Scenery {
   colosseum(batch, ARTEMIS_LOOK);
   colosseum(batch, KRATOS_LOOK);
   hydraPeak(batch);
+  medusaLair(batch);
   // Boulders strewn round Kratos's colosseum, the bare rock it stands on.
   for (let k = 0; k < 40; k++) {
     const a = hash(k, 1, 95) * Math.PI * 2;
@@ -332,6 +334,12 @@ export function buildScenery(): Scenery {
   for (const f of flameSpots(ARTEMIS_LOOK)) flames.push(flame(root, f.x, f.y, f.z, 0.7, 0xb8f0c0, 0xffffff));
   for (const f of flameSpots(KRATOS_LOOK)) flames.push(flame(root, f.x, f.y, f.z, 0.8));
   // Each in their own colour outside their gate.
+  // Warriors who looked Medusa in the eye, turned to stone where they stood round her lair.
+  for (let k = 0; k < 7; k++) {
+    const a = (k / 7) * Math.PI * 2 + 0.4;
+    const d = LAIR.r - 4 - (k % 2) * 3;
+    root.add(statue(k % 3 === 0 ? SPARTAN_BUILD : HERO_BUILD, 0x9a9a92, { x: LAIR.x + Math.sin(a) * d, y: 0.4, z: LAIR.z + Math.cos(a) * d }, a + Math.PI + (hash(k, 5, 97) - 0.5), 1.05));
+  }
   const statues: Array<[ArenaLook, Build, number]> = [
     [ARTEMIS_LOOK, ARTEMIS_BUILD, 0xd8e0e4],
     [KRATOS_LOOK, KRATOS_BUILD, 0x9c6a3a],
@@ -1544,6 +1552,34 @@ function olympia(b: Batch): void {
     else cypress(b, tx, tz, 0.8);
   }
   b.setFrame();
+}
+
+/** Medusa's lair: an old temple's floor in a forest clearing, its columns fallen, ivy everywhere. */
+function medusaLair(b: Batch): void {
+  const { x: lx, z: lz, r } = LAIR;
+  b.add(G.cyl, 0x8a8a78, { x: lx, y: 0.04, z: lz }, {}, { x: r, y: 0.08, z: r });
+  b.add(new THREE.TorusGeometry(1, 0.08, 3, 48), 0x6a6a5a, { x: lx, y: 0.09, z: lz }, { x: Math.PI / 2 }, { x: r - 1, y: r - 1, z: 1 });
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * Math.PI * 2;
+    const cx = lx + Math.sin(a) * (r - 1.5);
+    const cz = lz + Math.cos(a) * (r - 1.5);
+    const standing = hash(k, 1, 97) > 0.45;
+    if (standing) {
+      const height = 3 + hash(k, 2, 97) * 4;
+      column(b, cx, cz, height, 0.45, 0xc8c4b0);
+      b.add(G.blob, 0x4a7a2a, { x: cx, y: height * 0.6, z: cz }, {}, { x: 0.6, y: 1.2, z: 0.6 });
+    } else {
+      // Fallen, broken in two, lying in the grass.
+      b.add(G.fluted, 0xc8c4b0, { x: cx + Math.cos(a) * 1.5, y: 0.45, z: cz - Math.sin(a) * 1.5 }, { z: Math.PI / 2, y: a }, { x: 0.45, y: 3, z: 0.45 });
+      b.add(G.box, 0xc8c4b0, { x: cx, y: 0.15, z: cz }, {}, { x: 1.3, y: 0.3, z: 1.3 });
+    }
+  }
+  // Ivy and moss over the old floor.
+  for (let k = 0; k < 24; k++) {
+    const a = hash(k, 3, 97) * Math.PI * 2;
+    const d = hash(k, 4, 97) * (r - 2);
+    b.add(G.blob, k % 2 ? 0x3f6a2a : 0x5a8a3a, { x: lx + Math.sin(a) * d, y: 0.1, z: lz + Math.cos(a) * d }, {}, { x: 0.8, y: 0.15, z: 0.6 });
+  }
 }
 
 /** Hydra's Peak: grey-green rock, a ledge of steps winding round it, and a murky pool on top. */

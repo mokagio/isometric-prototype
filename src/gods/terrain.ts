@@ -5,6 +5,7 @@ import { OLYMPUS, ZEUS_RING } from "./zeus";
 import { ARTEMIS } from "./artemis";
 import { KRATOS } from "./kratos";
 import { PEAK } from "./hydra";
+import { LAIR } from "./medusa";
 
 /**
  * The lie of the open land: rolling hills you can walk up and over, flattened
@@ -41,6 +42,7 @@ function places(): Array<{ x: number; z: number; r: number }> {
     { x: ARTEMIS.x, z: ARTEMIS.z, r: ARTEMIS.r + ARTEMIS.thick + 12 },
     { x: KRATOS.x, z: KRATOS.z, r: KRATOS.r + KRATOS.thick + 12 },
     { x: PEAK.x, z: PEAK.z, r: PEAK.r + 12 },
+    { x: LAIR.x, z: LAIR.z, r: LAIR.r + 10 },
     ...CAMPS.map((c) => ({ x: c.x, z: c.z, r: 9 })),
   ];
 }

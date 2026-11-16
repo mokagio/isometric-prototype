@@ -27,6 +27,7 @@ import {
   HADES_BUILD,
   ZEUS_BUILD,
   KRONOS_BUILD,
+  MEDUSA_BUILD,
   ARTEMIS_BUILD,
   KRATOS_BUILD,
   ANGEL_BUILD,
@@ -78,6 +79,7 @@ import { addSnack, MAX_EACH, SNACK_INFO, SNACKS, useSnack, type Snack } from "./
 import { toon } from "./toon";
 import { buildScenery, HORIZON, placeStep, SKY_TOP } from "./scenery";
 import { groundY } from "./terrain";
+import { BODY as MEDUSA_BODY, gazeMeets, LAIR, makeMedusa, MEDUSA_HP, STONE_DAMAGE, STONE_TIME, strikeMedusa, stun, updateMedusa, type Medusa } from "./medusa";
 import {
   BODY as HYDRA_BODY,
   BODY_HP as HYDRA_BODY_HP,
@@ -1157,6 +1159,50 @@ function bossBarForHydra(h: Hydra): void {
   else hud.setBoss("The Hydra — strike its body!", h.body / HYDRA_BODY_HP);
 }
 
+// ---------------------------------------------------------------------------
+// Medusa, in her ruined temple
+
+let medusaFight: Fight = save.beaten.includes("medusa") ? "won" : "waiting";
+let medusa: { m: Medusa; fig: Figure; shadow: THREE.Mesh; flash: number } | null = null;
+/** Seconds left turned to stone. */
+let stone = 0;
+
+function startMedusa(): void {
+  medusaFight = "on";
+  const fig = buildFigure(MEDUSA_BUILD);
+  fig.root.scale.setScalar(1.7);
+  for (const c of fig.sword.children) c.visible = false;
+  fig.sword.add(weaponModel("whip"));
+  // Her hair is snakes: a ring of them round her head, each with its own little head.
+  const snake = toon(0x4a7a2a);
+  for (let k = 0; k < 9; k++) {
+    const a = (k / 9) * Math.PI * 2;
+    const s = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.04, 0.32, 5), snake);
+    s.position.set(Math.sin(a) * 0.16, 0.2, Math.cos(a) * 0.16 - 0.03);
+    s.rotation.set(Math.cos(a) * 0.9, 0, -Math.sin(a) * 0.9);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 4), snake);
+    head.position.y = 0.17;
+    s.add(head);
+    fig.head.add(s);
+  }
+  scene.add(fig.root);
+  medusa = { m: makeMedusa(LAIR.x, LAIR.z - 4, 0), fig, shadow: blob(2), flash: 0 };
+  hud.banner("MEDUSA", "Don't look her in the eye…", 3);
+  hud.setBoss("Medusa", 1);
+}
+
+function clearMedusa(): void {
+  if (!medusa) return;
+  scene.remove(medusa.fig.root, medusa.shadow);
+  medusa = null;
+}
+
+function endMedusaFight(): void {
+  clearMedusa();
+  stone = 0;
+  if (medusaFight === "on") medusaFight = "waiting";
+}
+
 function kronosFalls(): void {
   if (!kronos) return;
   kronosFight = "won";
@@ -1485,6 +1531,24 @@ function swingLands(
       burst(w.w.x, 0.8, w.w.z, 0x9a9aa0, 10, 5);
     }
   }
+  if (medusa && test(medusa.m.x, medusa.m.z, MEDUSA_BODY)) {
+    const result = strikeMedusa(medusa.m, power);
+    if (result !== "none") {
+      medusa.flash = 1;
+      hitAny = true;
+      burst(medusa.m.x, 2, medusa.m.z, 0x9ab88a, 14, 7);
+      hud.setBoss("Medusa", medusa.m.hp / MEDUSA_HP);
+      if (result === "dead") {
+        medusaFight = "won";
+        hud.setBoss(null, 0);
+        hud.banner("Medusa is beaten!", "Claim her armor", 3.5);
+        shake = 0.8;
+        stop = 0.25;
+        burst(medusa.m.x, 2, medusa.m.z, 0x9ab88a, 45, 10, 1.6);
+        spawnReward(medusa.m.x, medusa.m.z, "medusa");
+      }
+    }
+  }
   if (hydra && hydra.h.dead < 0) {
     const h = hydra.h;
     // A head in reach takes the blow; failing that, the body does.
@@ -1654,6 +1718,11 @@ function claimReward(): void {
   wearKit(heroFig, save.armor);
   hud.setArmor(save.armor);
   armHero();
+  if (kit === "medusa") {
+    hud.banner("Serpent-Scale Armor", "Your sword hits twice as hard", 4);
+    clearMedusa();
+    return;
+  }
   if (kit === "hydra") {
     hud.banner("Hydra-Scale Armor", "Tough as the beast, and your sword hits twice as hard", 4);
     clearHydra();
@@ -1701,6 +1770,7 @@ function respawn(): void {
   endKronosFight();
   endHunterFights();
   endHydraFight();
+  endMedusaFight();
   heroY = 0;
   falling = null;
   clearHades();
@@ -1802,6 +1872,13 @@ function update(dt: number): void {
     move.z *= 0.6;
   }
 
+  if (stone > 0) {
+    stone = Math.max(0, stone - dt);
+    controls.takeJump();
+    controls.takeAttack();
+    move.x = 0;
+    move.z = 0;
+  }
   if (controls.takeJump()) jump(hero);
   if (controls.takeAttack() && startSwing(hero)) {
     // Phones get help aiming: the swing turns to the nearest thing in front worth hitting.
@@ -1813,6 +1890,7 @@ function update(dt: number): void {
     if (kronos && kronos.k.state !== "dead") targets.push(kronos.k);
     if (artemis && artemis.a.state !== "dead") targets.push(artemis.a);
     if (kratos && kratos.k.state !== "dead") targets.push(kratos.k);
+    if (medusa && medusa.m.state !== "dead") targets.push(medusa.m);
     for (const w of wolves) if (w.w.dead < 0) targets.push(w.w);
     let best: { x: number; z: number } | null = null;
     let bestD = SWING_REACH + 2;
@@ -2138,6 +2216,36 @@ function update(dt: number): void {
   crumble();
   stepBack();
 
+  if (medusaFight === "waiting" && dist(hero.x, hero.z, LAIR.x, LAIR.z) < LAIR.r - 3 && standing(hero)) startMedusa();
+  if (medusa) {
+    const m = medusa.m;
+    for (const e of updateMedusa(m, sim, { x: hero.x, z: hero.z, alive: standing(hero) })) {
+      if (e.kind === "blow") heroLoses(e);
+      else if (e.kind === "roar") shake = 0.3;
+      else if (e.kind === "glare") hud.banner("Her eyes are glowing!", "Look away — or raise your shield at her!", 1.6);
+      else if (e.kind === "gaze" && standing(hero)) {
+        const meets = gazeMeets({ x: hero.x, z: hero.z, yaw: hero.yaw, blocking: hero.blocking }, m);
+        if (meets === "reflect") {
+          stun(m);
+          shake = 0.5;
+          burst(m.x, 2.4, m.z, 0xd8f0a0, 30, 7, 1.3);
+          hud.banner("Her gaze bounced back!", "She's stunned — hit her now!", 2);
+        } else if (meets === "stone") {
+          stone = STONE_TIME;
+          hero.hp = Math.max(1, hero.hp - damageTaken(STONE_DAMAGE, save.armor));
+          heroFlash = 1;
+          hud.banner("Turned to stone!", "", 1.6);
+        } else hud.banner("You looked away just in time!", "", 1.4);
+      }
+    }
+    if (m.state !== "dead") {
+      const q = pushOut(world, m.x, m.z, MEDUSA_BODY, true, true, true, true, false, true, true);
+      // She stays in her lair.
+      const d = dist(q.x, q.z, LAIR.x, LAIR.z);
+      m.x = d > LAIR.r - 1 ? LAIR.x + ((q.x - LAIR.x) / d) * (LAIR.r - 1) : q.x;
+      m.z = d > LAIR.r - 1 ? LAIR.z + ((q.z - LAIR.z) / d) * (LAIR.r - 1) : q.z;
+    }
+  }
   if (hydra) {
     for (const e of updateHydra(hydra.h, sim, { x: hero.x, z: hero.z, alive: standing(hero) })) {
       if (e.kind === "blow") heroLoses(e);
@@ -2393,7 +2501,7 @@ function update(dt: number): void {
   hud.setHealth(Math.ceil(hero.hp));
   hud.setCompass(
     camYaw,
-    fight === "on" || seaFight === "on" || zeusFight === "on" || kronosFight === "on" || artemisFight === "on" || kratosFight === "on" || hydraFight === "on" || inTartarus(hero.x, hero.z)
+    fight === "on" || seaFight === "on" || zeusFight === "on" || kronosFight === "on" || artemisFight === "on" || kratosFight === "on" || hydraFight === "on" || medusaFight === "on" || inTartarus(hero.x, hero.z)
       ? null
       : [
           { id: "colosseum", label: fight === "won" ? "Colosseum" : "Ares", yaw: yawTo(hero.x, hero.z, COLOSSEUM.x, COLOSSEUM.z) },
@@ -2406,6 +2514,7 @@ function update(dt: number): void {
           { id: "artemis", label: "Artemis", yaw: yawTo(hero.x, hero.z, ARTEMIS.x, ARTEMIS.z) },
           { id: "kratos", label: "Kratos", yaw: yawTo(hero.x, hero.z, KRATOS.x, KRATOS.z) },
           { id: "hydra", label: "Hydra", yaw: yawTo(hero.x, hero.z, PEAK.x, PEAK.z) },
+          { id: "medusa", label: "Medusa", yaw: yawTo(hero.x, hero.z, LAIR.x, LAIR.z) },
         ].filter(
           (m) =>
             (m.id !== "city" || !inCity(hero.x, hero.z)) &&
@@ -2577,6 +2686,23 @@ function draw(dt: number): void {
   scenery.doors.forEach((door, i) => (door.rotation.y = (i === 0 ? 1 : -1) * 1.45 * doorsOpen));
   scenery.artemisGate.position.y += ((artemisGateClosed ? 0 : 6) - scenery.artemisGate.position.y) * Math.min(1, dt * (artemisGateClosed ? 10 : 2));
   scenery.kratosGate.position.y += ((kratosGateClosed ? 0 : 6) - scenery.kratosGate.position.y) * Math.min(1, dt * (kratosGateClosed ? 10 : 2));
+  if (medusa) {
+    const m = medusa.m;
+    const fig = medusa.fig;
+    fig.root.position.set(m.x, 0, m.z);
+    fig.root.rotation.y = m.yaw;
+    let swing = -1;
+    if (m.state === "windup") swing = 0.38 * Math.min(1, m.t / 0.6);
+    else if (m.state === "swipe") swing = 0.38 + 0.24 * Math.min(1, m.t / 0.2);
+    else if (m.state === "recover") swing = 0.62 + 0.38 * Math.min(1, m.t / 0.4);
+    poseFigure(fig, dt, { speed: m.moving ? 2.6 : 0, swing, raise: m.state === "glare" ? 0.6 : 0, daze: m.state === "stunned" ? 1 : 0, fallen: m.state === "dead" ? m.t : -1 });
+    if (m.state === "glare") flash(fig, 0.45 + 0.45 * Math.sin(clock * 28), 0xd8f0a0);
+    else flash(fig, medusa.flash, 0xffffff);
+    medusa.flash = Math.max(0, medusa.flash - dt * 6);
+    medusa.shadow.position.set(m.x, 0.07, m.z);
+  }
+  // Stone grey while turned to stone.
+  if (stone > 0) flash(heroFig, 0.85, 0x9a9a92);
   if (hydra) {
     const h = hydra.h;
     const y = PEAK.h;
@@ -2749,7 +2875,7 @@ function draw(dt: number): void {
   updateSparks(dt);
 
   // Camera: behind the hero, pulled back and up in the arena so the god fits in frame.
-  const fighting = (ares !== null && ares.a.state !== "dead") || (poseidon !== null && poseidon.p.state !== "dead") || (hades !== null && hades.h.state !== "dead") || (zeus !== null && zeus.z.state !== "dead") || (kronos !== null && kronos.k.state !== "dead") || (artemis !== null && artemis.a.state !== "dead") || (kratos !== null && kratos.k.state !== "dead") || (hydra !== null && hydra.h.dead < 0);
+  const fighting = (ares !== null && ares.a.state !== "dead") || (poseidon !== null && poseidon.p.state !== "dead") || (hades !== null && hades.h.state !== "dead") || (zeus !== null && zeus.z.state !== "dead") || (kronos !== null && kronos.k.state !== "dead") || (artemis !== null && artemis.a.state !== "dead") || (kratos !== null && kratos.k.state !== "dead") || (hydra !== null && hydra.h.dead < 0) || (medusa !== null && medusa.m.state !== "dead");
   const back = (fighting ? CAM_DIST + 2.5 : CAM_DIST) * devZoom;
   const up = LOOK_HEIGHT + ((fighting ? CAM_HEIGHT + 1.6 : CAM_HEIGHT) - LOOK_HEIGHT) * devZoom;
   const tx = hero.x;
@@ -2852,7 +2978,7 @@ hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods
 if (import.meta.env.DEV) {
   Object.assign(window, {
     gods: {
-      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, zeusFight, kronosFight, hydraFight, hydra: hydra?.h ?? null, kronos: kronos?.k ?? null, artemis: artemis?.a ?? null, kratos: kratos?.k ?? null, wolves: wolves.map((w) => w.w), zeus: zeus?.z ?? null, heroY, falling, stairsBroken, collapse, foes: foes.map((f) => f.g) }),
+      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, zeusFight, kronosFight, hydraFight, hydra: hydra?.h ?? null, medusa: medusa?.m ?? null, stone, kronos: kronos?.k ?? null, artemis: artemis?.a ?? null, kratos: kratos?.k ?? null, wolves: wolves.map((w) => w.w), zeus: zeus?.z ?? null, heroY, falling, stairsBroken, collapse, foes: foes.map((f) => f.g) }),
       teleport(x: number, z: number, yaw = hero.yaw) {
         hero.x = x;
         hero.z = z;

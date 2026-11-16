@@ -3,6 +3,7 @@ import { HADES_RING, inTartarus } from "./hades";
 import { ARTEMIS } from "./artemis";
 import { KRATOS } from "./kratos";
 import { onPeak, PEAK } from "./hydra";
+import { LAIR } from "./medusa";
 import { inVolcano, VOLCANO } from "./volcano";
 import { MONUMENT, OLYMPUS, olympiaHouses, onOlympus, ZEUS_RING } from "./zeus";
 
@@ -326,6 +327,13 @@ export function trees(): Tree[] {
       // Clear round the two newest colosseums; Artemis's stands in a thick wood, Kratos's on bare rock.
       const fromArtemis = dist(x, z, ARTEMIS.x, ARTEMIS.z);
       if (fromArtemis < ARTEMIS.r + ARTEMIS.thick + 10 || dist(x, z, KRATOS.x, KRATOS.z) < KRATOS.r + KRATOS.thick + 50) continue;
+      // Medusa's lair: a clearing in the darkest wood, reached by one path from the north-east.
+      const fromLair = dist(x, z, LAIR.x, LAIR.z);
+      if (fromLair < LAIR.r + 6) continue;
+      if (fromLair < 110 && keep < 0.7 && !(Math.abs(Math.atan2(Math.sin(Math.atan2(x - LAIR.x, z - LAIR.z) - Math.atan2(-LAIR.x, -LAIR.z)), Math.cos(Math.atan2(x - LAIR.x, z - LAIR.z) - Math.atan2(-LAIR.x, -LAIR.z)))) < 0.18)) {
+        out.push({ x, z, size: 1.1 + hash(gx, gz, 4) * 0.8 });
+        continue;
+      }
       if (fromArtemis < 90 && keep < 0.55 && !(Math.abs(Math.atan2(x - ARTEMIS.x, z - ARTEMIS.z) - ARTEMIS.yaw) < 0.25)) {
         out.push({ x, z, size: 0.9 + hash(gx, gz, 4) * 0.8 });
         continue;

@@ -247,6 +247,18 @@ export function weaponModel(kind: string): THREE.Group {
   } else if (kind === "bow") {
     g.add(part(new THREE.TorusGeometry(0.7, 0.03, 6, 20, Math.PI * 0.8), m(0xdfe8f0), [0.5, 1, 1], [0, 0.1, 0], [0, 0, Math.PI * 0.6]));
     g.add(part(CYL, m(0xf4f4f0), [0.006, 1.1, 0.006], [-0.18, 0.1, 0]));
+  } else if (kind === "whip") {
+    // A green lash in links, curling away from the grip, a snake's head at the end.
+    const green = m(0x4a7a2a);
+    g.add(part(CYL, m(0x3a2a1e), [0.03, 0.3, 0.03], [0, 0, 0]));
+    let x = 0;
+    let y = 0.15;
+    for (let k = 0; k < 8; k++) {
+      x += 0.05 + k * 0.01;
+      y += 0.16;
+      g.add(part(SPHERE, green, [0.045, 0.06, 0.045], [x, y, 0]));
+    }
+    g.add(part(CONE, m(0x6a9a3a), [0.07, 0.16, 0.05], [x + 0.05, y + 0.12, 0], [0, 0, -0.5]));
   } else if (kind === "fang") {
     // A Hydra fang made a blade: curved, pale, dripping green.
     g.add(part(CYL, m(0x2a5a3a), [0.03, 0.22, 0.03], [0, 0, 0]));
@@ -357,6 +369,25 @@ export const KRATOS_BUILD: Build = {
   cape: 0x8a5a22,
 };
 
+/** Medusa: pale green skin, a gown of old bronze-green, eyes that turn you to stone. Her snakes are added by the game. */
+export const MEDUSA_BUILD: Build = {
+  body: "flesh",
+  skin: 0x9ab88a,
+  hair: 0x3f6a2a,
+  hairStyle: "long",
+  beard: null,
+  band: 0xd8c060,
+  tunic: 0x4a6a3a,
+  sandals: 0x3a2a1e,
+  eyes: GOD_EYES,
+  eyeGlow: true,
+  bulk: 1.1,
+  shield: null,
+  weapon: "sword",
+  blade: 0x9ab88a,
+  cape: 0x2a4a1a,
+};
+
 export const FISHER_BUILD: Build = {
   body: "flesh",
   skin: 0xc98a58,
@@ -386,6 +417,7 @@ export const KIT_PAINT: Record<Exclude<Kit, "none">, { metal: number; trim: numb
   artemis: { metal: 0xcfd8dc, trim: 0x6fbf6a, crest: 0x3f8a4a },
   kratos: { metal: 0x5a5a62, trim: 0xc8913a, crest: 0xc8913a },
   hydra: { metal: 0x3f8a5a, trim: 0xb8e05a, crest: 0x2a5a3a },
+  medusa: { metal: 0x6a8a3a, trim: 0xd8c060, crest: 0x2a4a1a },
 };
 
 export interface Figure {
@@ -970,7 +1002,7 @@ export function wearKit(fig: Figure, armor: Record<Slot, Kit>): void {
   for (const m of fig.hairline) m.visible = armor.helmet === "none";
   // One paint for the whole figure: the god's if any piece is the god's.
   const kits = Object.values(armor);
-  const kit: Kit = kits.includes("hydra") ? "hydra" : kits.includes("kratos") ? "kratos" : kits.includes("artemis") ? "artemis" : kits.includes("kronos") ? "kronos" : kits.includes("zeus") ? "zeus" : kits.includes("hades") ? "hades" : kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
+  const kit: Kit = kits.includes("medusa") ? "medusa" : kits.includes("hydra") ? "hydra" : kits.includes("kratos") ? "kratos" : kits.includes("artemis") ? "artemis" : kits.includes("kronos") ? "kronos" : kits.includes("zeus") ? "zeus" : kits.includes("hades") ? "hades" : kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
   if (kit !== "none") {
     const paint = KIT_PAINT[kit];
     fig.metal.color.setHex(paint.metal);
