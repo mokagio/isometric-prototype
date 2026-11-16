@@ -97,8 +97,9 @@ export function stepHero(h: Hero, dt: number, input: HeroInput): boolean {
 }
 
 /** Whether a body at `(tx, tz)` with radius `r` is under the blade of a swing. */
-export function underBlade(h: Hero, tx: number, tz: number, r: number): boolean {
-  return dist(h.x, h.z, tx, tz) <= SWING_REACH + r && inArc(h.yaw, h.x, h.z, tx, tz, SWING_ARC);
+/** Whether the swing catches something of radius `r` at `(tx, tz)`; a longer weapon passes its own reach. */
+export function underBlade(h: Hero, tx: number, tz: number, r: number, reach = SWING_REACH): boolean {
+  return dist(h.x, h.z, tx, tz) <= reach + r && inArc(h.yaw, h.x, h.z, tx, tz, SWING_ARC);
 }
 
 export function hurtHero(h: Hero, damage: number, fromX: number, fromZ: number, heavy: boolean): void {

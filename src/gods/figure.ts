@@ -215,6 +215,50 @@ export const ZEUS_BUILD: Build = {
   cape: 0x2a4fb0,
 };
 
+/**
+ * A weapon on its own, to hang in the hero's hand in place of the sword the doll
+ * was built with: shapes along +y from the grip, as the doll's own weapons are.
+ */
+export function weaponModel(kind: string): THREE.Group {
+  const g = new THREE.Group();
+  const m = (color: number, glow = 0x000000): THREE.MeshToonMaterial => toon(color, { emissive: glow });
+  const gold = m(0xe8b83e, 0x302008);
+  const wood = m(0x7a5232);
+  if (kind === "sword" || kind === "ares") {
+    const blade = kind === "ares" ? m(0xb3271f, 0x300808) : m(0xdfe8f0);
+    const k = kind === "ares" ? 1.15 : 1;
+    g.add(part(xiphos(), blade, [k, k, k], [0, 0.1, 0]));
+    g.add(part(BOX, kind === "ares" ? gold : m(0xb88a2e), [0.18 * k, 0.035, 0.05], [0, 0.09, 0]));
+    g.add(part(CYL, m(0x6b4429), [0.024, 0.15, 0.024], [0, 0, 0]));
+    g.add(part(SPHERE, gold, [0.035, 0.035, 0.035], [0, -0.09, 0]));
+  } else if (kind === "trident" || kind === "bident") {
+    const metal = kind === "trident" ? gold : m(0x5fe08a, 0x0a3018);
+    g.add(part(CYL, kind === "trident" ? wood : m(0x1a1418), [0.022, 1.9, 0.022], [0, 0.35, 0]));
+    g.add(part(BOX, metal, [0.34, 0.04, 0.04], [0, 1.3, 0]));
+    for (const x of kind === "bident" ? [-0.13, 0.13] : [-0.15, 0, 0.15]) {
+      g.add(part(CYL, metal, [0.018, x === 0 ? 0.42 : 0.32, 0.018], [x, x === 0 ? 1.51 : 1.46, 0]));
+      g.add(part(CONE, metal, [0.04, 0.12, 0.04], [x, x === 0 ? 1.77 : 1.67, 0]));
+    }
+  } else if (kind === "bolt") {
+    g.add(new THREE.Mesh(boltGeometry(), new THREE.MeshBasicMaterial({ color: 0xfff27a })));
+  } else if (kind === "scythe") {
+    g.add(part(CYL, m(0x3a2a1e), [0.03, 2.2, 0.03], [0, 0.6, 0]));
+    g.add(part(new THREE.TorusGeometry(0.6, 0.06, 6, 18, Math.PI * 0.75), m(0xc0c4cc), [1, 1, 0.4], [0.6, 1.62, 0], [0, 0, Math.PI * 0.55]));
+  } else if (kind === "bow") {
+    g.add(part(new THREE.TorusGeometry(0.7, 0.03, 6, 20, Math.PI * 0.8), m(0xdfe8f0), [0.5, 1, 1], [0, 0.1, 0], [0, 0, Math.PI * 0.6]));
+    g.add(part(CYL, m(0xf4f4f0), [0.006, 1.1, 0.006], [-0.18, 0.1, 0]));
+  } else if (kind === "club") {
+    const iron = m(0x4a4a52);
+    g.add(part(new THREE.CylinderGeometry(1, 0.55, 1, 10), m(0x5a3a22), [0.1, 0.95, 0.1], [0, 0.42, 0]));
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      g.add(part(CONE, iron, [0.03, 0.08, 0.03], [Math.sin(a) * 0.1, 0.72 + (k % 2) * 0.12, Math.cos(a) * 0.1], [Math.cos(a) * 1.4, 0, -Math.sin(a) * 1.4]));
+    }
+  }
+  for (const c of g.children) c.castShadow = true;
+  return g;
+}
+
 /** A lightning bolt held like a blade along +y: a zigzag, thick enough to read at a distance. */
 export function boltGeometry(): THREE.BufferGeometry {
   const s = new THREE.Shape();

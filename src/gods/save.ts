@@ -1,4 +1,5 @@
 import { NO_ARMOR, SLOTS, type Armor, type Kit, type Slot } from "./armor";
+import { WEAPON_IDS, type WeaponId } from "./weapons";
 
 /** What a run keeps between visits: purse, kit, and which gods are down. */
 export interface Save {
@@ -7,12 +8,14 @@ export interface Save {
   beaten: string[];
   /** Bronze pieces bought from the blacksmith, kept while a god's kit is worn over them. */
   bronze: Slot[];
+  /** The weapon in hand: the sword, or a beaten god's. */
+  weapon: WeaponId;
 }
 
 export const SAVE_KEY = "gods:save";
 
 export function freshSave(): Save {
-  return { coins: 0, armor: { ...NO_ARMOR }, beaten: [], bronze: [] };
+  return { coins: 0, armor: { ...NO_ARMOR }, beaten: [], bronze: [], weapon: "sword" };
 }
 
 const KITS: readonly Kit[] = ["none", "bronze", "ares", "poseidon", "hades", "zeus", "kronos", "artemis", "kratos"];
@@ -36,7 +39,8 @@ export function decodeSave(raw: string | null): Save {
     const bronze = Array.isArray(d.bronze)
       ? SLOTS.filter((s) => (d.bronze as unknown[]).includes(s))
       : SLOTS.filter((s) => armor[s] === "bronze");
-    return { coins, armor, beaten, bronze };
+    const weapon = WEAPON_IDS.includes(d.weapon as WeaponId) ? (d.weapon as WeaponId) : "sword";
+    return { coins, armor, beaten, bronze, weapon };
   } catch {
     return freshSave();
   }

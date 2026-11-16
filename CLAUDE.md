@@ -225,7 +225,7 @@ Hades takes turns between two tricks: he vanishes and comes back behind you, glo
 
 South of the city, Zeus's colosseum (`zeus.ts`) stands at the foot of Mount Olympus with its back against the bottom step; the back is a gap in the batch filled by `backWall` blocks, and beating him knocks them out and opens it in `pushOut`.
 Zeus parries from the front, throws bolts at a hero who keeps away, and calls a storm — rings on the floor, one under the hero, then lightning — that leaves him spent and open.
-His whole kit makes the hero's sword a lightning bolt (`armHero`) and hits three times as hard.
+Beating any god also wins their weapon (`weapons.ts`): claiming the prize puts it in the hero's hand (`armHero` hangs a `weaponModel` in place of the doll's sword), and the wardrobe switches between every one won. Each has its own power and reach; a blow lands with the weapon's power or the armour's, whichever is more. The Bow of Artemis looses arrows that go through the same `swingLands` as a swing, testing where the arrow has got to instead of the blade's arc.
 The stairs climb to Olympia on the summit: a monument whose door bursts open the moment the hero reaches the top, and Kronos (`kronos.ts`) strides out — his scythe sweeps all the way round, and his trick slows the hero's whole world (`SLOW`, applied to the hero's own step) until it wears off and leaves him tired and open; the angels' houses, and angels who walk or fly in circles and are only drawn when the hero is near the mountain.
 
 Out in the open country stand two more colosseums: Artemis's (`artemis.ts`) in a thick wood to the north-west, and Kratos's (`kratos.ts`, the god of strength from the myths, deliberately not the video-game character) on bare rock to the south-east.

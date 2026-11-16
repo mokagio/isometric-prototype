@@ -11,7 +11,7 @@ import {
   updatePoseidon,
   type Poseidon,
 } from "./poseidon";
-import { buy, damageTaken, godKit, outfitArmor, outfits, shieldStops, swordPower, wearsFullKit, wornOutfit, type Kit } from "./armor";
+import { buy, damageTaken, godKit, outfitArmor, outfits, shieldStops, swordPower, wornOutfit, type Kit } from "./armor";
 import { dist, inArc, yawTo } from "./bearing";
 import { createControls } from "./controls";
 import {
@@ -31,6 +31,7 @@ import {
   KRATOS_BUILD,
   ANGEL_BUILD,
   boltGeometry,
+  weaponModel,
   LAVA_SKELETON_BUILD,
   DROWNED_BUILD,
   SKELETON_BUILD,
@@ -75,6 +76,7 @@ import { loadSave, SAVE_KEY, storeSave } from "./save";
 import { toon } from "./toon";
 import { buildScenery, HORIZON, placeStep, SKY_TOP } from "./scenery";
 import { groundY } from "./terrain";
+import { ARROW_RANGE, ARROW_SPEED, blowPower, ownedWeapons, WEAPON_OF, WEAPONS, type WeaponId } from "./weapons";
 import {
   ARTEMIS,
   ARTEMIS_HP,
@@ -795,15 +797,43 @@ function updateAngels(dt: number): void {
   }
 }
 
-/** With Zeus's whole kit on, the hero's sword is a lightning bolt. */
-const heroBolt = new THREE.Mesh(boltGeometry(), boltGlow);
-heroBolt.position.y = 0.05;
-heroFig.sword.add(heroBolt);
+/** The weapon in the hero's hand: the doll's own sword is hidden and the chosen one hung there instead. */
+const heldModels = new Map<WeaponId, THREE.Group>();
 function armHero(): void {
-  const lightning = wearsFullKit(save.armor, "zeus");
-  for (const c of heroFig.sword.children) c.visible = c === heroBolt ? lightning : !lightning;
+  for (const c of heroFig.sword.children) if (![...heldModels.values()].includes(c as THREE.Group)) c.visible = false;
+  let model = heldModels.get(save.weapon);
+  if (!model) {
+    model = weaponModel(save.weapon);
+    heldModels.set(save.weapon, model);
+    heroFig.sword.add(model);
+  }
+  for (const [id, m] of heldModels) m.visible = id === save.weapon;
 }
 armHero();
+
+/** Arrows loosed from the Bow of Artemis, flying until they hit something or run out of range. */
+const heroArrowGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.1, 5).rotateX(Math.PI / 2);
+const heroArrowMat = toon(0xf4f4f0);
+let heroArrows: Array<{ mesh: THREE.Mesh; x: number; z: number; yaw: number; fromX: number; fromZ: number; flown: number; y: number }> = [];
+function looseArrow(): void {
+  const mesh = new THREE.Mesh(heroArrowGeo, heroArrowMat);
+  scene.add(mesh);
+  heroArrows.push({ mesh, x: hero.x, z: hero.z, yaw: hero.yaw, fromX: hero.x, fromZ: hero.z, flown: 0, y: heroY + 1.4 });
+}
+function stepArrows(dt: number): void {
+  for (const a of heroArrows) {
+    const step = ARROW_SPEED * dt;
+    a.x += Math.sin(a.yaw) * step;
+    a.z += Math.cos(a.yaw) * step;
+    a.flown += step;
+    const hit = swingLands((x, z, r) => dist(a.x, a.z, x, z) < r + 0.5, a.fromX, a.fromZ);
+    if (hit || a.flown > ARROW_RANGE) a.flown = Infinity;
+    a.mesh.position.set(a.x, a.y, a.z);
+    a.mesh.rotation.y = a.yaw;
+  }
+  for (const a of heroArrows.filter((a) => a.flown === Infinity)) scene.remove(a.mesh);
+  heroArrows = heroArrows.filter((a) => a.flown !== Infinity);
+}
 
 // ---------------------------------------------------------------------------
 // Kronos, behind the monument's door
@@ -1243,20 +1273,29 @@ function heroLoses(blow: Blow): void {
   }
 }
 
-function swingLands(): void {
-  const power = swordPower(save.armor);
+/**
+ * A blow lands: on whatever `test` says it catches, struck from `(fromX, fromZ)` so a
+ * shield or a guard can turn it. A sword's swing tests its own arc; an arrow tests
+ * where it has got to. Hands back whether it hit anything.
+ */
+function swingLands(
+  test: (x: number, z: number, r: number) => boolean = (x, z, r) => underBlade(hero, x, z, r, WEAPONS[save.weapon].reach),
+  fromX = hero.x,
+  fromZ = hero.z,
+): boolean {
+  const power = blowPower(save.weapon, swordPower(save.armor));
   let hitAny = false;
   for (const f of foes) {
-    if (!underBlade(hero, f.g.x, f.g.z, 0.5)) continue;
-    const result = strikeGrunt(f.g, power, hero.x, hero.z);
+    if (!test(f.g.x, f.g.z, 0.5)) continue;
+    const result = strikeGrunt(f.g, power, fromX, fromZ);
     if (result === "none") continue;
     hitAny = true;
     f.flash = 1;
     burst(f.g.x, 1.2, f.g.z, f.g.kind === "bandit" ? 0xd9b98a : 0xffd27a, result === "hurt" ? 8 : 16, 6);
     if (result === "dead") dropCoins(f.g.x, f.g.z, BOUNTY[f.g.kind]);
   }
-  if (ares && underBlade(hero, ares.a.x, ares.a.z, BODY)) {
-    const result = strikeAres(ares.a, power, hero.x, hero.z);
+  if (ares && test(ares.a.x, ares.a.z, BODY)) {
+    const result = strikeAres(ares.a, power, fromX, fromZ);
     const ax = ares.a.x;
     const az = ares.a.z;
     if (result === "clang") {
@@ -1274,12 +1313,12 @@ function swingLands(): void {
     }
   }
   for (const w of wolves) {
-    if (underBlade(hero, w.w.x, w.w.z, 0.5) && strikeWolf(w.w, power)) {
+    if (test(w.w.x, w.w.z, 0.5) && strikeWolf(w.w, power)) {
       hitAny = true;
       burst(w.w.x, 0.8, w.w.z, 0x9a9aa0, 10, 5);
     }
   }
-  if (artemis && underBlade(hero, artemis.a.x, artemis.a.z, ARTEMIS_BODY)) {
+  if (artemis && test(artemis.a.x, artemis.a.z, ARTEMIS_BODY)) {
     const result = strikeArtemis(artemis.a, power);
     if (result !== "none") {
       artemis.flash = 1;
@@ -1289,9 +1328,9 @@ function swingLands(): void {
       if (result === "dead") hunterFalls("artemis", artemis.a.x, artemis.a.z);
     }
   }
-  if (kratos && underBlade(hero, kratos.k.x, kratos.k.z, KRATOS_BODY)) {
+  if (kratos && test(kratos.k.x, kratos.k.z, KRATOS_BODY)) {
     const k = kratos.k;
-    const result = strikeKratos(k, power, hero.x, hero.z);
+    const result = strikeKratos(k, power, fromX, fromZ);
     if (result === "clang") {
       burst(k.x + Math.sin(k.yaw) * 1.3, 2, k.z + Math.cos(k.yaw) * 1.3, 0xfff2a0, 14, 7);
       shove(hero, k.x, k.z, 8);
@@ -1305,9 +1344,9 @@ function swingLands(): void {
       if (result === "dead") hunterFalls("kratos", k.x, k.z);
     }
   }
-  if (kronos && kronos.k.state !== "emerge" && underBlade(hero, kronos.k.x, kronos.k.z, KRONOS_BODY)) {
+  if (kronos && kronos.k.state !== "emerge" && test(kronos.k.x, kronos.k.z, KRONOS_BODY)) {
     const k = kronos.k;
-    const result = strikeKronos(k, power, hero.x, hero.z);
+    const result = strikeKronos(k, power, fromX, fromZ);
     if (result === "clang") {
       burst(k.x + Math.sin(k.yaw) * 1.3, OLYMPUS.h + 2, k.z + Math.cos(k.yaw) * 1.3, 0xd8c8ff, 14, 7);
       shove(hero, k.x, k.z, 8);
@@ -1321,9 +1360,9 @@ function swingLands(): void {
       if (result === "dead") kronosFalls();
     }
   }
-  if (zeus && underBlade(hero, zeus.z.x, zeus.z.z, ZEUS_BODY)) {
+  if (zeus && test(zeus.z.x, zeus.z.z, ZEUS_BODY)) {
     const zz = zeus.z;
-    const result = strikeZeus(zz, power, hero.x, hero.z);
+    const result = strikeZeus(zz, power, fromX, fromZ);
     if (result === "clang") {
       burst(zz.x + Math.sin(zz.yaw) * 1.2, 1.8, zz.z + Math.cos(zz.yaw) * 1.2, 0xfff27a, 14, 7);
       shove(hero, zz.x, zz.z, 7);
@@ -1337,9 +1376,9 @@ function swingLands(): void {
       if (result === "dead") zeusFalls();
     }
   }
-  if (hades && underBlade(hero, hades.h.x, hades.h.z, HADES_BODY)) {
+  if (hades && test(hades.h.x, hades.h.z, HADES_BODY)) {
     const h = hades.h;
-    const result = strikeHades(h, power, hero.x, hero.z);
+    const result = strikeHades(h, power, fromX, fromZ);
     if (result === "clang") {
       burst(h.x + Math.sin(h.yaw) * 1.2, TARTARUS.y + 1.8, h.z + Math.cos(h.yaw) * 1.2, 0x9fffc0, 14, 7);
       shove(hero, h.x, h.z, 7);
@@ -1353,9 +1392,9 @@ function swingLands(): void {
       if (result === "dead") hadesFalls();
     }
   }
-  if (poseidon && underBlade(hero, poseidon.p.x, poseidon.p.z, SEA_BODY)) {
+  if (poseidon && test(poseidon.p.x, poseidon.p.z, SEA_BODY)) {
     const p = poseidon.p;
-    const result = strikePoseidon(p, power, hero.x, hero.z);
+    const result = strikePoseidon(p, power, fromX, fromZ);
     if (result === "clang") {
       // Turned aside by the trident, or by the sea itself while it is up.
       burst(p.x + Math.sin(p.yaw) * 1.2, 1.8, p.z + Math.cos(p.yaw) * 1.2, p.state === "flood" ? 0x9fe8ff : 0xfff2a0, 14, 7);
@@ -1370,7 +1409,7 @@ function swingLands(): void {
       if (result === "dead") poseidonFalls();
     }
   }
-  if (hitAny && wearsFullKit(save.armor, "zeus")) {
+  if (hitAny && save.weapon === "bolt") {
     const tx = hero.x + Math.sin(hero.yaw) * 1.6;
     const tz = hero.z + Math.cos(hero.yaw) * 1.6;
     burst(tx, heroY + 1.2, tz, 0xfff27a, 12, 8, 0.9);
@@ -1379,6 +1418,7 @@ function swingLands(): void {
     stop = Math.max(stop, 0.05);
     shake = Math.max(shake, 0.12);
   }
+  return hitAny;
 }
 
 function aresFalls(): void {
@@ -1403,6 +1443,11 @@ function claimReward(): void {
   burst(reward.x, 1.5, reward.z, 0xffd860, 50, 9, 1.4);
   const kit = reward.kit;
   reward = null;
+  const prize = WEAPON_OF[kit];
+  if (prize) {
+    save.weapon = prize;
+    window.setTimeout(() => hud.banner(WEAPONS[prize].name, "It's yours! Switch weapons with the Armor button", 3.5), 4300);
+  }
   save.armor = godKit(kit);
   if (!save.beaten.includes(kit)) save.beaten.push(kit);
   storeSave(save);
@@ -1469,14 +1514,26 @@ let shopRedraw: ((coins: number, armor: typeof save.armor) => void) | null = nul
 // The wardrobe: swap into any armour already owned.
 hud.onWardrobe(() => {
   if (hud.shopOpen()) return;
-  hud.openWardrobe(outfits(save.beaten, save.bronze), wornOutfit(save.armor), (outfit) => {
+  hud.openWardrobe(
+    outfits(save.beaten, save.bronze),
+    wornOutfit(save.armor),
+    (outfit) => {
     save.armor = outfitArmor(outfit, save.bronze);
     storeSave(save);
     wearKit(heroFig, save.armor);
     armHero();
     hud.setArmor(save.armor);
     burst(hero.x, heroY + 1.2, hero.z, 0xffd860, 20, 5, 1);
-  });
+    },
+    ownedWeapons(save.beaten).map((id) => ({ id, name: WEAPONS[id].name })),
+    save.weapon,
+    (id) => {
+      save.weapon = id as WeaponId;
+      storeSave(save);
+      armHero();
+      burst(hero.x, heroY + 1.2, hero.z, 0xfff2a0, 16, 5, 0.9);
+    },
+  );
 });
 function openShop(): void {
   shopRedraw = hud.openShop(
@@ -1568,7 +1625,11 @@ function update(dt: number): void {
   // While Kronos holds time, the hero's own world runs slow.
   const heroSim = kronos && kronos.k.slow > 0 ? sim * SLOW : sim;
   const was = { x: hero.x, z: hero.z };
-  if (stepHero(hero, heroSim, { move, block: blocking })) swingLands();
+  if (stepHero(hero, heroSim, { move, block: blocking })) {
+    if (WEAPONS[save.weapon].ranged) looseArrow();
+    else swingLands();
+  }
+  stepArrows(sim);
   const p = pushOut(world, hero.x, hero.z, RADIUS, gateClosed, seaGateClosed, hadesGateClosed, zeusGateClosed, zeusFight === "won", artemisGateClosed, kratosGateClosed);
   hero.x = p.x;
   hero.z = p.z;
@@ -2341,7 +2402,7 @@ function draw(dt: number): void {
   if (strikes.length > 0 && strikes[0]!.t >= STORM_WARN + 0.3) clearStrikes();
   scenery.zeusGate.position.y += ((zeusGateClosed ? 0 : 6) - scenery.zeusGate.position.y) * Math.min(1, dt * (zeusGateClosed ? 10 : 2));
   // The lightning sword crackles as it swings.
-  if (hero.swing >= 0 && wearsFullKit(save.armor, "zeus") && Math.random() < 0.7) {
+  if (hero.swing >= 0 && save.weapon === "bolt" && Math.random() < 0.7) {
     burst(hero.x + Math.sin(hero.yaw) * 1.3, heroY + 1.3, hero.z + Math.cos(hero.yaw) * 1.3, 0xfff27a, 1, 4, 0.6);
   }
   for (const p of scenery.portals) p.children[1]!.rotation.z = -clock * 2;

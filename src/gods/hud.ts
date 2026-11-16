@@ -12,7 +12,14 @@ export interface Hud {
   openShop(coins: number, armor: Armor, onBuy: (slot: Slot) => void, onClose: () => void): (coins: number, armor: Armor) => void;
   shopOpen(): boolean;
   /** Lists the outfits the hero owns; picking one hands it back and closes the card. */
-  openWardrobe(owned: Outfit[], worn: Outfit, onPick: (outfit: Outfit) => void): void;
+  openWardrobe(
+    owned: Outfit[],
+    worn: Outfit,
+    onPick: (outfit: Outfit) => void,
+    weapons: Array<{ id: string; name: string }>,
+    held: string,
+    onWeapon: (id: string) => void,
+  ): void;
   /** Called when the armour button by the pips is pressed. */
   onWardrobe(handler: () => void): void;
   /** Light the slots the hero is wearing. */
@@ -185,11 +192,11 @@ export function createHud(): Hud {
     onWardrobe(handler) {
       wardrobeHandler = handler;
     },
-    openWardrobe(owned, worn, onPick) {
+    openWardrobe(owned, worn, onPick, weapons, held, onWeapon) {
       shop.innerHTML = "";
       const card = div("gd-shop-card");
       const head = div("gd-shop-head");
-      head.innerHTML = `<h2>Your Armor</h2>`;
+      head.innerHTML = `<h2>Your Armor and Weapons</h2>`;
       card.appendChild(head);
       const lede = document.createElement("p");
       lede.className = "gd-shop-lede";
@@ -215,6 +222,27 @@ export function createHud(): Hud {
           onPick(outfit);
         });
         row.append(sw, name, b);
+        card.appendChild(row);
+      }
+      const sub = document.createElement("p");
+      sub.className = "gd-shop-lede";
+      sub.textContent = "Weapons";
+      card.appendChild(sub);
+      for (const w of weapons) {
+        const row = div("gd-shop-row");
+        const name = document.createElement("span");
+        name.className = "gd-shop-name";
+        name.textContent = w.name;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "gd-shop-buy";
+        b.textContent = w.id === held ? "Holding" : "Hold";
+        b.disabled = w.id === held;
+        b.addEventListener("click", () => {
+          shop.hidden = true;
+          onWeapon(w.id);
+        });
+        row.append(div("gd-weapon-dot"), name, b);
         card.appendChild(row);
       }
       const close = document.createElement("button");
