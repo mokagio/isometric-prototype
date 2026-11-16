@@ -4,6 +4,7 @@ import { ARTEMIS } from "./artemis";
 import { KRATOS } from "./kratos";
 import { onPeak, PEAK } from "./hydra";
 import { LAIR } from "./medusa";
+import { MAZE, MAZE_CENTRE, mazeWalls } from "./maze";
 import { inVolcano, VOLCANO } from "./volcano";
 import { MONUMENT, OLYMPUS, olympiaHouses, onOlympus, ZEUS_RING } from "./zeus";
 
@@ -328,6 +329,7 @@ export function trees(): Tree[] {
       const fromArtemis = dist(x, z, ARTEMIS.x, ARTEMIS.z);
       if (fromArtemis < ARTEMIS.r + ARTEMIS.thick + 10 || dist(x, z, KRATOS.x, KRATOS.z) < KRATOS.r + KRATOS.thick + 50) continue;
       // Medusa's lair: a clearing in the darkest wood, reached by one path from the north-east.
+      if (Math.abs(x - MAZE_CENTRE.x) < (MAZE.size * MAZE.cell) / 2 + 8 && Math.abs(z - MAZE_CENTRE.z) < (MAZE.size * MAZE.cell) / 2 + 8) continue;
       const fromLair = dist(x, z, LAIR.x, LAIR.z);
       if (fromLair < LAIR.r + 6) continue;
       if (fromLair < 110 && keep < 0.7 && !(Math.abs(Math.atan2(Math.sin(Math.atan2(x - LAIR.x, z - LAIR.z) - Math.atan2(-LAIR.x, -LAIR.z)), Math.cos(Math.atan2(x - LAIR.x, z - LAIR.z) - Math.atan2(-LAIR.x, -LAIR.z)))) < 0.18)) {
@@ -364,6 +366,8 @@ export const TRUNK_R = 0.5;
 
 export function layoutWorld(): World {
   const boxes: Box[] = [...houses(), ...huts(), ...olympiaHouses(), ...hamletHouses()].map((h) => ({ x0: h.x - h.w / 2, z0: h.z - h.d / 2, x1: h.x + h.w / 2, z1: h.z + h.d / 2 }));
+  // The labyrinth's walls.
+  boxes.push(...mazeWalls());
   // The monument, steps and all.
   boxes.push({ x0: MONUMENT.x - MONUMENT.w / 2 - 2, z0: MONUMENT.z - MONUMENT.d / 2 - 2, x1: MONUMENT.x + MONUMENT.w / 2 + 2, z1: MONUMENT.z + MONUMENT.d / 2 + 2 });
   // The forge and counter, with the smith behind them.

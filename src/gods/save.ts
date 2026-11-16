@@ -23,7 +23,7 @@ export function freshSave(): Save {
   return { coins: 0, armor: { ...NO_ARMOR }, beaten: [], bronze: [], weapon: "sword", bought: [], pantry: {} };
 }
 
-const KITS: readonly Kit[] = ["none", "bronze", "ares", "poseidon", "hades", "zeus", "kronos", "artemis", "kratos", "hydra", "medusa"];
+const KITS: readonly Kit[] = ["none", "bronze", "ares", "poseidon", "hades", "zeus", "kronos", "artemis", "kratos", "hydra", "medusa", "minotaur"];
 
 /** Anything unreadable starts the run over rather than half-loading it. */
 export function decodeSave(raw: string | null): Save {

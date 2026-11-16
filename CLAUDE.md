@@ -239,6 +239,8 @@ The hero can jump (the green button, or C): `hero.air` is how high, and a jump c
 
 Medusa (`medusa.ts`) waits in a ruined temple in the south-west forest, ringed by warriors she turned to stone. Her gaze is the trick, after Perseus: look away and it misses, keep looking and you are stone for a while, raise the shield toward her and it rebounds and stuns her, when blows land twice over (`gazeMeets`). She drops serpent-scale armour and the Snake Whip.
 
+The labyrinth (`maze.ts`) stands in the west: walls cut on a grid by a seeded random walk from the door, so it is the same every game and every cell reaches the door, with the Minotaur's room cleared in the middle. The Minotaur (`minotaur.ts`) swings a labrys and charges like a bull; a charge into a wall leaves his horns stuck, which is the opening. He drops horned armour and the Labrys.
+
 On the dev server `window.gods` can read state, teleport the hero and add coins, so a recording can reach the colosseum without walking the road.
 Progress is under the `gods:save` storage key.
 

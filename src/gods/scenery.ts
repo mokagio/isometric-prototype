@@ -11,6 +11,7 @@ import { ARTEMIS } from "./artemis";
 import { KRATOS } from "./kratos";
 import { ledgeAt, LEDGE_HALF, PEAK, peakSlope, SINK, STEPS } from "./hydra";
 import { LAIR } from "./medusa";
+import { DOOR as MAZE_DOOR, MAZE, mazeWalls, ROOM_CENTRE } from "./maze";
 import { toon } from "./toon";
 import {
   BRIDGE_HALF,
@@ -278,6 +279,7 @@ export function buildScenery(): Scenery {
   colosseum(batch, KRATOS_LOOK);
   hydraPeak(batch);
   medusaLair(batch);
+  labyrinth(batch);
   // Boulders strewn round Kratos's colosseum, the bare rock it stands on.
   for (let k = 0; k < 40; k++) {
     const a = hash(k, 1, 95) * Math.PI * 2;
@@ -1552,6 +1554,30 @@ function olympia(b: Batch): void {
     else cypress(b, tx, tz, 0.8);
   }
   b.setFrame();
+}
+
+/** The labyrinth: high walls of grey stone with a lighter coping, a paved room in the middle, bones at its door. */
+function labyrinth(b: Batch): void {
+  const { height } = MAZE;
+  for (const w of mazeWalls()) {
+    const cx = (w.x0 + w.x1) / 2;
+    const cz = (w.z0 + w.z1) / 2;
+    const sx = w.x1 - w.x0;
+    const sz = w.z1 - w.z0;
+    b.add(G.box, hash(Math.round(cx), Math.round(cz), 98) > 0.5 ? 0x8a8478 : 0x7a7468, { x: cx, y: height / 2, z: cz }, {}, { x: sx, y: height, z: sz });
+    b.add(G.box, 0xa8a294, { x: cx, y: height + 0.15, z: cz }, {}, { x: sx + 0.2, y: 0.3, z: sz + 0.2 });
+  }
+  // Packed earth through the passages, and the room's floor of old slabs.
+  const side = MAZE.size * MAZE.cell;
+  b.add(G.box, 0xa8906a, { x: MAZE.x0 + side / 2, y: 0.02, z: MAZE.z0 + side / 2 }, {}, { x: side, y: 0.04, z: side });
+  b.add(G.box, 0xb8b0a0, { x: ROOM_CENTRE.x, y: 0.05, z: ROOM_CENTRE.z }, {}, { x: MAZE.cell * 3 - 1, y: 0.04, z: MAZE.cell * 3 - 1 });
+  // Bull's horns over the door, and bones before it.
+  for (const s of [-1, 1]) {
+    b.add(G.cone, 0xe8dcc4, { x: MAZE_DOOR.x + 0.6, y: height + 1, z: MAZE_DOOR.z + s * 1.4 }, { x: s * -0.6 }, { x: 0.25, y: 1.6, z: 0.25 });
+  }
+  for (let k = 0; k < 6; k++) {
+    b.add(G.cyl8, 0xe9e1c9, { x: MAZE_DOOR.x + 2 + hash(k, 1, 98) * 4, y: 0.06, z: MAZE_DOOR.z + (hash(k, 2, 98) - 0.5) * 5 }, { z: Math.PI / 2, y: k }, { x: 0.05, y: 0.7, z: 0.05 });
+  }
 }
 
 /** Medusa's lair: an old temple's floor in a forest clearing, its columns fallen, ivy everywhere. */

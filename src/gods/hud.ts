@@ -379,6 +379,7 @@ export const OUTFIT_NAMES: Record<Outfit, string> = {
   kratos: "Armor of Kratos",
   hydra: "Hydra-Scale Armor",
   medusa: "Serpent-Scale Armor",
+  minotaur: "Horned Armor of the Minotaur",
 };
 
 function div(className: string): HTMLElement {

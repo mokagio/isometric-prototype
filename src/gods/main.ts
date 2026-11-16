@@ -28,6 +28,7 @@ import {
   ZEUS_BUILD,
   KRONOS_BUILD,
   MEDUSA_BUILD,
+  MINOTAUR_BUILD,
   ARTEMIS_BUILD,
   KRATOS_BUILD,
   ANGEL_BUILD,
@@ -79,6 +80,8 @@ import { addSnack, MAX_EACH, SNACK_INFO, SNACKS, useSnack, type Snack } from "./
 import { toon } from "./toon";
 import { buildScenery, HORIZON, placeStep, SKY_TOP } from "./scenery";
 import { groundY } from "./terrain";
+import { inRoomAt, mazeWalls, ROOM_CENTRE } from "./maze";
+import { BODY as MINOTAUR_BODY, makeMinotaur, MINOTAUR_HP, strikeMinotaur, updateMinotaur, type Minotaur } from "./minotaur";
 import { BODY as MEDUSA_BODY, gazeMeets, LAIR, makeMedusa, MEDUSA_HP, STONE_DAMAGE, STONE_TIME, strikeMedusa, stun, updateMedusa, type Medusa } from "./medusa";
 import {
   BODY as HYDRA_BODY,
@@ -1203,6 +1206,56 @@ function endMedusaFight(): void {
   if (medusaFight === "on") medusaFight = "waiting";
 }
 
+// ---------------------------------------------------------------------------
+// The Minotaur, at the heart of the labyrinth
+
+let minotaurFight: Fight = save.beaten.includes("minotaur") ? "won" : "waiting";
+let minotaur: { m: Minotaur; fig: Figure; shadow: THREE.Mesh; flash: number } | null = null;
+const walls = mazeWalls();
+/** Whether a point is inside one of the labyrinth's walls: what stops the bull's charge. */
+const inWall = (x: number, z: number): boolean => walls.some((w) => x > w.x0 && x < w.x1 && z > w.z0 && z < w.z1);
+
+function startMinotaur(): void {
+  minotaurFight = "on";
+  const fig = buildFigure(MINOTAUR_BUILD);
+  fig.root.scale.setScalar(2);
+  for (const c of fig.sword.children) c.visible = false;
+  fig.sword.add(weaponModel("labrys"));
+  // A bull's head: a broad snout, a ring through it, horns and ears.
+  const hide = toon(0x5a3018);
+  const horn = toon(0xe8dcc4);
+  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.22), hide);
+  snout.position.set(0, -0.04, 0.17);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 6, 12), toon(0xe8b83e));
+  ring.position.set(0, -0.12, 0.29);
+  fig.head.add(snout, ring);
+  for (const side of [-1, 1]) {
+    const h = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.38, 8), horn);
+    h.position.set(side * 0.2, 0.16, 0.02);
+    h.rotation.z = -side * 1.1;
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.14, 5), hide);
+    ear.position.set(side * 0.17, 0.05, -0.04);
+    ear.rotation.z = -side * 1.7;
+    fig.head.add(h, ear);
+  }
+  scene.add(fig.root);
+  minotaur = { m: makeMinotaur(ROOM_CENTRE.x - 4, ROOM_CENTRE.z, Math.PI / 2), fig, shadow: blob(2.6), flash: 0 };
+  hud.banner("THE MINOTAUR", "Lord of the Labyrinth", 2.8);
+  hud.setBoss("The Minotaur", 1);
+  shake = 0.6;
+}
+
+function clearMinotaur(): void {
+  if (!minotaur) return;
+  scene.remove(minotaur.fig.root, minotaur.shadow);
+  minotaur = null;
+}
+
+function endMinotaurFight(): void {
+  clearMinotaur();
+  if (minotaurFight === "on") minotaurFight = "waiting";
+}
+
 function kronosFalls(): void {
   if (!kronos) return;
   kronosFight = "won";
@@ -1531,6 +1584,30 @@ function swingLands(
       burst(w.w.x, 0.8, w.w.z, 0x9a9aa0, 10, 5);
     }
   }
+  if (minotaur && test(minotaur.m.x, minotaur.m.z, MINOTAUR_BODY)) {
+    const m = minotaur.m;
+    const result = strikeMinotaur(m, power, fromX, fromZ);
+    if (result === "clang") {
+      burst(m.x + Math.sin(m.yaw) * 1.3, 2, m.z + Math.cos(m.yaw) * 1.3, 0xfff2a0, 14, 7);
+      shove(hero, m.x, m.z, 7);
+      stop = 0.07;
+      hitAny = true;
+    } else if (result !== "none") {
+      minotaur.flash = 1;
+      hitAny = true;
+      burst(m.x, 2.4, m.z, 0xc8913a, 14, 7);
+      hud.setBoss("The Minotaur", m.hp / MINOTAUR_HP);
+      if (result === "dead") {
+        minotaurFight = "won";
+        hud.setBoss(null, 0);
+        hud.banner("The Minotaur is beaten!", "Claim his armor", 3.5);
+        shake = 0.9;
+        stop = 0.25;
+        burst(m.x, 2, m.z, 0xc8913a, 45, 10, 1.6);
+        spawnReward(m.x, m.z, "minotaur");
+      }
+    }
+  }
   if (medusa && test(medusa.m.x, medusa.m.z, MEDUSA_BODY)) {
     const result = strikeMedusa(medusa.m, power);
     if (result !== "none") {
@@ -1718,6 +1795,11 @@ function claimReward(): void {
   wearKit(heroFig, save.armor);
   hud.setArmor(save.armor);
   armHero();
+  if (kit === "minotaur") {
+    hud.banner("Horned Armor of the Minotaur", "Strong as a bull — your sword hits three times as hard", 4);
+    clearMinotaur();
+    return;
+  }
   if (kit === "medusa") {
     hud.banner("Serpent-Scale Armor", "Your sword hits twice as hard", 4);
     clearMedusa();
@@ -1771,6 +1853,7 @@ function respawn(): void {
   endHunterFights();
   endHydraFight();
   endMedusaFight();
+  endMinotaurFight();
   heroY = 0;
   falling = null;
   clearHades();
@@ -1891,6 +1974,7 @@ function update(dt: number): void {
     if (artemis && artemis.a.state !== "dead") targets.push(artemis.a);
     if (kratos && kratos.k.state !== "dead") targets.push(kratos.k);
     if (medusa && medusa.m.state !== "dead") targets.push(medusa.m);
+    if (minotaur && minotaur.m.state !== "dead") targets.push(minotaur.m);
     for (const w of wolves) if (w.w.dead < 0) targets.push(w.w);
     let best: { x: number; z: number } | null = null;
     let bestD = SWING_REACH + 2;
@@ -2216,6 +2300,31 @@ function update(dt: number): void {
   crumble();
   stepBack();
 
+  if (minotaurFight === "waiting" && inRoomAt(hero.x, hero.z) && standing(hero)) startMinotaur();
+  if (minotaur) {
+    const m = minotaur.m;
+    for (const e of updateMinotaur(m, sim, { x: hero.x, z: hero.z, alive: standing(hero) }, inWall)) {
+      if (e.kind === "blow") heroLoses(e);
+      else if (e.kind === "roar") shake = 0.5;
+      else if (e.kind === "paw") hud.banner("He's pawing the ground!", "Get out of the way!", 1.2);
+      else if (e.kind === "stuck") {
+        shake = 0.9;
+        burst(m.x + Math.sin(m.yaw) * 1.5, 2, m.z + Math.cos(m.yaw) * 1.5, 0x8a8478, 24, 7, 1.3);
+        hud.banner("His horns are stuck in the wall!", "Hit him now!", 1.8);
+      }
+    }
+    if (m.state !== "dead") {
+      const q = pushOut(world, m.x, m.z, MINOTAUR_BODY, true, true, true, true, false, true, true);
+      m.x = q.x;
+      m.z = q.z;
+      const d = dist(m.x, m.z, hero.x, hero.z);
+      const min = MINOTAUR_BODY + RADIUS;
+      if (d < min && d > 1e-4) {
+        hero.x = m.x + ((hero.x - m.x) / d) * min;
+        hero.z = m.z + ((hero.z - m.z) / d) * min;
+      }
+    }
+  }
   if (medusaFight === "waiting" && dist(hero.x, hero.z, LAIR.x, LAIR.z) < LAIR.r - 3 && standing(hero)) startMedusa();
   if (medusa) {
     const m = medusa.m;
@@ -2501,7 +2610,7 @@ function update(dt: number): void {
   hud.setHealth(Math.ceil(hero.hp));
   hud.setCompass(
     camYaw,
-    fight === "on" || seaFight === "on" || zeusFight === "on" || kronosFight === "on" || artemisFight === "on" || kratosFight === "on" || hydraFight === "on" || medusaFight === "on" || inTartarus(hero.x, hero.z)
+    fight === "on" || seaFight === "on" || zeusFight === "on" || kronosFight === "on" || artemisFight === "on" || kratosFight === "on" || hydraFight === "on" || medusaFight === "on" || minotaurFight === "on" || inTartarus(hero.x, hero.z)
       ? null
       : [
           { id: "colosseum", label: fight === "won" ? "Colosseum" : "Ares", yaw: yawTo(hero.x, hero.z, COLOSSEUM.x, COLOSSEUM.z) },
@@ -2515,6 +2624,7 @@ function update(dt: number): void {
           { id: "kratos", label: "Kratos", yaw: yawTo(hero.x, hero.z, KRATOS.x, KRATOS.z) },
           { id: "hydra", label: "Hydra", yaw: yawTo(hero.x, hero.z, PEAK.x, PEAK.z) },
           { id: "medusa", label: "Medusa", yaw: yawTo(hero.x, hero.z, LAIR.x, LAIR.z) },
+          { id: "minotaur", label: "Labyrinth", yaw: yawTo(hero.x, hero.z, ROOM_CENTRE.x, ROOM_CENTRE.z) },
         ].filter(
           (m) =>
             (m.id !== "city" || !inCity(hero.x, hero.z)) &&
@@ -2686,6 +2796,25 @@ function draw(dt: number): void {
   scenery.doors.forEach((door, i) => (door.rotation.y = (i === 0 ? 1 : -1) * 1.45 * doorsOpen));
   scenery.artemisGate.position.y += ((artemisGateClosed ? 0 : 6) - scenery.artemisGate.position.y) * Math.min(1, dt * (artemisGateClosed ? 10 : 2));
   scenery.kratosGate.position.y += ((kratosGateClosed ? 0 : 6) - scenery.kratosGate.position.y) * Math.min(1, dt * (kratosGateClosed ? 10 : 2));
+  if (minotaur) {
+    const m = minotaur.m;
+    const fig = minotaur.fig;
+    fig.root.position.set(m.x, 0, m.z);
+    fig.root.rotation.y = m.yaw;
+    let swing = -1;
+    if (m.state === "windup") swing = 0.38 * Math.min(1, m.t / 0.75);
+    else if (m.state === "swing") swing = 0.38 + 0.24 * Math.min(1, m.t / 0.2);
+    else if (m.state === "recover") swing = 0.62 + 0.38 * Math.min(1, m.t / 0.4);
+    poseFigure(fig, dt, { speed: m.state === "charge" ? 14 : m.moving ? 2.6 : 0, swing, daze: m.state === "stuck" ? 1 : 0, fallen: m.state === "dead" ? m.t : -1 });
+    // Head down to charge.
+    fig.body.rotation.x += m.state === "charge" || m.state === "paw" ? 0.45 : 0;
+    if (m.state === "paw") flash(fig, 0.4 + 0.4 * Math.sin(clock * 24), 0xff2a00);
+    else if (m.state === "windup") flash(fig, 0.25 + 0.25 * Math.sin(clock * 30), 0xffaa40);
+    else flash(fig, minotaur.flash, 0xffffff);
+    minotaur.flash = Math.max(0, minotaur.flash - dt * 6);
+    minotaur.shadow.position.set(m.x, 0.07, m.z);
+    if (m.state === "charge" && Math.random() < 0.6) burst(m.x, 0.2, m.z, 0xb89a70, 1, 3, 1.1);
+  }
   if (medusa) {
     const m = medusa.m;
     const fig = medusa.fig;
@@ -2875,7 +3004,7 @@ function draw(dt: number): void {
   updateSparks(dt);
 
   // Camera: behind the hero, pulled back and up in the arena so the god fits in frame.
-  const fighting = (ares !== null && ares.a.state !== "dead") || (poseidon !== null && poseidon.p.state !== "dead") || (hades !== null && hades.h.state !== "dead") || (zeus !== null && zeus.z.state !== "dead") || (kronos !== null && kronos.k.state !== "dead") || (artemis !== null && artemis.a.state !== "dead") || (kratos !== null && kratos.k.state !== "dead") || (hydra !== null && hydra.h.dead < 0) || (medusa !== null && medusa.m.state !== "dead");
+  const fighting = (ares !== null && ares.a.state !== "dead") || (poseidon !== null && poseidon.p.state !== "dead") || (hades !== null && hades.h.state !== "dead") || (zeus !== null && zeus.z.state !== "dead") || (kronos !== null && kronos.k.state !== "dead") || (artemis !== null && artemis.a.state !== "dead") || (kratos !== null && kratos.k.state !== "dead") || (hydra !== null && hydra.h.dead < 0) || (medusa !== null && medusa.m.state !== "dead") || (minotaur !== null && minotaur.m.state !== "dead");
   const back = (fighting ? CAM_DIST + 2.5 : CAM_DIST) * devZoom;
   const up = LOOK_HEIGHT + ((fighting ? CAM_HEIGHT + 1.6 : CAM_HEIGHT) - LOOK_HEIGHT) * devZoom;
   const tx = hero.x;
@@ -2978,7 +3107,7 @@ hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods
 if (import.meta.env.DEV) {
   Object.assign(window, {
     gods: {
-      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, zeusFight, kronosFight, hydraFight, hydra: hydra?.h ?? null, medusa: medusa?.m ?? null, stone, kronos: kronos?.k ?? null, artemis: artemis?.a ?? null, kratos: kratos?.k ?? null, wolves: wolves.map((w) => w.w), zeus: zeus?.z ?? null, heroY, falling, stairsBroken, collapse, foes: foes.map((f) => f.g) }),
+      state: () => ({ hero, fight, seaFight, coins: save.coins, armor: save.armor, ares: ares?.a ?? null, poseidon: poseidon?.p ?? null, hades: hades?.h ?? null, hadesFight, zeusFight, kronosFight, hydraFight, hydra: hydra?.h ?? null, medusa: medusa?.m ?? null, stone, minotaur: minotaur?.m ?? null, kronos: kronos?.k ?? null, artemis: artemis?.a ?? null, kratos: kratos?.k ?? null, wolves: wolves.map((w) => w.w), zeus: zeus?.z ?? null, heroY, falling, stairsBroken, collapse, foes: foes.map((f) => f.g) }),
       teleport(x: number, z: number, yaw = hero.yaw) {
         hero.x = x;
         hero.z = z;

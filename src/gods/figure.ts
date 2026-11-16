@@ -247,6 +247,14 @@ export function weaponModel(kind: string): THREE.Group {
   } else if (kind === "bow") {
     g.add(part(new THREE.TorusGeometry(0.7, 0.03, 6, 20, Math.PI * 0.8), m(0xdfe8f0), [0.5, 1, 1], [0, 0.1, 0], [0, 0, Math.PI * 0.6]));
     g.add(part(CYL, m(0xf4f4f0), [0.006, 1.1, 0.006], [-0.18, 0.1, 0]));
+  } else if (kind === "labrys") {
+    // The labrys: a long haft and a double axe-head, a crescent blade either side.
+    const steel = m(0xb8c0c8);
+    g.add(part(CYL, m(0x4a2a18), [0.04, 1.6, 0.04], [0, 0.55, 0]));
+    for (const side of [-1, 1]) {
+      g.add(part(new THREE.CylinderGeometry(0.42, 0.42, 0.05, 16, 1, false, 0, Math.PI), steel, [1, 1, 1], [side * 0.08, 1.2, 0], [0, side > 0 ? 0 : Math.PI, Math.PI / 2]));
+    }
+    g.add(part(BOX, m(0xc8913a), [0.18, 0.3, 0.12], [0, 1.2, 0]));
   } else if (kind === "whip") {
     // A green lash in links, curling away from the grip, a snake's head at the end.
     const green = m(0x4a7a2a);
@@ -388,6 +396,25 @@ export const MEDUSA_BUILD: Build = {
   cape: 0x2a4a1a,
 };
 
+/** The Minotaur's body: huge, brown and bare; his bull's head and horns are added by the game. */
+export const MINOTAUR_BUILD: Build = {
+  body: "flesh",
+  skin: 0x6a3a22,
+  hair: 0x3a2014,
+  hairStyle: "short",
+  beard: null,
+  band: null,
+  tunic: 0x3a2a1e,
+  sandals: 0x2a1a10,
+  eyes: GOD_EYES,
+  eyeGlow: true,
+  bulk: 1.5,
+  shield: null,
+  weapon: "sword",
+  blade: 0xb8c0c8,
+  cape: null,
+};
+
 export const FISHER_BUILD: Build = {
   body: "flesh",
   skin: 0xc98a58,
@@ -418,6 +445,7 @@ export const KIT_PAINT: Record<Exclude<Kit, "none">, { metal: number; trim: numb
   kratos: { metal: 0x5a5a62, trim: 0xc8913a, crest: 0xc8913a },
   hydra: { metal: 0x3f8a5a, trim: 0xb8e05a, crest: 0x2a5a3a },
   medusa: { metal: 0x6a8a3a, trim: 0xd8c060, crest: 0x2a4a1a },
+  minotaur: { metal: 0x6a3a22, trim: 0xe8dcc4, crest: 0xe8dcc4 },
 };
 
 export interface Figure {
@@ -1002,7 +1030,7 @@ export function wearKit(fig: Figure, armor: Record<Slot, Kit>): void {
   for (const m of fig.hairline) m.visible = armor.helmet === "none";
   // One paint for the whole figure: the god's if any piece is the god's.
   const kits = Object.values(armor);
-  const kit: Kit = kits.includes("medusa") ? "medusa" : kits.includes("hydra") ? "hydra" : kits.includes("kratos") ? "kratos" : kits.includes("artemis") ? "artemis" : kits.includes("kronos") ? "kronos" : kits.includes("zeus") ? "zeus" : kits.includes("hades") ? "hades" : kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
+  const kit: Kit = kits.includes("minotaur") ? "minotaur" : kits.includes("medusa") ? "medusa" : kits.includes("hydra") ? "hydra" : kits.includes("kratos") ? "kratos" : kits.includes("artemis") ? "artemis" : kits.includes("kronos") ? "kronos" : kits.includes("zeus") ? "zeus" : kits.includes("hades") ? "hades" : kits.includes("poseidon") ? "poseidon" : kits.includes("ares") ? "ares" : kits.includes("bronze") ? "bronze" : "none";
   if (kit !== "none") {
     const paint = KIT_PAINT[kit];
     fig.metal.color.setHex(paint.metal);
