@@ -1,5 +1,6 @@
 import { NO_ARMOR, SLOTS, type Armor, type Kit, type Slot } from "./armor";
 import { WEAPON_IDS, type WeaponId } from "./weapons";
+import { MAX_EACH, SNACKS, type Pantry } from "./pantry";
 
 /** What a run keeps between visits: purse, kit, and which gods are down. */
 export interface Save {
@@ -12,15 +13,14 @@ export interface Save {
   weapon: WeaponId;
   /** Weapons bought from a merchant. */
   bought: WeaponId[];
-  /** Healing potions carried. */
-  potions: number;
+  /** Food and potions carried, by kind. */
+  pantry: Pantry;
 }
 
 export const SAVE_KEY = "gods:save";
-export const MAX_POTIONS = 3;
 
 export function freshSave(): Save {
-  return { coins: 0, armor: { ...NO_ARMOR }, beaten: [], bronze: [], weapon: "sword", bought: [], potions: 0 };
+  return { coins: 0, armor: { ...NO_ARMOR }, beaten: [], bronze: [], weapon: "sword", bought: [], pantry: {} };
 }
 
 const KITS: readonly Kit[] = ["none", "bronze", "ares", "poseidon", "hades", "zeus", "kronos", "artemis", "kratos"];
@@ -46,8 +46,15 @@ export function decodeSave(raw: string | null): Save {
       : SLOTS.filter((s) => armor[s] === "bronze");
     const weapon = WEAPON_IDS.includes(d.weapon as WeaponId) ? (d.weapon as WeaponId) : "sword";
     const bought = Array.isArray(d.bought) ? WEAPON_IDS.filter((w) => (d.bought as unknown[]).includes(w)) : [];
-    const potions = typeof d.potions === "number" && d.potions > 0 ? Math.min(MAX_POTIONS, Math.floor(d.potions)) : 0;
-    return { coins, armor, beaten, bronze, weapon, bought, potions };
+    const pantry: Pantry = {};
+    const rawPantry = (typeof d.pantry === "object" && d.pantry !== null ? d.pantry : {}) as Record<string, unknown>;
+    for (const snack of SNACKS) {
+      const n = rawPantry[snack];
+      if (typeof n === "number" && n > 0) pantry[snack] = Math.min(MAX_EACH, Math.floor(n));
+    }
+    // Saves from before the pantry carried potions on their own.
+    if (typeof d.potions === "number" && d.potions > 0 && !pantry.potion) pantry.potion = Math.min(MAX_EACH, Math.floor(d.potions));
+    return { coins, armor, beaten, bronze, weapon, bought, pantry };
   } catch {
     return freshSave();
   }

@@ -1,5 +1,6 @@
 import { buy, PIECE_NAMES, PRICES, SLOTS, type Armor, type Outfit, type Slot } from "./armor";
 import { MAX_HP } from "./hero";
+import { SNACK_INFO, SNACKS, type Pantry, type Snack } from "./pantry";
 
 export const HEART_HP = 10;
 
@@ -32,9 +33,9 @@ export interface Hud {
   onWardrobe(handler: () => void): void;
   /** A merchant's card: a row per thing for sale; the function it hands back redraws it after a sale. */
   openMerchant(title: string, lede: string, coins: number, rows: MerchantRow[], onBuy: (i: number) => void): (coins: number, rows: MerchantRow[]) => void;
-  /** How many potions are carried; the button to drink one hides at none. */
-  setPotions(n: number): void;
-  onPotion(handler: () => void): void;
+  /** The bar along the bottom: a button per kind of food or potion carried, with how many. */
+  setPantry(pantry: Pantry): void;
+  onSnack(handler: (snack: Snack) => void): void;
   /** Light the slots the hero is wearing. */
   setArmor(armor: Armor): void;
   /** Point the compass: `heading` is where the camera looks, and each mark a yaw on the ground. */
@@ -81,14 +82,10 @@ export function createHud(): Hud {
   wardrobeBtn.textContent = "Armor";
   let wardrobeHandler: (() => void) | null = null;
   wardrobeBtn.addEventListener("click", () => wardrobeHandler?.());
-  const potionBtn = document.createElement("button");
-  potionBtn.type = "button";
-  potionBtn.className = "gd-wardrobe-btn gd-potion-btn";
-  potionBtn.hidden = true;
-  let potionHandler: (() => void) | null = null;
-  potionBtn.addEventListener("click", () => potionHandler?.());
   const kitRow = div("gd-kit-row");
-  kitRow.append(kit, wardrobeBtn, potionBtn);
+  kitRow.append(kit, wardrobeBtn);
+  const pantryBar = div("gd-pantry");
+  let snackHandler: ((snack: Snack) => void) | null = null;
   corner.append(hearts, purse, kitRow);
 
   const compass = div("gd-compass");
@@ -131,7 +128,8 @@ export function createHud(): Hud {
   const shop = div("gd-shop");
   shop.hidden = true;
 
-  document.body.append(corner, compass, boss, bannerEl, shop);
+  pantryBar.hidden = true;
+  document.body.append(corner, compass, boss, bannerEl, pantryBar, shop);
 
   let lastHp = -1;
   return {
@@ -211,12 +209,25 @@ export function createHud(): Hud {
     onWardrobe(handler) {
       wardrobeHandler = handler;
     },
-    setPotions(n) {
-      potionBtn.hidden = n === 0;
-      potionBtn.textContent = `Potion ×${n}`;
+    setPantry(pantry) {
+      pantryBar.innerHTML = "";
+      for (const snack of SNACKS) {
+        const n = pantry[snack] ?? 0;
+        if (n === 0) continue;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "gd-snack";
+        b.title = `${SNACK_INFO[snack].name} — tap to use`;
+        b.innerHTML = `<span></span><b></b>`;
+        b.querySelector("span")!.textContent = SNACK_INFO[snack].icon;
+        b.querySelector("b")!.textContent = String(n);
+        b.addEventListener("click", () => snackHandler?.(snack));
+        pantryBar.appendChild(b);
+      }
+      pantryBar.hidden = pantryBar.children.length === 0;
     },
-    onPotion(handler) {
-      potionHandler = handler;
+    onSnack(handler) {
+      snackHandler = handler;
     },
     openMerchant(title, lede, coins, rows, onBuy) {
       const render = (purse: number, list: MerchantRow[]): void => {

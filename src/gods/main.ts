@@ -72,7 +72,8 @@ import {
   type Hero,
 } from "./hero";
 import { createHud } from "./hud";
-import { loadSave, MAX_POTIONS, SAVE_KEY, storeSave } from "./save";
+import { loadSave, SAVE_KEY, storeSave } from "./save";
+import { addSnack, MAX_EACH, SNACK_INFO, SNACKS, useSnack, type Snack } from "./pantry";
 import { toon } from "./toon";
 import { buildScenery, HORIZON, placeStep, SKY_TOP } from "./scenery";
 import { groundY } from "./terrain";
@@ -361,33 +362,19 @@ let merchantRedraw: ((coins: number, rows: MerchantRow[]) => void) | null = null
 
 /** What a merchant has for sale right now, and what buying each one does. */
 function wares(m: Merchant): Array<MerchantRow & { buy: () => void }> {
-  const full = hero.hp >= MAX_HP;
-  const meal = (name: string, note: string, price: number, heal: number): MerchantRow & { buy: () => void } => ({
-    name,
-    note,
+  const snack = (kind: Snack, note: string, price: number): MerchantRow & { buy: () => void } => ({
+    name: SNACK_INFO[kind].name,
+    note: `${note} · you have ${save.pantry[kind] ?? 0}`,
     price,
-    blocked: full ? "Full!" : undefined,
+    blocked: (save.pantry[kind] ?? 0) >= MAX_EACH ? "Bag full" : undefined,
     buy: () => {
-      hero.hp = Math.min(MAX_HP, hero.hp + heal);
-      burst(hero.x, heroY + 1.4, hero.z, 0x7cff8a, 14, 4, 0.9);
+      addSnack(save.pantry, kind);
+      hud.setPantry(save.pantry);
     },
   });
-  if (m.trade === "baker") return [meal("Bread", "Heals 3 hearts", 4, 30), meal("Honey cake", "Heals you all the way", 10, MAX_HP)];
-  if (m.trade === "fish") return [meal("Grilled fish", "Heals 5 hearts", 6, 50)];
-  if (m.trade === "potions") {
-    return [
-      {
-        name: "Healing potion",
-        note: `Carry it and drink it any time · ${save.potions} of ${MAX_POTIONS}`,
-        price: 12,
-        blocked: save.potions >= MAX_POTIONS ? "Bag full" : undefined,
-        buy: () => {
-          save.potions += 1;
-          hud.setPotions(save.potions);
-        },
-      },
-    ];
-  }
+  if (m.trade === "baker") return [snack("bread", "Heals 3 hearts", 4), snack("cake", "Heals you all the way", 10)];
+  if (m.trade === "fish") return [snack("fish", "Heals 5 hearts", 6)];
+  if (m.trade === "potions") return [snack("potion", "Heals 6 hearts", 12)];
   // The weaponsmith.
   return (Object.keys(WEAPON_PRICES) as WeaponId[]).map((id) => ({
     name: WEAPONS[id].name,
@@ -420,17 +407,28 @@ function openMerchant(m: Merchant): void {
   });
 }
 
-function drinkPotion(): void {
-  if (save.potions <= 0 || !standing(hero) || hero.hp >= MAX_HP) return;
-  save.potions -= 1;
-  hero.hp = Math.min(MAX_HP, hero.hp + 60);
-  burst(hero.x, heroY + 1.4, hero.z, 0xff5a7a, 20, 4, 1);
-  hud.setPotions(save.potions);
+/** Eat or drink one thing from the bar. */
+function eat(snack: Snack): void {
+  if (!standing(hero)) return;
+  const hp = useSnack(save.pantry, snack, hero.hp, MAX_HP);
+  if (hp === null) {
+    if (hero.hp >= MAX_HP) hud.banner("You're already full!", "", 1.2);
+    return;
+  }
+  hero.hp = hp;
+  burst(hero.x, heroY + 1.4, hero.z, snack === "potion" ? 0xff5a7a : 0x7cff8a, 18, 4, 1);
+  hud.setPantry(save.pantry);
   storeSave(save);
 }
-hud.onPotion(drinkPotion);
+hud.onSnack(eat);
 window.addEventListener("keydown", (e) => {
-  if (e.key.toLowerCase() === "q") drinkPotion();
+  // 1 to 4 eat or drink from the bar, in the bar's order.
+  const n = Number(e.key);
+  if (n >= 1 && n <= 4) {
+    const carried = SNACKS.filter((k) => (save.pantry[k] ?? 0) > 0);
+    const snack = carried[n - 1];
+    if (snack) eat(snack);
+  }
 });
 
 // Fishermen about the village, each leaning on a fishing spear.
@@ -2647,7 +2645,7 @@ function draw(dt: number): void {
 
 hud.setCoins(save.coins);
 hud.setArmor(save.armor);
-hud.setPotions(save.potions);
+hud.setPantry(save.pantry);
 hud.setHealth(hero.hp);
 hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods are coming" : "Ares waits in his colosseum, north of the city", 3.5);
 

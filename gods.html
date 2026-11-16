@@ -339,7 +339,46 @@
       .gd-shop-head h2 { margin: 0; font: italic 700 26px var(--gd-serif); }
       .gd-shop-lede { margin: 6px 0 12px; color: #6b4f34; }
       .gd-shop-note { display: block; font-size: 12px; font-weight: 600; color: #8a6f52; }
-      .gd-potion-btn { border-color: #e2465a; }
+      /* Food and potions carried, along the bottom between the stick and the buttons. */
+      .gd-pantry {
+        position: fixed;
+        left: 50%;
+        bottom: calc(var(--ww-inset-bottom) + 10px);
+        transform: translateX(-50%);
+        display: flex;
+        gap: 6px;
+        padding: 5px 8px;
+        border-radius: 14px;
+        background: var(--gd-panel);
+        z-index: 1;
+      }
+      .gd-snack {
+        position: relative;
+        width: 44px;
+        height: 44px;
+        border: 2px solid var(--gd-gold);
+        border-radius: 10px;
+        background: rgba(251, 243, 223, 0.12);
+        font-size: 24px;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .gd-snack:active { transform: scale(0.94); }
+      /* A phone held upright stacks the sword and shield buttons at the bottom: sit above them. */
+      @media (max-width: 560px) {
+        .gd-pantry { bottom: calc(var(--ww-inset-bottom) + 190px); }
+      }
+      .gd-snack b {
+        position: absolute;
+        right: -6px;
+        bottom: -6px;
+        min-width: 18px;
+        padding: 1px 4px;
+        border-radius: 9px;
+        background: #b3271f;
+        color: #fff;
+        font: 800 12px system-ui, sans-serif;
+      }
       .gd-weapon-dot {
         width: 28px;
         height: 28px;
