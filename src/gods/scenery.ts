@@ -1580,7 +1580,6 @@ function hydraPeak(b: Batch): void {
     }
   }
   // The top: rock, a murky pool, and the bones of those who came before.
-  b.add(G.cyl, 0x6a7466, { x: px, y: h - 0.1, z: pz }, {}, { x: top + 0.2, y: 0.2, z: top + 0.2 });
   b.add(G.cyl, 0x2f4a32, { x: px, y: h + 0.02, z: pz }, {}, { x: 6, y: 0.06, z: 6 });
   for (let k = 0; k < 14; k++) {
     const a = (k / 14) * Math.PI * 2;
