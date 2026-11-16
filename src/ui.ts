@@ -4,6 +4,8 @@ import { fullscreenActive, fullscreenLabel, fullscreenSupported, toggleFullscree
 // Whispering Woods has no worlds to generate or maps to load.
 export interface MenuActions {
   onNewWorld?: () => void;
+  /** Wipe the saved game and start again. Asks for a second tap first. */
+  onRestart?: () => void;
   onEditor?: () => void;
   /** Pick a saved map file and play it. */
   onLoadMap?: () => void;
@@ -158,6 +160,27 @@ export function createMenu(title: string, actions: MenuActions): void {
   if (actions.onOutline) addItem("Island Outline", actions.onOutline);
   if (actions.onEnemyMode) addModeToggle(actions.onEnemyMode);
   if (actions.onDebug) addToggle("Debug boxes", actions.onDebug);
+  if (actions.onRestart) {
+    // Losing a whole game to one stray tap would be cruel, so the first tap only asks.
+    const onRestart = actions.onRestart;
+    const item = document.createElement("button");
+    item.className = "ww-menu-item";
+    item.textContent = "Restart Game";
+    let armed = 0;
+    item.addEventListener("click", () => {
+      if (armed) {
+        window.clearTimeout(armed);
+        onRestart();
+        return;
+      }
+      item.textContent = "Tap again to restart";
+      armed = window.setTimeout(() => {
+        armed = 0;
+        item.textContent = "Restart Game";
+      }, 3000);
+    });
+    panel.appendChild(item);
+  }
   // Not a MenuActions entry: it asks nothing of the game, and any page with a
   // menu wants it. Absent where the browser has no API to offer.
   if (fullscreenSupported(document)) {

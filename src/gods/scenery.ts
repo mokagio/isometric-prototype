@@ -6,6 +6,7 @@ import { ARES_BUILD, boltGeometry, buildFigure, HERO_BUILD, POSEIDON_BUILD, pose
 import { MONUMENT, OLYMPUS, OLYMPUS_STAIR_HALF, OLYMPUS_STEP, olympiaHouses, olympusSlope, olympusStepY, ZEUS_RING } from "./zeus";
 import { godKit } from "./armor";
 import { BRIDGE_HALF as HELL_BRIDGE, BRIDGES, HADES_RING, HOME_PORTAL, ISLAND, ISLANDS, LOW_Y, stairStepY, STAIRS, TARTARUS } from "./hades";
+import { groundY, heightAt } from "./terrain";
 import { toon } from "./toon";
 import {
   BRIDGE_HALF,
@@ -402,7 +403,7 @@ function flowers(): THREE.InstancedMesh {
   const m = new THREE.Matrix4();
   const col = new THREE.Color();
   spots.forEach((s, i) => {
-    m.makeTranslation(s.x, 0.42 + hash(i, 0, 45) * 0.15, s.z);
+    m.makeTranslation(s.x, groundY(s.x, s.z) + 0.42 + hash(i, 0, 45) * 0.15, s.z);
     mesh.setMatrixAt(i, m);
     mesh.setColorAt(i, col.setHex(s.c));
   });
@@ -638,6 +639,8 @@ function camps(b: Batch): void {
 
 function forest(b: Batch): void {
   for (const t of trees()) {
+    // Each tree stands on the hillside where it grows.
+    b.setFrame(0, 0, 0, groundY(t.x, t.z));
     const ix = Math.round(t.x * 10);
     const iz = Math.round(t.z * 10);
     const s = t.size;
@@ -651,6 +654,7 @@ function forest(b: Batch): void {
     if (hash(ix, iz, 18) > 0.7) b.add(G.blob, C.bush, { x: t.x + 1.4, y: 0.35, z: t.z - 0.9 }, {}, { x: 0.7, y: 0.55, z: 0.6 });
     if (hash(ix, iz, 19) > 0.85) b.add(G.rock, C.rock, { x: t.x - 1.5, y: 0.25, z: t.z + 1 }, { y: turn }, { x: 0.7, y: 0.5, z: 0.6 });
   }
+  b.setFrame();
 }
 
 function olive(b: Batch, x: number, z: number, s: number, turn: number): void {
@@ -1715,7 +1719,8 @@ function ground(): THREE.Mesh {
     const fromOlympus = dist(x, z, OLYMPUS.x, OLYMPUS.z);
     const clear = Math.min(1, Math.max(0, (fromVolcano - VOLCANO.r - 4) / 20)) * Math.min(1, Math.max(0, (fromOlympus - OLYMPUS.r - 4) / 20));
     const y = out * 0.25 * smoothNoise(x / 30, z / 30) * coast * clear;
-    pos.setY(i, x > SHORE_X - 2 ? -Math.min(3, (x - SHORE_X + 2) * 0.3) : y);
+    // Inside the open land the hills are walkable and come from `terrain.ts`; past its edge they rise on out of reach.
+    pos.setY(i, x > SHORE_X - 2 ? -Math.min(3, (x - SHORE_X + 2) * 0.3) : heightAt(x, z) + y);
   }
   g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   g.computeVertexNormals();
@@ -1798,7 +1803,7 @@ function grassField(): { mesh: THREE.InstancedMesh; material: THREE.ShaderMateri
       if (!inRegions(px, pz) || inVillage(px, pz, 21) || inHamlet(px, pz, 12) || px > SHORE_X - 13) continue;
       const s = 0.7 + hash(ix, iz, 8) * 0.8;
       q.setFromAxisAngle(up, hash(ix, iz, 10) * Math.PI);
-      m.compose(new THREE.Vector3(px, 0, pz), q, new THREE.Vector3(s, s, s));
+      m.compose(new THREE.Vector3(px, groundY(px, pz), pz), q, new THREE.Vector3(s, s, s));
       spots.push(m.clone());
     }
   }

@@ -69,9 +69,10 @@ import {
   type Hero,
 } from "./hero";
 import { createHud } from "./hud";
-import { loadSave, storeSave } from "./save";
+import { loadSave, SAVE_KEY, storeSave } from "./save";
 import { toon } from "./toon";
 import { buildScenery, HORIZON, placeStep, SKY_TOP } from "./scenery";
+import { groundY } from "./terrain";
 import { BODY as KRONOS_BODY, KRONOS_HP, makeKronos, SLOW, strikeKronos, updateKronos, type Kronos } from "./kronos";
 import {
   BODY as ZEUS_BODY,
@@ -290,6 +291,14 @@ const save = loadSave();
 const hud = createHud();
 const controls = createControls();
 createMenu("Battle of the Gods", {
+  onRestart: () => {
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch {
+      // nothing saved to wipe
+    }
+    location.reload();
+  },
   onAllGames: () => {
     location.href = "index.html";
   },
@@ -405,7 +414,7 @@ stockHell();
 function foeY(f: Foe): number {
   if (f.drop !== undefined) return f.drop;
   if (f.camp === STAIR_CAMP) return stepY(f.g.x - VOLCANO.x);
-  return inTartarus(f.g.x, f.g.z) ? (tartarusFooting(f.g.x, f.g.z, stairsBroken) ?? TARTARUS.y) : 0;
+  return inTartarus(f.g.x, f.g.z) ? (tartarusFooting(f.g.x, f.g.z, stairsBroken) ?? TARTARUS.y) : groundY(f.g.x, f.g.z);
 }
 
 /** Keep a stair skeleton on its stairs, whatever it is chasing. */
@@ -1469,7 +1478,7 @@ function update(dt: number): void {
       if (hadesFight === "won" && dist(hero.x, hero.z, HOME_PORTAL.x, HOME_PORTAL.z) < 1.4) outOfTartarus();
     }
   } else if (!inVolcano(hero.x, hero.z)) {
-    heroY = onIsland(hero.x, hero.z) ? ISLAND_H : 0;
+    heroY = onIsland(hero.x, hero.z) ? ISLAND_H : groundY(hero.x, hero.z);
   }
 
   if (!standing(hero)) {
@@ -1801,8 +1810,9 @@ function update(dt: number): void {
     } else {
       c.v.y -= 20 * sim;
       m.addScaledVector(c.v, sim);
-      if (m.y < 0.3) {
-        m.y = 0.3;
+      const floor = groundY(m.x, m.z) + 0.3;
+      if (m.y < floor) {
+        m.y = floor;
         c.v.set(c.v.x * 0.5, Math.abs(c.v.y) > 2 ? -c.v.y * 0.35 : 0, c.v.z * 0.5);
       }
     }
@@ -2125,7 +2135,8 @@ function draw(dt: number): void {
     }
   }
   // Up the volcano the camera rises with the hero, and never sinks into the rock.
-  let cy = up + heroY;
+  // Downhill of the hero the camera rides up with the slope, rather than peering up at the sky from below.
+  let cy = Math.max(up + heroY, groundY(cx, cz) + up);
   const camFrom = dist(cx, cz, VOLCANO.x, VOLCANO.z);
   if (camFrom < VOLCANO.r + 2) cy = Math.max(cy, (camFrom < VOLCANO.rim ? LAVA_Y : slopeY(camFrom)) + 2.5);
   const camFromOlympus = dist(cx, cz, OLYMPUS.x, OLYMPUS.z);
