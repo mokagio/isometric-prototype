@@ -200,6 +200,9 @@ Static scenery goes through `batch.ts`, merged into one mesh per colour for the 
 The rules live in modules with no three.js in them, and are what the tests cover: `hero.ts`, `grunts.ts`, `ares.ts`, `armor.ts` (guard, prices, the shield's arc), `world.ts` (layout and collision), `follow.ts` (camera-relative stick, auto-turn, lock-on), `save.ts`.
 Headings follow three.js: yaw 0 faces +z, forward is `(sin yaw, cos yaw)`, and `bearing.ts` is the arithmetic; the road runs north toward -z.
 
+The map is big on purpose: the kids asked for a long walk between colosseums, so each god sits 600-700 m from the city, with a `HAMLETS` village (houses, a well, a stall; it heals and restocks like the city) halfway along each road and bandit `CAMPS` every 70 m.
+Scenery tiles wholly inside the fog, and people past `PEOPLE_FAR`, are not drawn; the sky follows the camera; the forest only grows near the roads.
+
 Ares is beaten by not standing in front of him: his shield rings off frontal blows while he is on guard, and the opening is the charge — sidestep it and he runs into the wall and is dazed.
 He calls in Spartans at each line in `SUMMON_AT`.
 A bandit knocked flat gets back up unless struck again while down; the camps restock whenever the hero is in the city, which also heals.

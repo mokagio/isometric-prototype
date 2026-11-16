@@ -6,7 +6,7 @@ import { dist, inArc, turnToward, yawTo } from "./bearing";
  * mountain's north face to Olympia, a city on the flat summit. As on the
  * volcano, whatever is not the path is a fall.
  */
-export const OLYMPUS = { x: 0, z: 230, r: 70, h: 34, top: 30 };
+export const OLYMPUS = { x: 0, z: 700, r: 70, h: 34, top: 30 };
 /** Zeus's colosseum, its back against the foot of the stairs and its gate facing the city. */
 export const ZEUS_RING = { x: OLYMPUS.x, z: OLYMPUS.z - OLYMPUS.r - 22.5, r: 16, thick: 3.5, yaw: Math.PI };
 /** The monument in the middle of Olympia, and how close to its door counts as trying it. */

@@ -29,7 +29,7 @@ export const BLACKSMITH = { x: 11, z: 5 };
 /** How close to the blacksmith counts as being at the counter. */
 export const SHOP_RANGE = 4.2;
 
-export const COLOSSEUM = { x: 0, z: -220 };
+export const COLOSSEUM = { x: 0, z: -650 };
 export const ARENA_R = 20;
 export const WALL_THICK = 4;
 export const GATE_HALF = 3.2;
@@ -40,14 +40,14 @@ export const ROAD_HALF = 3.5;
 export const ROAD_START = CITY_GATE_Z;
 export const ROAD_END = COLOSSEUM.z + ARENA_R + WALL_THICK;
 
-export const BOUNDS: Box = { x0: -62, z0: -262, x1: 62, z1: 42 };
+export const BOUNDS: Box = { x0: -62, z0: -692, x1: 62, z1: 42 };
 
 /** The fishing village, east of the city on the coast, round Poseidon's colosseum. */
-export const VILLAGE: Circle = { x: 182, z: -40, r: 30 };
+export const VILLAGE: Circle = { x: 600, z: -40, r: 30 };
 /** Poseidon's colosseum, at the heart of the village. Its gate faces west, down the road. */
 export const SEA_ARENA = { x: VILLAGE.x, z: VILLAGE.z, r: 16, thick: 3.5, yaw: -Math.PI / 2 };
 /** Past this the land shelves into the sea. */
-export const SHORE_X = 222;
+export const SHORE_X = 640;
 /** The road east branches off the road to Ares here and runs straight to Poseidon's gate. */
 export const EAST_ROAD_Z = VILLAGE.z;
 export const EAST_ROAD_END = SEA_ARENA.x - SEA_ARENA.r - SEA_ARENA.thick;
@@ -70,6 +70,29 @@ export function onIsland(x: number, z: number): boolean {
 /** The statue of Poseidon, outside his gate. */
 export const SEA_STATUE = { x: EAST_ROAD_END - 5, z: VILLAGE.z + 7 };
 
+/**
+ * Villages with no colosseum, halfway along each road: somewhere to rest, heal
+ * and restock on a long walk. Each is a ring of houses round a little square,
+ * open where its road runs through.
+ */
+export interface Hamlet {
+  x: number;
+  z: number;
+  /** Which ways the road leaves it, as yaws: the ring of houses leaves these open. */
+  ways: number[];
+}
+export const HAMLET_R = 24;
+export const HAMLETS: readonly Hamlet[] = [
+  { x: 0, z: (CITY_GATE_Z + COLOSSEUM.z) / 2, ways: [0, Math.PI] },
+  { x: (BOUNDS.x1 + VILLAGE.x - VILLAGE.r) / 2, z: VILLAGE.z, ways: [Math.PI / 2, -Math.PI / 2] },
+  { x: (BOUNDS.x0 + VOLCANO.x + VOLCANO.r) / 2, z: VOLCANO.z, ways: [Math.PI / 2, -Math.PI / 2] },
+  { x: OLYMPUS.x, z: (BOUNDS.z1 + OLYMPUS.z - OLYMPUS.r - 42) / 2, ways: [0, Math.PI] },
+];
+
+export function inHamlet(x: number, z: number, within = HAMLET_R): boolean {
+  return HAMLETS.some((h) => dist(x, z, h.x, h.z) < within);
+}
+
 /** Everywhere the hero can walk: the meadow, the road east, the village, and out along the piers. */
 export const REGIONS: readonly Box[] = [
   BOUNDS,
@@ -82,6 +105,7 @@ export const REGIONS: readonly Box[] = [
   { x0: BOUNDS.x1 - 2, z0: EAST_ROAD_Z - 8, x1: VILLAGE.x - VILLAGE.r + 4, z1: EAST_ROAD_Z + 8 },
   { x0: VILLAGE.x - VILLAGE.r - 2, z0: VILLAGE.z - 34, x1: SHORE_X, z1: VILLAGE.z + 34 },
   ...PIERS.map((z) => ({ x0: SHORE_X - 2, z0: z - PIER_HALF, x1: SHORE_X + PIER_LENGTH, z1: z + PIER_HALF })),
+  ...HAMLETS.map((h) => ({ x0: h.x - HAMLET_R, z0: h.z - HAMLET_R, x1: h.x + HAMLET_R, z1: h.z + HAMLET_R })),
   { x0: LIGHTHOUSE.x - 3.4, z0: LIGHTHOUSE.z - 3.4, x1: LIGHTHOUSE.x + 3.4, z1: LIGHTHOUSE.z + 3.4 },
 ];
 
@@ -123,16 +147,48 @@ export interface Camp {
   count: number;
 }
 
-/** Bandit camps along the roads: one, then the rest in threes, and one on the way to the sea. */
+/** The houses round every hamlet's square, doors facing in, leaving the road open. */
+export function hamletHouses(): House[] {
+  const out: House[] = [];
+  HAMLETS.forEach((h, n) => {
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2 + n * 0.3;
+      if (h.ways.some((w) => Math.abs(Math.atan2(Math.sin(a - w), Math.cos(a - w))) < 0.55)) continue;
+      const r = 16 + (k % 2) * 2;
+      const x = Math.round(h.x + Math.sin(a) * r);
+      const z = Math.round(h.z + Math.cos(a) * r);
+      const yaw = Math.round(Math.atan2(h.x - x, h.z - z) / (Math.PI / 2)) * (Math.PI / 2);
+      const across = Math.abs(Math.sin(yaw)) > 0.5;
+      out.push({ x, z, w: across ? 4.5 : 5, d: across ? 5 : 4.5, yaw, dome: k % 3 === 1 });
+    }
+  });
+  return out;
+}
+
+export interface Camp {
+  x: number;
+  z: number;
+  count: number;
+}
+
+/** Bandit camps every 70 m or so along all four roads, off to alternate sides, and none in a hamlet. */
+function campsAlong(from: number, to: number, at: (t: number, side: number) => { x: number; z: number }): Camp[] {
+  const out: Camp[] = [];
+  const len = Math.abs(to - from);
+  const n = Math.floor(len / 70);
+  for (let k = 1; k <= n; k++) {
+    const t = from + ((to - from) * k) / (n + 1);
+    const p = at(t, k % 2 ? 1 : -1);
+    if (!inHamlet(p.x, p.z, HAMLET_R + 12)) out.push({ ...p, count: k === 1 ? 2 : 3 });
+  }
+  return out;
+}
+
 export const CAMPS: readonly Camp[] = [
-  { x: -4, z: -50, count: 2 },
-  { x: 48, z: EAST_ROAD_Z + 9, count: 2 },
-  { x: 112, z: EAST_ROAD_Z - 9, count: 3 },
-  { x: 6, z: -68, count: 3 },
-  { x: -6, z: -90, count: 3 },
-  { x: 4, z: -110, count: 3 },
-  { x: -5, z: -140, count: 3 },
-  { x: 5, z: -172, count: 3 },
+  ...campsAlong(CITY_GATE_Z - 26, COLOSSEUM.z + ARENA_R + WALL_THICK + 20, (z, side) => ({ x: side * 5, z })),
+  ...campsAlong(BOUNDS.x1, VILLAGE.x - VILLAGE.r - 6, (x, side) => ({ x, z: EAST_ROAD_Z + side * 6 })),
+  ...campsAlong(BOUNDS.x0, VOLCANO.x + VOLCANO.r + 8, (x) => ({ x, z: VOLCANO.z })),
+  ...campsAlong(BOUNDS.z1, OLYMPUS.z - OLYMPUS.r - 50, (z) => ({ x: OLYMPUS.x, z })),
 ];
 
 export interface World {
@@ -244,6 +300,9 @@ export function trees(): Tree[] {
       if (nearRoad(x, z, 5)) continue;
       if (nearColosseum(x, z, 8)) continue;
       if (inVillage(x, z, VILLAGE.r + 5)) continue;
+      if (inHamlet(x, z, HAMLET_R + 4)) continue;
+      // The wild beyond the roads stays open country: a forest only grows near where anyone walks.
+      if (!inside && outside(x, z) > 45) continue;
       if (dist(x, z, VOLCANO.x, VOLCANO.z) < VOLCANO.r + 8) continue;
       if (dist(x, z, OLYMPUS.x, OLYMPUS.z) < OLYMPUS.r + 8) continue;
       if (dist(x, z, ZEUS_RING.x, ZEUS_RING.z) < ZEUS_RING.r + ZEUS_RING.thick + 8) continue;
@@ -259,7 +318,7 @@ export function trees(): Tree[] {
 export const TRUNK_R = 0.5;
 
 export function layoutWorld(): World {
-  const boxes: Box[] = [...houses(), ...huts(), ...olympiaHouses()].map((h) => ({ x0: h.x - h.w / 2, z0: h.z - h.d / 2, x1: h.x + h.w / 2, z1: h.z + h.d / 2 }));
+  const boxes: Box[] = [...houses(), ...huts(), ...olympiaHouses(), ...hamletHouses()].map((h) => ({ x0: h.x - h.w / 2, z0: h.z - h.d / 2, x1: h.x + h.w / 2, z1: h.z + h.d / 2 }));
   // The monument, steps and all.
   boxes.push({ x0: MONUMENT.x - MONUMENT.w / 2 - 2, z0: MONUMENT.z - MONUMENT.d / 2 - 2, x1: MONUMENT.x + MONUMENT.w / 2 + 2, z1: MONUMENT.z + MONUMENT.d / 2 + 2 });
   // The forge and counter, with the smith behind them.

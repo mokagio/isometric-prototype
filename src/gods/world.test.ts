@@ -8,6 +8,10 @@ import {
   EAST_ROAD_END,
   EAST_ROAD_Z,
   huts,
+  inRegions,
+  inHamlet,
+  HAMLETS,
+  hamletHouses,
   onIsland,
   PIER_LENGTH,
   PIERS,
@@ -45,10 +49,8 @@ describe("the world", () => {
   });
 
   it("puts everything inside the bounds", () => {
-    for (const c of CAMPS) {
-      expect(c.x).toBeGreaterThan(BOUNDS.x0);
-      expect(c.z).toBeGreaterThan(BOUNDS.z0);
-    }
+    // Camps line every road now, so "inside" means somewhere walkable, not the first meadow.
+    for (const c of CAMPS) expect(inRegions(c.x, c.z), `camp at ${c.x},${c.z}`).toBe(true);
     expect(COLOSSEUM.z - ARENA_R - WALL_THICK).toBeGreaterThan(BOUNDS.z0);
     expect(CITY.z + CITY.r).toBeLessThan(BOUNDS.z1);
   });
@@ -115,12 +117,33 @@ describe("the world", () => {
       expect(Math.abs(h.z - EAST_ROAD_Z) > 4 || h.x > EAST_ROAD_END).toBe(true);
       expect(dist(h.x, h.z, SEA_ARENA.x, SEA_ARENA.z) - Math.max(h.w, h.d) / 2).toBeGreaterThan(SEA_ARENA.r + SEA_ARENA.thick);
     }
-    for (const c of CAMPS) expect(Math.abs(c.z - EAST_ROAD_Z)).toBeGreaterThan(6);
+    // Camps line the road east from either side; none sits in the middle of it.
+    for (const c of CAMPS) if (c.x > BOUNDS.x1) expect(Math.abs(c.z - EAST_ROAD_Z)).toBeGreaterThanOrEqual(6);
   });
 
   it("keeps Zeus's back wall shut until it breaks, then lets you through to the stairs", () => {
     const back = { x: ZEUS_RING.x, z: ZEUS_RING.z + ZEUS_RING.r + 1 };
     expect(pushOut(world, back.x, back.z, 0.45, false, false, false, false, false)).not.toEqual(back);
     expect(pushOut(world, back.x, back.z, 0.45, false, false, false, false, true)).toEqual(back);
+  });
+
+  it("puts a hamlet on every road, with its houses clear of the road through it", () => {
+    expect(HAMLETS).toHaveLength(4);
+    for (const h of HAMLETS) {
+      expect(inRegions(h.x, h.z)).toBe(true);
+      // Straight through the square along each way out, nothing is in the way.
+      for (const w of h.ways) {
+        for (let d = 0; d < 24; d += 1) {
+          const x = h.x + Math.sin(w) * d;
+          const z = h.z + Math.cos(w) * d;
+          expect(pushOut(world, x, z, 0.45, false), `hamlet at ${h.x},${h.z}, ${d} m out`).toEqual({ x, z });
+        }
+      }
+    }
+    for (const house of hamletHouses()) expect(inHamlet(house.x, house.z)).toBe(true);
+  });
+
+  it("keeps camps out of the hamlets", () => {
+    for (const c of CAMPS) expect(inHamlet(c.x, c.z, 30)).toBe(false);
   });
 });

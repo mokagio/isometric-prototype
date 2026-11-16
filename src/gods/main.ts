@@ -127,6 +127,7 @@ import {
   FISHERS,
   inArena,
   inCity,
+  inHamlet,
   inSeaArena,
   inVillage,
   ISLAND_H,
@@ -152,7 +153,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(HORIZON);
 scene.fog = new THREE.Fog(HORIZON, 45, 230);
-const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1200);
+const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2600);
 
 scene.add(new THREE.HemisphereLight(0xd8ecff, 0x6a8a3a, 1.5));
 const sun = new THREE.DirectionalLight(0xfff0d2, 2.4);
@@ -1468,7 +1469,7 @@ function update(dt: number): void {
   }
 
   // The city mends you and restocks the road.
-  const inTown = inCity(hero.x, hero.z) || (inVillage(hero.x, hero.z) && !inSeaArena(hero.x, hero.z, SEA_ARENA.r + SEA_ARENA.thick + 1));
+  const inTown = inCity(hero.x, hero.z) || inHamlet(hero.x, hero.z) || (inVillage(hero.x, hero.z) && !inSeaArena(hero.x, hero.z, SEA_ARENA.r + SEA_ARENA.thick + 1));
   if (inTown && standing(hero)) {
     hero.hp = Math.min(MAX_HP, hero.hp + CITY_HEAL * dt);
     for (let i = 0; i < CAMPS.length; i++) stockCamp(i);
@@ -2072,7 +2073,7 @@ function draw(dt: number): void {
   scenery.seaGate.position.y += ((seaGateClosed ? 0 : 6) - scenery.seaGate.position.y) * Math.min(1, dt * (seaGateClosed ? 10 : 2));
   for (const c of scenery.clouds.children) {
     c.position.x += dt * 2;
-    if (c.position.x > 400) c.position.x -= 800;
+    if (c.position.x > 800) c.position.x -= 1600;
   }
   updateSparks(dt);
 

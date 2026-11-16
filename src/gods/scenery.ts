@@ -32,9 +32,12 @@ import {
   EAST_ROAD_END,
   EAST_ROAD_Z,
   GATE_HALF,
+  HAMLETS,
+  hamletHouses,
   hash,
   houses,
   huts,
+  inHamlet,
   inRegions,
   inVillage,
   ISLAND_H,
@@ -60,7 +63,7 @@ import {
 
 export const SKY_TOP = 0x3f8fd8;
 /** The middle of the world, north to south: the ground, the sea and the mountains are all laid round it. */
-const WORLD_Z = -20;
+const WORLD_Z = 0;
 export const HORIZON = 0xcfe6f2;
 
 const C = {
@@ -433,6 +436,7 @@ function city(b: Batch): void {
   }
 
   for (const h of houses()) house(b, h.x, h.z, h.w, h.d, h.yaw, h.dome);
+  hamlets(b);
 
   // City gate: two fluted columns, an entablature with triglyphs, a pediment.
   for (const sx of [-4.5, 4.5]) column(b, sx, CITY_GATE_Z, 5.0, 0.55);
@@ -444,6 +448,34 @@ function city(b: Batch): void {
 
   smithy(b);
   market(b);
+}
+
+/** The villages along the roads: a paved square with a well and a stall, ringed by houses and olive trees. */
+function hamlets(b: Batch): void {
+  for (const h of HAMLETS) {
+    b.add(G.cyl, C.plaza, { x: h.x, y: 0.02, z: h.z }, {}, { x: 11, y: 0.04, z: 11 });
+    b.add(new THREE.TorusGeometry(1, 0.06, 3, 48), C.plazaDark, { x: h.x, y: 0.05, z: h.z }, { x: Math.PI / 2 }, { x: 11, y: 11, z: 1 });
+    // The well: a stone ring, two posts and a little tiled roof.
+    b.add(G.cyl, C.marbleShade, { x: h.x, y: 0.45, z: h.z }, {}, { x: 1.1, y: 0.9, z: 1.1 });
+    b.add(G.cyl, 0x2a4a6a, { x: h.x, y: 0.88, z: h.z }, {}, { x: 0.85, y: 0.05, z: 0.85 });
+    for (const side of [-1, 1]) b.add(G.cyl8, C.wood, { x: h.x + side * 0.95, y: 1.5, z: h.z }, {}, { x: 0.08, y: 2.0, z: 0.08 });
+    b.add(prism(2.6, 0.8, 1.6), C.roofRed, { x: h.x, y: 2.45, z: h.z });
+    // A stall on the square, and pots by it.
+    const sx = h.x + 6;
+    const sz = h.z + 4;
+    b.add(G.box, C.wood, { x: sx, y: 0.5, z: sz }, {}, { x: 2.4, y: 1.0, z: 1.1 });
+    for (const dx of [-1.1, 1.1]) b.add(G.cyl8, C.wood, { x: sx + dx, y: 1.3, z: sz }, {}, { x: 0.06, y: 2.6, z: 0.06 });
+    b.add(G.box, C.shutter, { x: sx, y: 2.65, z: sz }, { x: 0.15 }, { x: 2.8, y: 0.08, z: 1.6 });
+    for (let k = 0; k < 6; k++) b.add(G.blob, [0xe8463c, 0xffd23a, 0x7cbf4a][k % 3]!, { x: sx - 0.8 + k * 0.32, y: 1.12, z: sz }, {}, 0.13);
+    b.add(AMPHORA, C.terracotta, { x: sx - 1.8, y: 0, z: sz + 0.4 }, {}, 0.7);
+    // Olives round the square, clear of the road.
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2 + 0.5;
+      if (h.ways.some((w) => Math.abs(Math.atan2(Math.sin(a - w), Math.cos(a - w))) < 0.6)) continue;
+      olive(b, h.x + Math.sin(a) * 10, h.z + Math.cos(a) * 10, 0.7, a);
+    }
+  }
+  for (const hs of hamletHouses()) house(b, hs.x, hs.z, hs.w, hs.d, hs.yaw, hs.dome);
 }
 
 function house(b: Batch, x: number, z: number, w: number, d: number, yaw: number, dome: boolean): void {
@@ -1201,10 +1233,10 @@ function seaPlane(): THREE.Mesh {
         #include <colorspace_fragment>
       }`,
   });
-  const g = new THREE.PlaneGeometry(600, 1200, 1, 1);
+  const g = new THREE.PlaneGeometry(1400, 2600, 1, 1);
   g.rotateX(-Math.PI / 2);
   const mesh = new THREE.Mesh(g, material);
-  mesh.position.set(SHORE_X - 2 + 300, -0.25, WORLD_Z);
+  mesh.position.set(SHORE_X - 2 + 700, -0.25, WORLD_Z);
   return mesh;
 }
 
@@ -1705,7 +1737,7 @@ function sky(): THREE.Mesh {
       void main() { float h = clamp(vDir.y * 1.6, 0.0, 1.0); gl_FragColor = vec4(mix(horizon, top, pow(h, 0.7)), 1.0); }`,
   });
   // Big enough to hold the far mountains; the game keeps it centred on the camera.
-  const s = new THREE.Mesh(new THREE.SphereGeometry(900, 24, 12), m);
+  const s = new THREE.Mesh(new THREE.SphereGeometry(1700, 24, 12), m);
   s.renderOrder = -1;
   s.frustumCulled = false;
   s.name = "sky";
@@ -1714,9 +1746,9 @@ function sky(): THREE.Mesh {
 
 /** The meadow, mottled by a value hash so it is never one flat green. */
 function ground(): THREE.Mesh {
-  const size = 900;
-  // A vertex every 4 m, which lands one exactly on the shoreline.
-  const seg = 225;
+  const size = 2000;
+  // A vertex every 8 m, which lands one exactly on the shoreline; finer is half a million triangles of grass nobody sees.
+  const seg = 250;
   const g = new THREE.PlaneGeometry(size, size, seg, seg);
   g.rotateX(-Math.PI / 2);
   g.translate(0, 0, WORLD_Z);
@@ -1827,7 +1859,7 @@ function grassField(): { mesh: THREE.InstancedMesh; material: THREE.ShaderMateri
       if (dist(px, pz, CITY.x, CITY.z) < PLAZA_R + 1) continue;
       if (nearRoad(px, pz, 0.4)) continue;
       if (nearColosseum(px, pz, 0.5)) continue;
-      if (!inRegions(px, pz) || inVillage(px, pz, 21) || px > SHORE_X - 13) continue;
+      if (!inRegions(px, pz) || inVillage(px, pz, 21) || inHamlet(px, pz, 12) || px > SHORE_X - 13) continue;
       const s = 0.7 + hash(ix, iz, 8) * 0.8;
       q.setFromAxisAngle(up, hash(ix, iz, 10) * Math.PI);
       m.compose(new THREE.Vector3(px, 0, pz), q, new THREE.Vector3(s, s, s));
@@ -1845,12 +1877,12 @@ function mountains(): THREE.Group {
   const b = new Batch();
   for (let i = 0; i < 28; i++) {
     const a = (i / 28) * Math.PI * 2 + hash(i, 0, 20) * 0.2;
-    const r = 400 + hash(i, 1, 20) * 60;
+    const r = 1150 + hash(i, 1, 20) * 120;
     const x = Math.sin(a) * r;
     const z = WORLD_Z + Math.cos(a) * r;
     if (x > SHORE_X - 40) continue;
-    const h = 45 + hash(i, 2, 20) * 50;
-    const w = 60 + hash(i, 3, 20) * 50;
+    const h = 90 + hash(i, 2, 20) * 100;
+    const w = 120 + hash(i, 3, 20) * 100;
     b.add(G.cone, C.mountain, { x, y: h / 2 - 5, z }, { y: a }, { x: w, y: h, z: w });
     b.add(G.cone, C.snow, { x, y: h - 5 - h * 0.12, z }, { y: a }, { x: w * 0.26, y: h * 0.25, z: w * 0.26 });
   }
@@ -1918,7 +1950,7 @@ function cloudLayer(): THREE.Group {
       parts.push(puff.clone().applyMatrix4(m));
     }
     const cloud = new THREE.Mesh(mergeGeometries(parts)!, mat);
-    cloud.position.set((hash(i, 1, 34) - 0.5) * 800, 110 + hash(i, 2, 34) * 40, WORLD_Z + (hash(i, 3, 34) - 0.5) * 800);
+    cloud.position.set((hash(i, 1, 34) - 0.5) * 1600, 110 + hash(i, 2, 34) * 40, WORLD_Z + (hash(i, 3, 34) - 0.5) * 1600);
     g.add(cloud);
   }
   return g;
