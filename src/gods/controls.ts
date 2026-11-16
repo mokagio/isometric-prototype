@@ -11,6 +11,7 @@ export interface Controls {
   blocking(): boolean;
   /** True once per press. */
   takeAttack(): boolean;
+  takeJump(): boolean;
   takeInteract(): boolean;
   /** Pixels the camera was dragged right since last asked. */
   takeTurn(): number;
@@ -43,7 +44,9 @@ export function createControls(): Controls {
   const pads = el("div", "gd-pads");
   const attackBtn = button("gd-btn gd-attack", "Attack", swordIcon());
   const shieldBtn = button("gd-btn gd-shield", "Shield", shieldIcon());
-  pads.append(shieldBtn, attackBtn);
+  const jumpBtn = button("gd-btn gd-jump", "Jump", null);
+  jumpBtn.textContent = "⤒";
+  pads.append(shieldBtn, jumpBtn, attackBtn);
   const interactBtn = button("gd-interact", "", null);
   interactBtn.hidden = true;
   document.body.append(layer, pads, interactBtn);
@@ -130,6 +133,11 @@ export function createControls(): Controls {
     e.preventDefault();
     attack = true;
   });
+  let jumpPressed = false;
+  jumpBtn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    jumpPressed = true;
+  });
   shieldBtn.addEventListener("pointerdown", (e) => {
     e.preventDefault();
     shieldBtn.setPointerCapture(e.pointerId);
@@ -149,6 +157,7 @@ export function createControls(): Controls {
     keys.add(k);
     if (k === " " || k === "j") attack = true;
     if (k === "e" || k === "enter") interact = true;
+    if (k === "c") jumpPressed = true;
     if ([" ", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) e.preventDefault();
   });
   window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
@@ -174,6 +183,11 @@ export function createControls(): Controls {
       const a = attack;
       attack = false;
       return a;
+    },
+    takeJump() {
+      const j = jumpPressed;
+      jumpPressed = false;
+      return j;
     },
     takeInteract() {
       const i = interact;

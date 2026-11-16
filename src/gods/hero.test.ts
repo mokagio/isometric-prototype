@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { GUARD_SPEED, hurtHero, makeHero, MAX_HP, RUN, startSwing, stepHero, SWING_HIT, SWING_TIME, underBlade } from "./hero";
+import { GUARD_SPEED, hurtHero, makeHero, MAX_HP, RUN, startSwing, stepHero, SWING_HIT, SWING_TIME, underBlade,
+  jump,
+  JUMP_SPEED,
+  GRAVITY,
+} from "./hero";
 import { decodeSave, encodeSave, freshSave } from "./save";
 import { godKit } from "./armor";
 
@@ -48,6 +52,23 @@ describe("the hero", () => {
     hurtHero(h, MAX_HP, 0, 1, false);
     expect(h.fallen).toBe(0);
     expect(startSwing(h)).toBe(false);
+  });
+});
+
+describe("jumping", () => {
+  it("leaps up and comes back down to land, and can't jump again in mid-air", () => {
+    const h = makeHero(0, 0, 0);
+    expect(jump(h)).toBe(true);
+    expect(jump(h)).toBe(false);
+    let highest = 0;
+    for (let t = 0; t < 2; t += 1 / 60) {
+      stepHero(h, 1 / 60, { move: { x: 0, z: 0 }, block: false });
+      highest = Math.max(highest, h.air);
+    }
+    // About as high as the sums say; stepping a frame at a time lands a little short.
+    expect(Math.abs(highest - (JUMP_SPEED * JUMP_SPEED) / (2 * GRAVITY))).toBeLessThan(0.1);
+    expect(h.air).toBe(0);
+    expect(jump(h)).toBe(true);
   });
 });
 

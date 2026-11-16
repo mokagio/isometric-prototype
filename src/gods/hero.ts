@@ -35,10 +35,24 @@ export interface Hero {
   fallen: number;
   /** Ground speed this frame, which is what the legs animate from. */
   speed: number;
+  /** How high off the ground in a jump, and how fast rising (falling when negative). */
+  air: number;
+  airV: number;
+}
+
+export const JUMP_SPEED = 7.5;
+export const GRAVITY = 24;
+
+/** Leap, if standing on the ground. */
+export function jump(h: Hero): boolean {
+  if (!standing(h) || h.air > 0) return false;
+  h.airV = JUMP_SPEED;
+  h.air = 0.001;
+  return true;
 }
 
 export function makeHero(x: number, z: number, yaw: number): Hero {
-  return { x, z, yaw, hp: MAX_HP, swing: -1, blocking: false, hurt: 0, vx: 0, vz: 0, fallen: -1, speed: 0 };
+  return { x, z, yaw, hp: MAX_HP, swing: -1, blocking: false, hurt: 0, vx: 0, vz: 0, fallen: -1, speed: 0, air: 0, airV: 0 };
 }
 
 export function standing(h: Hero): boolean {
@@ -60,6 +74,14 @@ export interface HeroInput {
 /** Advance the hero; true on the frame the swing connects. */
 export function stepHero(h: Hero, dt: number, input: HeroInput): boolean {
   h.hurt = Math.max(0, h.hurt - dt);
+  if (h.air > 0) {
+    h.airV -= GRAVITY * dt;
+    h.air += h.airV * dt;
+    if (h.air <= 0) {
+      h.air = 0;
+      h.airV = 0;
+    }
+  }
   h.x += h.vx * dt;
   h.z += h.vz * dt;
   const drag = Math.exp(-9 * dt);

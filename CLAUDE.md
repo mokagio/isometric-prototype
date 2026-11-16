@@ -235,6 +235,8 @@ The kids gave no tricks for either, so those are placeholders to revisit. `pushO
 
 Hydra's Peak (`hydra.ts`) stands in the north-east: its stairs are a ledge winding `TURNS` times round the cone, and `peakFooting` finds which pass of the spiral a point is on. The Hydra waits in a pool on top: cut off a head and two grow back after `REGROW_TIME` unless the body is struck first, which seals the stump; only with every head gone does the body take harm. It drops Hydra-scale armour and the Hydra Fang.
 
+The hero can jump (the green button, or C): `hero.air` is how high, and a jump clears Kratos's shockwave, which rolls along the ground.
+
 On the dev server `window.gods` can read state, teleport the hero and add coins, so a recording can reach the colosseum without walking the road.
 Progress is under the `gods:save` storage key.
 

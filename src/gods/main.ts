@@ -59,6 +59,7 @@ import {
   CITY_HEAL,
   face,
   hurtHero,
+  jump,
   makeHero,
   MAX_HP,
   RADIUS,
@@ -107,7 +108,7 @@ import {
   type Artemis,
   type Wolf,
 } from "./artemis";
-import { BODY as KRATOS_BODY, KRATOS, KRATOS_HP, makeKratos, strikeKratos, updateKratos, type Kratos } from "./kratos";
+import { BODY as KRATOS_BODY, KRATOS, KRATOS_HP, makeKratos, strikeKratos, updateKratos, WAVE_DAMAGE, type Kratos } from "./kratos";
 import { BODY as KRONOS_BODY, KRONOS_HP, makeKronos, SLOW, strikeKronos, updateKronos, type Kronos } from "./kronos";
 import {
   BODY as ZEUS_BODY,
@@ -1801,6 +1802,7 @@ function update(dt: number): void {
     move.z *= 0.6;
   }
 
+  if (controls.takeJump()) jump(hero);
   if (controls.takeAttack() && startSwing(hero)) {
     // Phones get help aiming: the swing turns to the nearest thing in front worth hitting.
     const targets: Array<{ x: number; z: number }> = foes.filter((f) => f.g.state !== "dead").map((f) => f.g);
@@ -2191,7 +2193,9 @@ function update(dt: number): void {
   if (kratos) {
     const k = kratos.k;
     for (const e of updateKratos(k, sim, { x: hero.x, z: hero.z, alive: standing(hero) }, KRATOS)) {
-      if (e.kind === "blow") heroLoses(e);
+      // The shockwave rolls along the ground: jumping clears it.
+      if (e.kind === "blow" && e.damage === WAVE_DAMAGE && hero.air > 0.4) hud.banner("Jumped it!", "", 0.9);
+      else if (e.kind === "blow") heroLoses(e);
       else if (e.kind === "roar") shake = 0.5;
       else if (e.kind === "throw") hud.banner("A boulder!", "Block it or dodge it", 1.2);
       else if (e.kind === "slam") {
@@ -2425,7 +2429,7 @@ function draw(dt: number): void {
   // Hero.
   // Step up and down stairs over a moment rather than popping a whole step; anything bigger (a portal, a fall) snaps.
   shownY = Math.abs(heroY - shownY) > 2.5 ? heroY : shownY + (heroY - shownY) * Math.min(1, dt * 16);
-  heroFig.root.position.set(hero.x, shownY, hero.z);
+  heroFig.root.position.set(hero.x, shownY + hero.air, hero.z);
   heroFig.root.rotation.y = hero.yaw;
   poseFigure(heroFig, dt, {
     speed: hero.speed,
