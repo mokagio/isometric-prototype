@@ -1029,6 +1029,11 @@ function startKratos(): void {
   kratosGateClosed = true;
   const fig = buildFigure(KRATOS_BUILD);
   fig.root.scale.setScalar(2.1);
+  // His own great hammer, in place of the smith's hammer the doll comes with.
+  for (const c of fig.sword.children) c.visible = false;
+  const hammer = weaponModel("club");
+  hammer.scale.setScalar(1.3);
+  fig.sword.add(hammer);
   scene.add(fig.root);
   const inward = KRATOS.yaw + Math.PI;
   const boulder = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 0), toon(0x8a8478));

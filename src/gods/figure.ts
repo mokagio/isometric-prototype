@@ -248,12 +248,14 @@ export function weaponModel(kind: string): THREE.Group {
     g.add(part(new THREE.TorusGeometry(0.7, 0.03, 6, 20, Math.PI * 0.8), m(0xdfe8f0), [0.5, 1, 1], [0, 0.1, 0], [0, 0, Math.PI * 0.6]));
     g.add(part(CYL, m(0xf4f4f0), [0.006, 1.1, 0.006], [-0.18, 0.1, 0]));
   } else if (kind === "club") {
+    // The Hammer of Kratos: a long haft and a great iron head bound in bronze, far bigger than a smith's.
     const iron = m(0x4a4a52);
-    g.add(part(new THREE.CylinderGeometry(1, 0.55, 1, 10), m(0x5a3a22), [0.1, 0.95, 0.1], [0, 0.42, 0]));
-    for (let k = 0; k < 6; k++) {
-      const a = (k / 6) * Math.PI * 2;
-      g.add(part(CONE, iron, [0.03, 0.08, 0.03], [Math.sin(a) * 0.1, 0.72 + (k % 2) * 0.12, Math.cos(a) * 0.1], [Math.cos(a) * 1.4, 0, -Math.sin(a) * 1.4]));
-    }
+    const bronze = m(0xc8913a, 0x201004);
+    g.add(part(CYL, m(0x5a3a22), [0.05, 1.5, 0.05], [0, 0.55, 0]));
+    g.add(part(BOX, iron, [0.75, 0.42, 0.42], [0, 1.35, 0]));
+    for (const x of [-0.3, 0.3]) g.add(part(BOX, bronze, [0.08, 0.46, 0.46], [x, 1.35, 0]));
+    g.add(part(BOX, iron, [0.2, 0.3, 0.3], [0, 1.08, 0]));
+    g.add(part(SPHERE, bronze, [0.08, 0.08, 0.08], [0, -0.22, 0]));
   }
   for (const c of g.children) c.castShadow = true;
   return g;

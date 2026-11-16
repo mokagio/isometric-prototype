@@ -23,7 +23,7 @@ export const WEAPONS: Record<WeaponId, WeaponStats> = {
   bolt: { name: "Thunderbolt of Zeus", power: 3, reach: 2.6 },
   scythe: { name: "Scythe of Kronos", power: 3, reach: 3.0 },
   bow: { name: "Bow of Artemis", power: 2, reach: 2.4, ranged: true },
-  club: { name: "Club of Kratos", power: 3, reach: 2.8 },
+  club: { name: "Hammer of Kratos", power: 3, reach: 3.0 },
 };
 
 /** Which god's weapon is which. */
