@@ -19,11 +19,17 @@ export const STEPS = 240;
 
 export const ledgeRadius = (u: number): number => PEAK.r - (PEAK.r - PEAK.top) * u;
 
-/** How high the mountain's side is this far from the middle. */
+/**
+ * How far the rock is cut down below the stairs. The ledge is `LEDGE_HALF * 2` wide
+ * and the slope rises across it, so without this the rock would stand over the
+ * inner half of every step and swallow the legs of anyone climbing.
+ */
+export const SINK = 2.2;
+
+/** How high the mountain's rock side is this far from the middle: just under the stairs. */
 export function peakSlope(d: number): number {
-  if (d >= PEAK.r) return 0;
   if (d <= PEAK.top) return PEAK.h;
-  return (PEAK.h * (PEAK.r - d)) / (PEAK.r - PEAK.top);
+  return Math.max(0, (PEAK.h * (PEAK.r - d)) / (PEAK.r - PEAK.top) - SINK);
 }
 
 export function onPeak(x: number, z: number): boolean {

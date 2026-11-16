@@ -5,6 +5,8 @@ import {
   BODY_HP,
   HEAD_HP,
   ledgeAt,
+  LEDGE_HALF,
+  peakSlope,
   makeHydra,
   PEAK,
   peakFooting,
@@ -46,6 +48,17 @@ describe("Hydra's Peak", () => {
   it("starts the stairs on the side facing the city", () => {
     const foot = ledgeAt(0);
     expect(dist(foot.x, foot.z, 0, 0)).toBeLessThan(dist(PEAK.x, PEAK.z, 0, 0));
+  });
+
+  it("keeps the rock below every step, right across the ledge, so nothing stands over your feet", () => {
+    for (let u = 0; u <= 1; u += 0.01) {
+      const p = ledgeAt(u);
+      const d = Math.hypot(p.x - PEAK.x, p.z - PEAK.z);
+      for (const across of [-LEDGE_HALF, 0, LEDGE_HALF]) {
+        if (d + across <= PEAK.top) continue;
+        expect(peakSlope(d + across), `u=${u.toFixed(2)} ${across}`).toBeLessThanOrEqual(p.y + 0.01);
+      }
+    }
   });
 
   it("has nothing between one turn of the stairs and the next", () => {

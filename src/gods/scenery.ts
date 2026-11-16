@@ -9,7 +9,7 @@ import { BRIDGE_HALF as HELL_BRIDGE, BRIDGES, HADES_RING, HOME_PORTAL, ISLAND, I
 import { groundY, heightAt } from "./terrain";
 import { ARTEMIS } from "./artemis";
 import { KRATOS } from "./kratos";
-import { ledgeAt, LEDGE_HALF, PEAK, peakSlope, STEPS } from "./hydra";
+import { ledgeAt, LEDGE_HALF, PEAK, peakSlope, SINK, STEPS } from "./hydra";
 import { toon } from "./toon";
 import {
   BRIDGE_HALF,
@@ -1549,7 +1549,9 @@ function olympia(b: Batch): void {
 /** Hydra's Peak: grey-green rock, a ledge of steps winding round it, and a murky pool on top. */
 function hydraPeak(b: Batch): void {
   const { x: px, z: pz, r, h, top } = PEAK;
-  const mountain = flat(lathe([[r + 3, -1], [r, 0], [top + (r - top) * 0.5, h * 0.5], [top + 0.4, h], [0, h]], 40));
+  // The rock sits `SINK` below the stairs all the way up, then rises sheer to the top's rim.
+  const foot = r - (SINK * (r - top)) / h;
+  const mountain = flat(lathe([[r + 3, -1], [r, 0], [foot, 0], [top + 0.4, h - SINK], [top + 0.4, h], [0, h]], 40));
   b.add(mountain, 0x7a8478, { x: px, y: 0, z: pz });
   // Moss and rock along the flanks.
   for (let k = 0; k < 30; k++) {
@@ -1569,12 +1571,12 @@ function hydraPeak(b: Batch): void {
     const mz = (a.z + c.z) / 2;
     b.add(G.box, i % 2 ? 0x9a9488 : 0x8a8478, { x: mx, y: a.y - 1, z: mz }, { y: yaw }, { x: LEDGE_HALF * 2, y: 2, z: len });
     if (i % 12 === 6) {
-      // A stone post on the outer edge now and then, with a skull on it.
+      // A stone post standing on the stairs' outer edge now and then, a skull on top.
       const out = Math.atan2(mx - px, mz - pz);
-      const ox = mx + Math.sin(out) * (LEDGE_HALF + 0.3);
-      const oz = mz + Math.cos(out) * (LEDGE_HALF + 0.3);
-      b.add(G.box, 0x6a6a62, { x: ox, y: a.y + 0.5, z: oz }, {}, { x: 0.4, y: 1, z: 0.4 });
-      b.add(G.blob, 0xe9e1c9, { x: ox, y: a.y + 1.15, z: oz }, {}, { x: 0.2, y: 0.18, z: 0.22 });
+      const ox = mx + Math.sin(out) * (LEDGE_HALF - 0.25);
+      const oz = mz + Math.cos(out) * (LEDGE_HALF - 0.25);
+      b.add(G.box, 0x6a6a62, { x: ox, y: a.y + 0.7, z: oz }, {}, { x: 0.4, y: 1.4, z: 0.4 });
+      b.add(G.blob, 0xe9e1c9, { x: ox, y: a.y + 1.55, z: oz }, {}, { x: 0.2, y: 0.18, z: 0.22 });
     }
   }
   // The top: rock, a murky pool, and the bones of those who came before.
