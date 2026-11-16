@@ -146,4 +146,11 @@ describe("the world", () => {
   it("keeps camps out of the hamlets", () => {
     for (const c of CAMPS) expect(inHamlet(c.x, c.z, 30)).toBe(false);
   });
+
+  it("is open land between places, with no roads to keep to", () => {
+    // Cross-country, between the roads that used to be.
+    for (const [x, z] of [[300, -300], [-300, 300], [200, 400], [-400, -500]] as const) {
+      expect(pushOut(world, x, z, 0.45, false), `${x},${z}`).toEqual({ x, z });
+    }
+  });
 });

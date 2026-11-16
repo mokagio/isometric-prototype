@@ -200,8 +200,9 @@ Static scenery goes through `batch.ts`, merged into one mesh per colour for the 
 The rules live in modules with no three.js in them, and are what the tests cover: `hero.ts`, `grunts.ts`, `ares.ts`, `armor.ts` (guard, prices, the shield's arc), `world.ts` (layout and collision), `follow.ts` (camera-relative stick, auto-turn, lock-on), `save.ts`.
 Headings follow three.js: yaw 0 faces +z, forward is `(sin yaw, cos yaw)`, and `bearing.ts` is the arithmetic; the road runs north toward -z.
 
-The map is big on purpose: the kids asked for a long walk between colosseums, so each god sits 600-700 m from the city, with a `HAMLETS` village (houses, a well, a stall; it heals and restocks like the city) halfway along each road and bandit `CAMPS` every 70 m.
-Scenery tiles wholly inside the fog, and people past `PEOPLE_FAR`, are not drawn; the sky follows the camera; the forest only grows near the roads.
+The map is big on purpose: the kids asked for a long walk between colosseums, so each god sits 600-700 m from the city, with a `HAMLETS` village (houses, a well, a stall; it heals and restocks like the city) halfway along each old route and bandit `CAMPS` every 70 m.
+There are no roads: the kids took them away, so the walkable world is one `OPEN` box of countryside and the compass is how you find things. The mountains are only climbed by their stairs — `main.ts` stops the hero at a mountain's foot anywhere else, and keeps Olympus shut until Zeus is beaten, since open land would otherwise walk round his colosseum to the stairs.
+Scenery tiles wholly inside the fog, and people past `PEOPLE_FAR`, are not drawn; the sky follows the camera; copses scatter the open land, and grass and flowers only grow round places people gather.
 
 Ares is beaten by not standing in front of him: his shield rings off frontal blows while he is on guard, and the opening is the charge — sidestep it and he runs into the wall and is dazed.
 He calls in Spartans at each line in `SUMMON_AT`.

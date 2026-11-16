@@ -24,14 +24,12 @@ import {
 import {
   ARENA_R,
   BLACKSMITH,
-  BOUNDS,
   CAMPS,
   CITY,
   CITY_GATE_Z,
   COLOSSEUM,
-  EAST_ROAD_END,
-  EAST_ROAD_Z,
   GATE_HALF,
+  HAMLET_R,
   HAMLETS,
   hamletHouses,
   hash,
@@ -52,11 +50,9 @@ import {
   SHORE_X,
   VILLAGE,
   nearColosseum,
-  nearRoad,
+  OPEN,
   PLAZA_R,
-  ROAD_END,
   ROAD_HALF,
-  ROAD_START,
   trees,
   WALL_THICK,
 } from "./world";
@@ -261,10 +257,9 @@ export function buildScenery(): Scenery {
 
   const batch = new Batch();
   city(batch);
-  road(batch);
+  camps(batch);
   forest(batch);
   colosseum(batch, ARES_LOOK);
-  eastRoad(batch);
   village(batch);
   colosseum(batch, SEA_LOOK);
   const torches = volcano(batch);
@@ -372,19 +367,33 @@ function statue(build: Build, color: number, at: { x: number; y: number; z: numb
   return g;
 }
 
+/**
+ * Whether a spot is within `reach` of somewhere people gather. Tufts of grass and
+ * flowers grow round those; across the whole open country they would be
+ * hundreds of thousands, and the meadow's own colour carries it out there.
+ */
+function nearPlace(x: number, z: number, reach: number): boolean {
+  if (dist(x, z, CITY.x, CITY.z) < CITY.r + reach) return true;
+  if (HAMLETS.some((h) => dist(x, z, h.x, h.z) < HAMLET_R + reach)) return true;
+  if (dist(x, z, COLOSSEUM.x, COLOSSEUM.z) < ARENA_R + WALL_THICK + reach) return true;
+  if (dist(x, z, ZEUS_RING.x, ZEUS_RING.z) < ZEUS_RING.r + ZEUS_RING.thick + reach) return true;
+  if (dist(x, z, VILLAGE.x, VILLAGE.z) < VILLAGE.r + reach) return true;
+  return CAMPS.some((c) => dist(x, z, c.x, c.z) < reach * 0.4);
+}
+
 /** Wildflowers through the meadow: white, yellow, poppy red and a little purple. */
 function flowers(): THREE.InstancedMesh {
   const spots: Array<{ x: number; z: number; c: number }> = [];
   const colors = [0xffffff, 0xffe066, 0xe8463c, 0xb48ae0, 0xffffff, 0xffe066];
-  for (let z = BOUNDS.z0; z < BOUNDS.z1; z += 2.3) {
-    for (let x = BOUNDS.x0; x < SHORE_X; x += 2.3) {
+  for (let z = OPEN.z0; z < OPEN.z1; z += 2.3) {
+    for (let x = OPEN.x0; x < SHORE_X; x += 2.3) {
       const ix = Math.round(x * 7);
       const iz = Math.round(z * 7);
       // Patches rather than an even sprinkle.
       if (hash(Math.floor(x / 14), Math.floor(z / 14), 40) > 0.45 || hash(ix, iz, 41) > 0.5) continue;
       const px = x + (hash(ix, iz, 42) - 0.5) * 2;
       const pz = z + (hash(ix, iz, 43) - 0.5) * 2;
-      if (dist(px, pz, CITY.x, CITY.z) < CITY.r || nearRoad(px, pz, 0.5) || nearColosseum(px, pz, 1)) continue;
+      if (!nearPlace(px, pz, 60) || dist(px, pz, CITY.x, CITY.z) < CITY.r || nearColosseum(px, pz, 1)) continue;
       if (!inRegions(px, pz) || inVillage(px, pz) || px > SHORE_X - 16) continue;
       spots.push({ x: px, z: pz, c: colors[Math.floor(hash(Math.floor(x / 14), Math.floor(z / 14), 44) * colors.length)]! });
     }
@@ -597,46 +606,9 @@ function market(b: Batch): void {
 }
 
 // ---------------------------------------------------------------------------
-// The road
+// Bandit camps out in the open country
 
-function road(b: Batch): void {
-  // A bed of packed earth, then cobbles laid over it in staggered courses.
-  b.add(G.box, C.dirt, { x: 0, y: 0.015, z: (ROAD_START + ROAD_END) / 2 }, {}, { x: ROAD_HALF * 2 + 0.6, y: 0.03, z: ROAD_START - ROAD_END });
-  const tones = [C.cobble, C.cobbleDark, C.cobbleWarm];
-  for (let z = ROAD_START - 0.4; z > ROAD_END; z -= 0.95) {
-    const iz = Math.round(z * 10);
-    const off = Math.round(z / 0.95) % 2 ? 0.47 : 0;
-    for (let x = -ROAD_HALF + 0.4 + off; x < ROAD_HALF - 0.2; x += 0.95) {
-      const ix = Math.round(x * 10);
-      const r = 0.38 + hash(ix, iz, 11) * 0.12;
-      // Stones thin out toward the edge, where the grass is taking the road back.
-      if (Math.abs(x) > ROAD_HALF - 0.9 && hash(ix, iz, 14) > 0.5) continue;
-      b.add(G.cobble, tones[Math.floor(hash(ix, iz, 12) * 3)]!, { x: x + (hash(ix, iz, 13) - 0.5) * 0.15, y: 0.05, z }, { y: hash(ix, iz, 15) * 3 }, {
-        x: r,
-        y: 0.1,
-        z: r * 0.9,
-      });
-    }
-  }
-  // Columns along the way, some standing, some fallen into drums.
-  for (let z = ROAD_START - 8; z > ROAD_END + 6; z -= 14) {
-    for (const side of [-1, 1]) {
-      const iz = Math.round(z);
-      const broken = hash(iz, side, 13) > 0.55;
-      const x = side * (ROAD_HALF + 1.6);
-      if (!broken) {
-        column(b, x, z, 4.4, 0.42);
-      } else {
-        const height = 1.2 + hash(iz, side, 14) * 1.5;
-        b.add(G.box, C.marble, { x, y: 0.12, z }, {}, { x: 1.2, y: 0.24, z: 1.2 });
-        b.add(G.fluted, C.marble, { x, y: height / 2 + 0.2, z }, {}, { x: 0.42, y: height, z: 0.42 });
-        for (let d = 0; d < 2; d++) {
-          b.add(G.fluted, C.marbleShade, { x: x + side * (1.3 + d * 1.1), y: 0.42, z: z + 0.5 - d * 0.3 }, { z: Math.PI / 2, y: 0.4 + d }, { x: 0.42, y: 0.9, z: 0.42 });
-        }
-        b.add(ECHINUS, C.marbleShade, { x: x - side * 1.1, y: 0.0, z: z - 1.0 }, { z: 0.3 }, 0.42);
-      }
-    }
-  }
+function camps(b: Batch): void {
   // Each camp: a ring of stones, a cold fire, and a broken shield.
   for (const camp of CAMPS) {
     for (let i = 0; i < 9; i++) {
@@ -1003,37 +975,7 @@ export function colosseumFlameSpots(): Array<{ x: number; y: number; z: number }
 }
 
 // ---------------------------------------------------------------------------
-// The road east and the fishing village
-
-function eastRoad(b: Batch): void {
-  const z = EAST_ROAD_Z;
-  const from = ROAD_HALF;
-  b.add(G.box, C.dirt, { x: (from + EAST_ROAD_END) / 2, y: 0.015, z }, {}, { x: EAST_ROAD_END - from, y: 0.03, z: ROAD_HALF * 2 + 0.6 });
-  // Worn flagstones, thinning toward the verges.
-  for (let x = from + 0.6; x < EAST_ROAD_END - 0.5; x += 1.25) {
-    for (let k = -2; k <= 2; k++) {
-      const ix = Math.round(x * 10);
-      if (hash(ix, k, 60) > 0.55 - Math.abs(k) * 0.12) continue;
-      const shade = [C.cobble, C.cobbleDark, C.cobbleWarm][Math.floor(hash(ix, k, 61) * 3)]!;
-      b.add(G.cobble, shade, { x: x + (hash(ix, k, 62) - 0.5) * 0.4, y: 0.04, z: z + k * 1.3 }, { y: hash(ix, k, 63) * 3 }, { x: 0.55, y: 0.06, z: 0.45 });
-    }
-  }
-  // Milestones, alternating sides.
-  for (let x = from + 14, i = 0; x < EAST_ROAD_END - 6; x += 16, i++) {
-    const side = i % 2 ? 1 : -1;
-    b.add(G.box, C.marbleShade, { x, y: 0.45, z: z + side * (ROAD_HALF + 0.9) }, {}, { x: 0.45, y: 0.9, z: 0.35 });
-    b.add(G.halfDisc, C.marbleShade, { x, y: 0.9, z: z + side * (ROAD_HALF + 0.9) }, { x: Math.PI / 2 }, { x: 0.225, y: 0.35, z: 0.225 });
-  }
-  // A signpost at the fork: red for Ares up the road, blue for Poseidon by the sea.
-  const sx = ROAD_HALF + 1.2;
-  const sz = z + ROAD_HALF + 1.2;
-  b.add(G.cyl8, C.wood, { x: sx, y: 1.3, z: sz }, {}, { x: 0.09, y: 2.6, z: 0.09 });
-  b.add(G.box, C.banner, { x: sx, y: 2.2, z: sz - 0.55 }, {}, { x: 0.08, y: 0.42, z: 1.1 });
-  b.add(G.pyramid, C.banner, { x: sx, y: 2.2, z: sz - 1.2 }, { x: -Math.PI / 2, y: Math.PI / 4 }, { x: 0.3, y: 0.3, z: 0.3 });
-  b.add(G.box, 0x2a6cb0, { x: sx + 0.55, y: 1.7, z: sz }, {}, { x: 1.1, y: 0.42, z: 0.08 });
-  b.add(G.pyramid, 0x2a6cb0, { x: sx + 1.2, y: 1.7, z: sz }, { z: -Math.PI / 2, y: Math.PI / 4 }, { x: 0.3, y: 0.3, z: 0.3 });
-  b.add(G.blob, C.rock, { x: sx, y: 0.1, z: sz }, {}, { x: 0.4, y: 0.25, z: 0.4 });
-}
+// The fishing village
 
 const HUT = { wall: 0xf6f3ec, blue: 0x2a6cb0, thatch: 0xc9a35a, thatchDark: 0xa8843f, net: 0x8a7656 };
 
@@ -1300,9 +1242,6 @@ function volcano(b: Batch): Array<{ x: number; y: number; z: number }> {
     b.add(G.blob, 0x1b1410, { x: px + 0.22, y: 2.62, z: pz - 0.1 }, {}, 0.07);
     b.add(G.blob, 0x1b1410, { x: px + 0.22, y: 2.62, z: pz + 0.1 }, {}, 0.07);
   }
-  // A worn path to it from the meadow.
-  const pathFrom = BOUNDS.x0 + 2;
-  b.add(G.box, C.dirt, { x: (pathFrom + vx + r) / 2, y: 0.02, z: vz }, {}, { x: pathFrom - (vx + r), y: 0.03, z: 4.5 });
 
   // The landing on the lip, and the bridge down to the island.
   b.add(G.box, ROCK.step, { x: vx + (LANDING_IN + LANDING_OUT) / 2, y: h - 0.6, z: vz }, {}, { x: LANDING_OUT - LANDING_IN, y: 1.2, z: LANDING_HALF * 2 });
@@ -1427,9 +1366,6 @@ function olympus(b: Batch): Array<{ x: number; y: number; z: number }> {
   b.add(G.box, C.marble, { x: ox, y: 6.3, z: fz }, {}, { x: 8, y: 0.6, z: 1.4 });
   b.add(prism(8.2, 1.4, 1.5), C.gold, { x: ox, y: 6.6, z: fz });
   b.add(boltGeometry(), C.gold, { x: ox, y: 6.75, z: fz - 0.8 }, { z: 0.15 }, 1.3);
-  // A path out to Zeus's gate from the city.
-  const gateZ = ZEUS_RING.z - ZEUS_RING.r - ZEUS_RING.thick;
-  b.add(G.box, C.dirt, { x: ox, y: 0.02, z: (BOUNDS.z1 - 2 + gateZ) / 2 }, {}, { x: 4.5, y: 0.03, z: gateZ - BOUNDS.z1 + 2 });
   return torches;
 }
 
@@ -1849,15 +1785,15 @@ function grassField(): { mesh: THREE.InstancedMesh; material: THREE.ShaderMateri
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const up = new THREE.Vector3(0, 1, 0);
-  for (let z = BOUNDS.z0; z < BOUNDS.z1; z += 1.6) {
-    for (let x = BOUNDS.x0; x < SHORE_X; x += 1.6) {
+  for (let z = OPEN.z0; z < OPEN.z1; z += 1.6) {
+    for (let x = OPEN.x0; x < SHORE_X; x += 1.6) {
       const ix = Math.round(x * 10);
       const iz = Math.round(z * 10);
       if (hash(ix, iz, 5) > 0.55) continue;
       const px = x + (hash(ix, iz, 6) - 0.5) * 1.5;
       const pz = z + (hash(ix, iz, 7) - 0.5) * 1.5;
       if (dist(px, pz, CITY.x, CITY.z) < PLAZA_R + 1) continue;
-      if (nearRoad(px, pz, 0.4)) continue;
+      if (!nearPlace(px, pz, 50)) continue;
       if (nearColosseum(px, pz, 0.5)) continue;
       if (!inRegions(px, pz) || inVillage(px, pz, 21) || inHamlet(px, pz, 12) || px > SHORE_X - 13) continue;
       const s = 0.7 + hash(ix, iz, 8) * 0.8;

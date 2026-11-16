@@ -94,18 +94,18 @@ export function inHamlet(x: number, z: number, within = HAMLET_R): boolean {
 }
 
 /** Everywhere the hero can walk: the meadow, the road east, the village, and out along the piers. */
+/** The open land, from beyond the volcano to the beach and from past Ares to past Olympus: no roads, walk anywhere. */
+export const OPEN: Box = {
+  x0: VOLCANO.x - VOLCANO.r - 30,
+  z0: COLOSSEUM.z - ARENA_R - WALL_THICK - 40,
+  x1: SHORE_X,
+  z1: OLYMPUS.z + OLYMPUS.r + 30,
+};
+
+/** Everywhere the hero can walk: the open land, and out along the piers to the lighthouse. */
 export const REGIONS: readonly Box[] = [
-  BOUNDS,
-  // The path south to Zeus's gate, his arena, and the way out of its back to the foot of Olympus's stairs.
-  { x0: OLYMPUS.x - 6, z0: BOUNDS.z1 - 2, x1: OLYMPUS.x + 6, z1: ZEUS_RING.z - ZEUS_RING.r + 1 },
-  { x0: ZEUS_RING.x - ZEUS_RING.r, z0: ZEUS_RING.z - ZEUS_RING.r, x1: ZEUS_RING.x + ZEUS_RING.r, z1: ZEUS_RING.z + ZEUS_RING.r },
-  { x0: OLYMPUS.x - 3, z0: ZEUS_RING.z + ZEUS_RING.r - 1, x1: OLYMPUS.x + 3, z1: OLYMPUS.z - OLYMPUS.r + 2 },
-  // The path west to the foot of the volcano's stairs.
-  { x0: VOLCANO.x + VOLCANO.r - 1, z0: VOLCANO.z - 6, x1: BOUNDS.x0 + 2, z1: VOLCANO.z + 6 },
-  { x0: BOUNDS.x1 - 2, z0: EAST_ROAD_Z - 8, x1: VILLAGE.x - VILLAGE.r + 4, z1: EAST_ROAD_Z + 8 },
-  { x0: VILLAGE.x - VILLAGE.r - 2, z0: VILLAGE.z - 34, x1: SHORE_X, z1: VILLAGE.z + 34 },
+  OPEN,
   ...PIERS.map((z) => ({ x0: SHORE_X - 2, z0: z - PIER_HALF, x1: SHORE_X + PIER_LENGTH, z1: z + PIER_HALF })),
-  ...HAMLETS.map((h) => ({ x0: h.x - HAMLET_R, z0: h.z - HAMLET_R, x1: h.x + HAMLET_R, z1: h.z + HAMLET_R })),
   { x0: LIGHTHOUSE.x - 3.4, z0: LIGHTHOUSE.z - 3.4, x1: LIGHTHOUSE.x + 3.4, z1: LIGHTHOUSE.z + 3.4 },
 ];
 
@@ -287,15 +287,16 @@ export interface Tree {
 export function trees(): Tree[] {
   const out: Tree[] = [];
   const step = 7;
-  for (let gz = BOUNDS.z0 - 40; gz <= BOUNDS.z1 + 40; gz += step) {
-    for (let gx = BOUNDS.x0 - 40; gx <= SHORE_X - 14; gx += step) {
+  for (let gz = OPEN.z0 - 40; gz <= OPEN.z1 + 40; gz += step) {
+    for (let gx = OPEN.x0 - 40; gx <= SHORE_X - 14; gx += step) {
       const keep = hash(gx, gz, 1);
       const x = gx + (hash(gx, gz, 2) - 0.5) * step * 0.8;
       const z = gz + (hash(gx, gz, 3) - 0.5) * step * 0.8;
       if (x > SHORE_X - 16) continue;
       const inside = inRegions(x, z);
       // Thick forest past the edge of the world, open meadow with copses inside it.
-      if (keep > (inside ? 0.28 : 0.75)) continue;
+      // Copses scattered over open country, thicker at the edge of the world.
+      if (keep > (inside ? (hash(Math.floor(gx / 60), Math.floor(gz / 60), 5) > 0.5 ? 0.16 : 0.03) : 0.6)) continue;
       if (dist(x, z, CITY.x, CITY.z) < CITY.r + 6) continue;
       if (nearRoad(x, z, 5)) continue;
       if (nearColosseum(x, z, 8)) continue;

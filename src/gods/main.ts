@@ -1376,10 +1376,19 @@ function update(dt: number): void {
 
   // While Kronos holds time, the hero's own world runs slow.
   const heroSim = kronos && kronos.k.slow > 0 ? sim * SLOW : sim;
+  const was = { x: hero.x, z: hero.z };
   if (stepHero(hero, heroSim, { move, block: blocking })) swingLands();
   const p = pushOut(world, hero.x, hero.z, RADIUS, gateClosed, seaGateClosed, hadesGateClosed, zeusGateClosed, zeusFight === "won");
   hero.x = p.x;
   hero.z = p.z;
+  // The mountains stand in the open country with only their stairs to climb: walking up to
+  // one anywhere else stops at its foot, and Olympus stays shut until Zeus is beaten.
+  const ontoVolcano = inVolcano(hero.x, hero.z) && !inVolcano(was.x, was.z) && footing(hero.x, hero.z) === null;
+  const ontoOlympus = onOlympus(hero.x, hero.z) && !onOlympus(was.x, was.z) && (zeusFight !== "won" || olympusFooting(hero.x, hero.z) === null);
+  if (ontoVolcano || ontoOlympus) {
+    hero.x = was.x;
+    hero.z = was.z;
+  }
 
   // The volcano: stand on its path, and fall off anywhere else.
   if (falling) {
