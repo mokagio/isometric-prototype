@@ -2892,7 +2892,9 @@ if (import.meta.env.DEV) {
 
 let last = performance.now();
 function frame(now: number): void {
-  const dt = Math.min(0.05, (now - last) / 1000);
+  // Never backwards: the first frame's timestamp can be from before the world finished building,
+  // and a negative step runs everything in reverse — healing that hurts, a hit-stop that grows.
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
   last = now;
   update(dt);
   draw(dt);
