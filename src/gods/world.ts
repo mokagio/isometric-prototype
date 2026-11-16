@@ -267,6 +267,32 @@ export function huts(): House[] {
   return out;
 }
 
+/** What a merchant trades in. */
+export type Trade = "baker" | "potions" | "weapons" | "armour" | "fish";
+
+/** A merchant behind a stall: where they stand, and how close counts as at their counter. */
+export interface Merchant {
+  trade: Trade;
+  name: string;
+  x: number;
+  z: number;
+}
+export const MERCHANT_RANGE = 3.6;
+
+/** One behind each hamlet's stall, in the order the hamlets are listed, and the fishmonger at the village market. */
+export const MERCHANTS: readonly Merchant[] = [
+  ...(["baker", "potions", "weapons", "armour"] as const).map((trade, i) => ({
+    trade,
+    name: { baker: "Baker", potions: "Potion Seller", weapons: "Weaponsmith", armour: "Armourer" }[trade],
+    x: HAMLETS[i]!.x + 6,
+    z: HAMLETS[i]!.z + 5.3,
+  })),
+  { trade: "fish", name: "Fishmonger", x: SEA_ARENA.x + SEA_ARENA.r + SEA_ARENA.thick + 2.7, z: VILLAGE.z - 8 },
+];
+
+/** Where a customer stands to trade with a merchant: across the stall from them. */
+export const counterOf = (m: Merchant): { x: number; z: number } => (m.trade === "fish" ? { x: m.x - 1.6, z: m.z } : { x: m.x, z: m.z - 2.6 });
+
 /** Fishermen about the village and the docks: where each stands and which way they face. */
 export const FISHERS: ReadonlyArray<{ x: number; z: number; yaw: number }> = [
   { x: SHORE_X + 6, z: PIERS[0]! + 0.4, yaw: Math.PI / 2 },

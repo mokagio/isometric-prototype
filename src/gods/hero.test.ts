@@ -53,7 +53,7 @@ describe("the hero", () => {
 
 describe("the save", () => {
   it("round-trips", () => {
-    const save = { coins: 12, armor: godKit("ares"), beaten: ["ares"], bronze: ["helmet" as const, "legs" as const], weapon: "ares" as const };
+    const save = { coins: 12, armor: godKit("ares"), beaten: ["ares"], bronze: ["helmet" as const, "legs" as const], weapon: "ares" as const, bought: ["spear" as const], potions: 2 };
     expect(decodeSave(encodeSave(save))).toEqual(save);
   });
 

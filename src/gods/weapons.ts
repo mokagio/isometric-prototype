@@ -3,7 +3,7 @@
  * weapon once that god is beaten. Each has its own power and reach; the bow
  * alone fights at a distance, by loosing an arrow instead of swinging.
  */
-export type WeaponId = "sword" | "ares" | "trident" | "bident" | "bolt" | "scythe" | "bow" | "club";
+export type WeaponId = "sword" | "spear" | "iron" | "ares" | "trident" | "bident" | "bolt" | "scythe" | "bow" | "club";
 
 export interface WeaponStats {
   name: string;
@@ -15,6 +15,8 @@ export interface WeaponStats {
 
 export const WEAPONS: Record<WeaponId, WeaponStats> = {
   sword: { name: "Sword", power: 1, reach: 2.4 },
+  spear: { name: "Bronze Spear", power: 1, reach: 3.3 },
+  iron: { name: "Iron Sword", power: 2, reach: 2.5 },
   ares: { name: "Sword of Ares", power: 2, reach: 2.6 },
   trident: { name: "Trident of Poseidon", power: 2, reach: 3.4 },
   bident: { name: "Bident of Hades", power: 2, reach: 3.2 },
@@ -37,9 +39,12 @@ export const WEAPON_OF: Record<string, WeaponId> = {
 
 export const WEAPON_IDS = Object.keys(WEAPONS) as WeaponId[];
 
-/** The sword, and every beaten god's weapon, in the order the gods are met. */
-export function ownedWeapons(beaten: readonly string[]): WeaponId[] {
-  return ["sword", ...WEAPON_IDS.filter((w) => w !== "sword" && beaten.some((god) => WEAPON_OF[god] === w))];
+/** The weapons a merchant sells, and for how much. */
+export const WEAPON_PRICES: Partial<Record<WeaponId, number>> = { spear: 30, iron: 70 };
+
+/** The sword, anything bought, and every beaten god's weapon, in that order. */
+export function ownedWeapons(beaten: readonly string[], bought: readonly WeaponId[] = []): WeaponId[] {
+  return WEAPON_IDS.filter((w) => w === "sword" || bought.includes(w) || beaten.some((god) => WEAPON_OF[god] === w));
 }
 
 /** How hard a blow lands: the weapon's own power, or the armour's if a god's whole kit hits harder. */

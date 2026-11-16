@@ -72,11 +72,12 @@ import {
   type Hero,
 } from "./hero";
 import { createHud } from "./hud";
-import { loadSave, SAVE_KEY, storeSave } from "./save";
+import { loadSave, MAX_POTIONS, SAVE_KEY, storeSave } from "./save";
 import { toon } from "./toon";
 import { buildScenery, HORIZON, placeStep, SKY_TOP } from "./scenery";
 import { groundY } from "./terrain";
-import { ARROW_RANGE, ARROW_SPEED, blowPower, ownedWeapons, WEAPON_OF, WEAPONS, type WeaponId } from "./weapons";
+import { ARROW_RANGE, ARROW_SPEED, blowPower, ownedWeapons, WEAPON_OF, WEAPON_PRICES, WEAPONS, type WeaponId } from "./weapons";
+import type { MerchantRow } from "./hud";
 import {
   ARTEMIS,
   ARTEMIS_HP,
@@ -144,7 +145,11 @@ import {
   CAMPS,
   COLOSSEUM,
   FIGHT_TRIGGER,
+  counterOf,
   FISHERS,
+  MERCHANT_RANGE,
+  MERCHANTS,
+  type Merchant,
   inArena,
   inCity,
   inHamlet,
@@ -338,6 +343,95 @@ smith.root.rotation.y = -Math.PI / 2;
 smith.root.scale.setScalar(1.1);
 scene.add(smith.root);
 blob(1.3).position.set(smith.root.position.x, 0.07, smith.root.position.z);
+
+// Merchants behind the hamlets' stalls; the village's fishmonger is already one of its fishermen.
+const merchantFigs = MERCHANTS.filter((m) => m.trade !== "fish").map((m, i) => {
+  const tunic = { baker: 0xf2e8d0, potions: 0x7a3a8a, weapons: 0x5a5a62, armour: 0x8a5a22, fish: 0 }[m.trade];
+  const fig = buildFigure({ ...SMITH_BUILD, tunic, bulk: 1.05 + (i % 2) * 0.15, hairStyle: i % 2 ? "short" : "bald", hair: 0x4a3a2e });
+  if (m.trade === "baker" || m.trade === "potions") fig.sword.visible = false;
+  fig.root.position.set(m.x, 0, m.z);
+  fig.root.rotation.y = Math.PI;
+  fig.walk = i * 2.1;
+  scene.add(fig.root);
+  blob(1.2).position.set(m.x, 0.07, m.z);
+  return fig;
+});
+
+let merchantRedraw: ((coins: number, rows: MerchantRow[]) => void) | null = null;
+
+/** What a merchant has for sale right now, and what buying each one does. */
+function wares(m: Merchant): Array<MerchantRow & { buy: () => void }> {
+  const full = hero.hp >= MAX_HP;
+  const meal = (name: string, note: string, price: number, heal: number): MerchantRow & { buy: () => void } => ({
+    name,
+    note,
+    price,
+    blocked: full ? "Full!" : undefined,
+    buy: () => {
+      hero.hp = Math.min(MAX_HP, hero.hp + heal);
+      burst(hero.x, heroY + 1.4, hero.z, 0x7cff8a, 14, 4, 0.9);
+    },
+  });
+  if (m.trade === "baker") return [meal("Bread", "Heals 3 hearts", 4, 30), meal("Honey cake", "Heals you all the way", 10, MAX_HP)];
+  if (m.trade === "fish") return [meal("Grilled fish", "Heals 5 hearts", 6, 50)];
+  if (m.trade === "potions") {
+    return [
+      {
+        name: "Healing potion",
+        note: `Carry it and drink it any time · ${save.potions} of ${MAX_POTIONS}`,
+        price: 12,
+        blocked: save.potions >= MAX_POTIONS ? "Bag full" : undefined,
+        buy: () => {
+          save.potions += 1;
+          hud.setPotions(save.potions);
+        },
+      },
+    ];
+  }
+  // The weaponsmith.
+  return (Object.keys(WEAPON_PRICES) as WeaponId[]).map((id) => ({
+    name: WEAPONS[id].name,
+    note: id === "spear" ? "Reaches further than a sword" : "Hits twice as hard",
+    price: WEAPON_PRICES[id]!,
+    blocked: save.bought.includes(id) ? "Owned" : undefined,
+    buy: () => {
+      save.bought.push(id);
+      save.weapon = id;
+      armHero();
+      hud.banner(WEAPONS[id].name, "In your hand — switch weapons with the Armor button", 3);
+    },
+  }));
+}
+
+function openMerchant(m: Merchant): void {
+  if (m.trade === "armour") {
+    openShop();
+    return;
+  }
+  const ledes = { baker: "Fresh from the oven.", fish: "Caught this morning.", potions: "Red for health. Drink when you need it.", weapons: "Better steel for the road.", armour: "" };
+  merchantRedraw = hud.openMerchant(m.name, ledes[m.trade], save.coins, wares(m), (i) => {
+    const item = wares(m)[i];
+    if (!item || item.blocked || save.coins < item.price) return;
+    save.coins -= item.price;
+    item.buy();
+    hud.setCoins(save.coins);
+    storeSave(save);
+    merchantRedraw?.(save.coins, wares(m));
+  });
+}
+
+function drinkPotion(): void {
+  if (save.potions <= 0 || !standing(hero) || hero.hp >= MAX_HP) return;
+  save.potions -= 1;
+  hero.hp = Math.min(MAX_HP, hero.hp + 60);
+  burst(hero.x, heroY + 1.4, hero.z, 0xff5a7a, 20, 4, 1);
+  hud.setPotions(save.potions);
+  storeSave(save);
+}
+hud.onPotion(drinkPotion);
+window.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() === "q") drinkPotion();
+});
 
 // Fishermen about the village, each leaning on a fishing spear.
 const fishers = FISHERS.map((f, i) => {
@@ -1525,7 +1619,7 @@ hud.onWardrobe(() => {
     hud.setArmor(save.armor);
     burst(hero.x, heroY + 1.2, hero.z, 0xffd860, 20, 5, 1);
     },
-    ownedWeapons(save.beaten).map((id) => ({ id, name: WEAPONS[id].name })),
+    ownedWeapons(save.beaten, save.bought).map((id) => ({ id, name: WEAPONS[id].name })),
     save.weapon,
     (id) => {
       save.weapon = id as WeaponId;
@@ -2133,8 +2227,12 @@ function update(dt: number): void {
 
   // The blacksmith's counter.
   const atCounter = standing(hero) && dist(hero.x, hero.z, BLACKSMITH.x - 1.4, BLACKSMITH.z) < SHOP_RANGE;
-  controls.offer(atCounter ? "Blacksmith" : null);
-  if (controls.takeInteract() && atCounter) openShop();
+  const merchant = standing(hero) ? MERCHANTS.find((m) => dist(hero.x, hero.z, counterOf(m).x, counterOf(m).z) < MERCHANT_RANGE) : undefined;
+  controls.offer(atCounter ? "Blacksmith" : (merchant?.name ?? null));
+  if (controls.takeInteract()) {
+    if (atCounter) openShop();
+    else if (merchant) openMerchant(merchant);
+  }
 
   blockAnim += ((hero.blocking ? 1 : 0) - blockAnim) * Math.min(1, dt * 18);
   heroFlash = Math.max(0, heroFlash - dt * 5);
@@ -2193,6 +2291,7 @@ function draw(dt: number): void {
   const hammer = (clock * 1.3) % 1;
   poseFigure(smith, dt, { swing: hammer });
   for (const f of fishers) poseFigure(f, dt, {});
+  for (const f of merchantFigs) poseFigure(f, dt, {});
 
   for (const f of foes) {
     const g = f.g;
@@ -2534,6 +2633,7 @@ function draw(dt: number): void {
   }
   for (const f of fishers) f.root.visible = seen(f.root.position.x, f.root.position.z);
   smith.root.visible = seen(smith.root.position.x, smith.root.position.z);
+  for (const f of merchantFigs) f.root.visible = seen(f.root.position.x, f.root.position.z);
 
   // Snap the shadow box to whole texels, or shadows shimmer as the hero walks.
   const texel = (SHADOW_REACH * 2) / sun.shadow.mapSize.x;
@@ -2547,6 +2647,7 @@ function draw(dt: number): void {
 
 hud.setCoins(save.coins);
 hud.setArmor(save.armor);
+hud.setPotions(save.potions);
 hud.setHealth(hero.hp);
 hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods are coming" : "Ares waits in his colosseum, north of the city", 3.5);
 

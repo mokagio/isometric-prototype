@@ -8,6 +8,10 @@ describe("weapons", () => {
     expect(ownedWeapons(["kratos", "poseidon", "artemis"])).toEqual(["sword", "trident", "bow", "club"]);
   });
 
+  it("adds weapons bought from the weaponsmith", () => {
+    expect(ownedWeapons(["ares"], ["iron"])).toEqual(["sword", "iron", "ares"]);
+  });
+
   it("hits with the weapon's power, or the armour's when that is more", () => {
     expect(blowPower("sword", 1)).toBe(1);
     expect(blowPower("sword", 3)).toBe(3);

@@ -3,6 +3,14 @@ import { MAX_HP } from "./hero";
 
 export const HEART_HP = 10;
 
+export interface MerchantRow {
+  name: string;
+  note: string;
+  price: number;
+  /** Why it can't be bought, shown on the button instead of the price. */
+  blocked?: string;
+}
+
 export interface Hud {
   setHealth(hp: number): void;
   setCoins(coins: number): void;
@@ -22,6 +30,11 @@ export interface Hud {
   ): void;
   /** Called when the armour button by the pips is pressed. */
   onWardrobe(handler: () => void): void;
+  /** A merchant's card: a row per thing for sale; the function it hands back redraws it after a sale. */
+  openMerchant(title: string, lede: string, coins: number, rows: MerchantRow[], onBuy: (i: number) => void): (coins: number, rows: MerchantRow[]) => void;
+  /** How many potions are carried; the button to drink one hides at none. */
+  setPotions(n: number): void;
+  onPotion(handler: () => void): void;
   /** Light the slots the hero is wearing. */
   setArmor(armor: Armor): void;
   /** Point the compass: `heading` is where the camera looks, and each mark a yaw on the ground. */
@@ -68,8 +81,14 @@ export function createHud(): Hud {
   wardrobeBtn.textContent = "Armor";
   let wardrobeHandler: (() => void) | null = null;
   wardrobeBtn.addEventListener("click", () => wardrobeHandler?.());
+  const potionBtn = document.createElement("button");
+  potionBtn.type = "button";
+  potionBtn.className = "gd-wardrobe-btn gd-potion-btn";
+  potionBtn.hidden = true;
+  let potionHandler: (() => void) | null = null;
+  potionBtn.addEventListener("click", () => potionHandler?.());
   const kitRow = div("gd-kit-row");
-  kitRow.append(kit, wardrobeBtn);
+  kitRow.append(kit, wardrobeBtn, potionBtn);
   corner.append(hearts, purse, kitRow);
 
   const compass = div("gd-compass");
@@ -191,6 +210,57 @@ export function createHud(): Hud {
     shopOpen: () => !shop.hidden,
     onWardrobe(handler) {
       wardrobeHandler = handler;
+    },
+    setPotions(n) {
+      potionBtn.hidden = n === 0;
+      potionBtn.textContent = `Potion ×${n}`;
+    },
+    onPotion(handler) {
+      potionHandler = handler;
+    },
+    openMerchant(title, lede, coins, rows, onBuy) {
+      const render = (purse: number, list: MerchantRow[]): void => {
+        shop.innerHTML = "";
+        const card = div("gd-shop-card");
+        const head = div("gd-shop-head");
+        head.innerHTML = `<h2></h2><div class="gd-purse"><span class="gd-coin"></span><b>${purse}</b></div>`;
+        head.querySelector("h2")!.textContent = title;
+        card.appendChild(head);
+        const p = document.createElement("p");
+        p.className = "gd-shop-lede";
+        p.textContent = lede;
+        card.appendChild(p);
+        list.forEach((row, i) => {
+          const r = div("gd-shop-row");
+          const name = document.createElement("span");
+          name.className = "gd-shop-name";
+          name.innerHTML = `${row.name}<small class="gd-shop-note"></small>`;
+          name.querySelector("small")!.textContent = row.note;
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "gd-shop-buy";
+          if (row.blocked) {
+            b.textContent = row.blocked;
+            b.disabled = true;
+          } else {
+            b.innerHTML = `<span class="gd-coin"></span>${row.price}`;
+            b.disabled = purse < row.price;
+            b.addEventListener("click", () => onBuy(i));
+          }
+          r.append(div("gd-weapon-dot"), name, b);
+          card.appendChild(r);
+        });
+        const close = document.createElement("button");
+        close.type = "button";
+        close.className = "gd-shop-close";
+        close.textContent = "Back to the road";
+        close.addEventListener("click", () => (shop.hidden = true));
+        card.appendChild(close);
+        shop.appendChild(card);
+      };
+      render(coins, rows);
+      shop.hidden = false;
+      return render;
     },
     openWardrobe(owned, worn, onPick, weapons, held, onWeapon) {
       shop.innerHTML = "";

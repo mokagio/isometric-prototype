@@ -10,12 +10,17 @@ export interface Save {
   bronze: Slot[];
   /** The weapon in hand: the sword, or a beaten god's. */
   weapon: WeaponId;
+  /** Weapons bought from a merchant. */
+  bought: WeaponId[];
+  /** Healing potions carried. */
+  potions: number;
 }
 
 export const SAVE_KEY = "gods:save";
+export const MAX_POTIONS = 3;
 
 export function freshSave(): Save {
-  return { coins: 0, armor: { ...NO_ARMOR }, beaten: [], bronze: [], weapon: "sword" };
+  return { coins: 0, armor: { ...NO_ARMOR }, beaten: [], bronze: [], weapon: "sword", bought: [], potions: 0 };
 }
 
 const KITS: readonly Kit[] = ["none", "bronze", "ares", "poseidon", "hades", "zeus", "kronos", "artemis", "kratos"];
@@ -40,7 +45,9 @@ export function decodeSave(raw: string | null): Save {
       ? SLOTS.filter((s) => (d.bronze as unknown[]).includes(s))
       : SLOTS.filter((s) => armor[s] === "bronze");
     const weapon = WEAPON_IDS.includes(d.weapon as WeaponId) ? (d.weapon as WeaponId) : "sword";
-    return { coins, armor, beaten, bronze, weapon };
+    const bought = Array.isArray(d.bought) ? WEAPON_IDS.filter((w) => (d.bought as unknown[]).includes(w)) : [];
+    const potions = typeof d.potions === "number" && d.potions > 0 ? Math.min(MAX_POTIONS, Math.floor(d.potions)) : 0;
+    return { coins, armor, beaten, bronze, weapon, bought, potions };
   } catch {
     return freshSave();
   }
