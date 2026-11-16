@@ -182,7 +182,6 @@ import {
   pushOut,
   SEA_ARENA,
   SHOP_RANGE,
-  VILLAGE,
 } from "./world";
 
 const ARES_SCALE = 1.75;
@@ -2608,31 +2607,6 @@ function update(dt: number): void {
   blockAnim += ((hero.blocking ? 1 : 0) - blockAnim) * Math.min(1, dt * 18);
   heroFlash = Math.max(0, heroFlash - dt * 5);
   hud.setHealth(Math.ceil(hero.hp));
-  hud.setCompass(
-    camYaw,
-    fight === "on" || seaFight === "on" || zeusFight === "on" || kronosFight === "on" || artemisFight === "on" || kratosFight === "on" || hydraFight === "on" || medusaFight === "on" || minotaurFight === "on" || inTartarus(hero.x, hero.z)
-      ? null
-      : [
-          { id: "colosseum", label: fight === "won" ? "Colosseum" : "Ares", yaw: yawTo(hero.x, hero.z, COLOSSEUM.x, COLOSSEUM.z) },
-          { id: "city", label: "City", yaw: yawTo(hero.x, hero.z, 0, 0) },
-          { id: "village", label: seaFight === "won" ? "Village" : "Poseidon", yaw: yawTo(hero.x, hero.z, VILLAGE.x, VILLAGE.z) },
-          { id: "volcano", label: "Volcano", yaw: yawTo(hero.x, hero.z, VOLCANO.x, VOLCANO.z) },
-          zeusFight === "won"
-            ? { id: "olympus", label: "Olympia", yaw: yawTo(hero.x, hero.z, OLYMPUS.x, OLYMPUS.z) }
-            : { id: "olympus", label: "Zeus", yaw: yawTo(hero.x, hero.z, ZEUS_RING.x, ZEUS_RING.z) },
-          { id: "artemis", label: "Artemis", yaw: yawTo(hero.x, hero.z, ARTEMIS.x, ARTEMIS.z) },
-          { id: "kratos", label: "Kratos", yaw: yawTo(hero.x, hero.z, KRATOS.x, KRATOS.z) },
-          { id: "hydra", label: "Hydra", yaw: yawTo(hero.x, hero.z, PEAK.x, PEAK.z) },
-          { id: "medusa", label: "Medusa", yaw: yawTo(hero.x, hero.z, LAIR.x, LAIR.z) },
-          { id: "minotaur", label: "Labyrinth", yaw: yawTo(hero.x, hero.z, ROOM_CENTRE.x, ROOM_CENTRE.z) },
-        ].filter(
-          (m) =>
-            (m.id !== "city" || !inCity(hero.x, hero.z)) &&
-            (m.id !== "village" || !inVillage(hero.x, hero.z)) &&
-            (m.id !== "volcano" || !inVolcano(hero.x, hero.z)) &&
-            (m.id !== "olympus" || !onOlympus(hero.x, hero.z)),
-        ),
-  );
 }
 
 /** Where a grunt is in its own swing, as a 0..1 through the shared swing animation. */
@@ -3100,6 +3074,8 @@ function draw(dt: number): void {
 hud.setCoins(save.coins);
 hud.setArmor(save.armor);
 hud.setPantry(save.pantry);
+// The kids took the compass away: finding your way is part of the adventure.
+hud.setCompass(0, null);
 hud.setHealth(hero.hp);
 hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods are coming" : "Ares waits in his colosseum, north of the city", 3.5);
 
