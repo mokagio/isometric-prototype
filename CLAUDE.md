@@ -1,7 +1,7 @@
 # Games Playground
 
 A browser games prototype: TypeScript, Vite, no framework, and one runtime dependency that only Blockpocalypse uses.
-Twelve pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), Peaceful Plains (`game.html`, entry `main.ts`), Whispering Woods (`woods.html`, entry `woods/main.ts`), Blockpocalypse (`blockpocalypse.html`, entry `blockpocalypse/main.ts`), Amelia's Dungeon (`dungeon.html`, entry `dungeon/main.ts`), Battle of the Gods (`gods.html`, entry `gods/main.ts`), a world editor for the Plains (`editor.html`), an island editor for the Woods (`woodsEditor.html`, entry `woods/editor/main.ts`), a coastline editor (`outline.html`), the dungeon builder (`dungeonEditor.html`, entry `dungeon/editor/main.ts`), the asset library (`library.html`, entry `sunnyside/catalogPage.ts`), and credits (`credits.html`).
+Thirteen pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), Peaceful Plains (`game.html`, entry `main.ts`), Whispering Woods (`woods.html`, entry `woods/main.ts`), Blockpocalypse (`blockpocalypse.html`, entry `blockpocalypse/main.ts`), Amelia's Dungeon (`dungeon.html`, entry `dungeon/main.ts`), Battle of the Gods (`gods.html`, entry `gods/main.ts`), Seaside (`seaside.html`, entry `seaside/main.ts`), a world editor for the Plains (`editor.html`), an island editor for the Woods (`woodsEditor.html`, entry `woods/editor/main.ts`), a coastline editor (`outline.html`), the dungeon builder (`dungeonEditor.html`, entry `dungeon/editor/main.ts`), the asset library (`library.html`, entry `sunnyside/catalogPage.ts`), and credits (`credits.html`).
 A new game is an entry in `games.ts` plus its own page and Rollup input.
 Only Peaceful Plains is isometric: Whispering Woods is drawn straight down the screen, and shares the input, sprite, loop, and viewport plumbing but none of `iso.ts`.
 Blockpocalypse, Amelia's Dungeon and Battle of the Gods share none of it — see below.
@@ -225,6 +225,14 @@ The stairs climb to Olympia on the summit: a monument whose door bursts open the
 
 On the dev server `window.gods` can read state, teleport the hero and add coins, so a recording can reach the colosseum without walking the road.
 Progress is under the `gods:save` storage key.
+
+## Seaside
+
+`src/seaside/` is a cozy top-down pixel game the kids designed: a kid in a seaside town who gardens, fishes, keeps chickens and sells what they gather at the market for seeds. No enemies, no fighting.
+It is drawn with the same Sunnyside pack and painter as Whispering Woods — the town is library ground brushes and props laid out in `town.ts`, so `drawGroundCell`/`drawProp` paint it — and borrows that game's `walk`, `Input`, stick and loop, but none of its island.
+The kid's fishing, digging and watering strips, the crop stages, soil and items are cut from the pack by `scripts/vendorSeaside.sh` into `public/seaside/`; re-run it rather than editing those files.
+The rules are pure and tested: `garden.ts` (a crop grows a stage only while watered, and each stage drinks the water up), `fishing.ts` (reel while it bites, not before or after), `coop.ts`, `market.ts`, `save.ts` under the `seaside:save` key.
+Cooking and decorating are the next things the kids asked for.
 
 ## Islands
 

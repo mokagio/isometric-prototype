@@ -11,4 +11,5 @@ export const GAMES: GameEntry[] = [
   { name: "Blockpocalypse", href: "blockpocalypse.html" },
   { name: "Amelia's Dungeon", href: "dungeon.html" },
   { name: "Battle of the Gods", href: "gods.html" },
+  { name: "Seaside", href: "seaside.html" },
 ];

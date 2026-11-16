@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Seaside | Games Playground</title>
+    <!-- The menu, stick and shared chrome live in `src/chrome.css`, which
+         `sharedHead.ts` links into every page. What is below is this game's. -->
+    <style>
+      html, body {
+        height: 100%;
+        overflow: hidden;
+        background: #0099db;
+      }
+      [hidden] { display: none !important; }
+      :root {
+        --ss-panel: rgba(58, 36, 16, 0.72);
+        --ss-cream: #fff4dc;
+        --ss-gold: #ffd23a;
+      }
+      .ss-icon {
+        display: inline-block;
+        flex: none;
+        background-repeat: no-repeat;
+        image-rendering: pixelated;
+      }
+      .ss-coin {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 35%, #fff2a0, #e8b83e 60%, #a8741e);
+        box-shadow: inset 0 0 0 2px #a8741e;
+        vertical-align: -2px;
+        margin-right: 4px;
+      }
+
+      /* Purse and bag, top left; the menu takes top right. */
+      .ss-top {
+        position: fixed;
+        top: var(--ww-inset-top);
+        left: var(--ww-inset-left);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .ss-purse, .ss-bag {
+        align-self: flex-start;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: var(--ss-panel);
+        color: var(--ss-cream);
+        font: 700 16px system-ui, sans-serif;
+      }
+      .ss-bag:empty { display: none; }
+      .ss-bag { max-width: 70vw; flex-wrap: wrap; border-radius: 14px; }
+      .ss-slot { display: flex; align-items: center; gap: 2px; }
+      .ss-slot b { font-size: 13px; }
+
+      /* The seed in hand, under the purse: tap to switch. */
+      .ss-seed {
+        pointer-events: auto;
+        align-self: flex-start;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        min-height: 40px;
+        padding: 4px 12px 4px 6px;
+        border: 2px solid var(--ss-gold);
+        border-radius: 999px;
+        background: var(--ss-panel);
+        color: var(--ss-cream);
+        font: 700 14px system-ui, sans-serif;
+      }
+
+      /* The one action button, under the right thumb. */
+      .ss-action {
+        position: fixed;
+        right: calc(var(--ww-inset-right) + 6px);
+        bottom: calc(var(--ww-inset-bottom) + 18px);
+        width: 96px;
+        height: 96px;
+        border-radius: 50%;
+        border: 4px solid var(--ss-gold);
+        background: #e2733a;
+        color: #fff;
+        font: 800 18px system-ui, sans-serif;
+        box-shadow: 0 6px 0 #9a4a20;
+        z-index: 1;
+        touch-action: none;
+      }
+      .ss-action:disabled { background: rgba(58, 36, 16, 0.45); border-color: rgba(255, 244, 220, 0.4); box-shadow: none; color: rgba(255, 244, 220, 0.5); }
+      .ss-action:not(:disabled):active { transform: translateY(4px); box-shadow: 0 2px 0 #9a4a20; }
+
+      .ss-message {
+        position: fixed;
+        top: calc(var(--ww-inset-top) + 8px);
+        left: 50%;
+        transform: translate(-50%, -12px);
+        padding: 8px 16px;
+        border-radius: 999px;
+        background: var(--ss-panel);
+        color: var(--ss-cream);
+        font: 700 16px system-ui, sans-serif;
+        opacity: 0;
+        transition: opacity 0.25s, transform 0.25s;
+        pointer-events: none;
+        white-space: nowrap;
+        z-index: 1;
+      }
+      .ss-message.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+      /* The market card. */
+      .ss-market {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(20, 40, 60, 0.45);
+        z-index: 2;
+      }
+      .ss-card {
+        width: min(360px, calc(100vw - 32px));
+        max-height: calc(100vh - 32px);
+        overflow-y: auto;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 3px solid #a8741e;
+        background: #fff4dc;
+        color: #3a2410;
+        font: 600 15px system-ui, sans-serif;
+      }
+      .ss-card h2 { margin: 0 0 8px; font-size: 24px; }
+      .ss-card p { margin: 10px 0 4px; font-weight: 800; color: #8a5a22; }
+      .ss-card button {
+        min-height: 38px;
+        border: 2px solid #a8741e;
+        border-radius: 10px;
+        background: #ffd23a;
+        color: #3a2410;
+        font: 800 15px system-ui, sans-serif;
+      }
+      .ss-card button:disabled { opacity: 0.45; }
+      .ss-sell { width: 100%; }
+      .ss-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px dashed #d8b88a; }
+      .ss-row span:not(.ss-icon):not(.ss-coin) { flex: 1; }
+      .ss-row small { color: #8a5a22; }
+      .ss-row button { min-width: 64px; }
+      .ss-close { width: 100%; margin-top: 10px; background: #f2e2bc !important; }
+
+      @media (max-height: 500px) {
+        .ss-card { padding: 10px 12px; }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="seaside"></canvas>
+    <script type="module" src="/src/seaside/main.ts"></script>
+  </body>
+</html>
