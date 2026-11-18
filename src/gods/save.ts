@@ -15,12 +15,15 @@ export interface Save {
   bought: WeaponId[];
   /** Food and potions carried, by kind. */
   pantry: Pantry;
+  /** Bought from the cartographer. */
+  compass: boolean;
+  map: boolean;
 }
 
 export const SAVE_KEY = "gods:save";
 
 export function freshSave(): Save {
-  return { coins: 0, armor: { ...NO_ARMOR }, beaten: [], bronze: [], weapon: "sword", bought: [], pantry: {} };
+  return { coins: 0, armor: { ...NO_ARMOR }, beaten: [], bronze: [], weapon: "sword", bought: [], pantry: {}, compass: false, map: false };
 }
 
 const KITS: readonly Kit[] = ["none", "bronze", "ares", "poseidon", "hades", "zeus", "kronos", "artemis", "kratos", "hydra", "medusa", "minotaur"];
@@ -54,7 +57,7 @@ export function decodeSave(raw: string | null): Save {
     }
     // Saves from before the pantry carried potions on their own.
     if (typeof d.potions === "number" && d.potions > 0 && !pantry.potion) pantry.potion = Math.min(MAX_EACH, Math.floor(d.potions));
-    return { coins, armor, beaten, bronze, weapon, bought, pantry };
+    return { coins, armor, beaten, bronze, weapon, bought, pantry, compass: d.compass === true, map: d.map === true };
   } catch {
     return freshSave();
   }

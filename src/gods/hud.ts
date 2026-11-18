@@ -1,6 +1,8 @@
 import { buy, PIECE_NAMES, PRICES, SLOTS, type Armor, type Outfit, type Slot } from "./armor";
 import { MAX_HP } from "./hero";
 import { SNACK_INFO, SNACKS, type Pantry, type Snack } from "./pantry";
+import type { DialMark } from "./compass";
+import { drawWorldMap, type MapHero } from "./worldMap";
 
 export const HEART_HP = 10;
 
@@ -38,17 +40,14 @@ export interface Hud {
   onSnack(handler: (snack: Snack) => void): void;
   /** Light the slots the hero is wearing. */
   setArmor(armor: Armor): void;
-  /** Point the compass: `heading` is where the camera looks, and each mark a yaw on the ground. */
-  setCompass(heading: number, marks: Array<{ id: string; label: string; yaw: number }> | null): void;
-}
-
-/** Where a mark sits across the compass strip, 0..1, or null when it is behind you. */
-export function compassAt(heading: number, yaw: number, fov = Math.PI * 0.9): number | null {
-  let d = yaw - heading;
-  d = Math.atan2(Math.sin(d), Math.cos(d));
-  // Yaw grows to the left of the view (right of a +z heading is -x), so flip it for the screen.
-  const x = 0.5 - d / fov;
-  return x < 0 || x > 1 ? null : x;
+  /** Turn the dial's arrow to `heading` and put the gods round its rim; null hides the dial. */
+  setCompass(heading: number | null, marks: readonly DialMark[]): void;
+  /** Show the map button, and what pressing it does. */
+  offerMap(onOpen: (() => void) | null): void;
+  /** Lay the whole world out across the screen; a tap anywhere folds it away. */
+  openMap(hero: MapHero | null, beaten: readonly string[]): void;
+  closeMap(): void;
+  mapOpen(): boolean;
 }
 
 /** How full each heart is, from a health total: 1 whole, 0 empty, anything between. */
@@ -88,21 +87,30 @@ export function createHud(): Hud {
   let snackHandler: ((snack: Snack) => void) | null = null;
   corner.append(hearts, purse, kitRow);
 
-  const compass = div("gd-compass");
-  compass.innerHTML = `<div class="gd-compass-strip"></div>`;
-  const strip = compass.querySelector<HTMLElement>(".gd-compass-strip")!;
+  // The compass and the map button under it, down the right-hand side.
+  const side = div("gd-side");
+  const dial = div("gd-dial");
+  dial.hidden = true;
+  dial.innerHTML = `<b class="gd-dial-n">N</b><b class="gd-dial-e">E</b><b class="gd-dial-s">S</b><b class="gd-dial-w">W</b>
+    <svg class="gd-dial-arrow" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 4 L28 30 L20 25 L12 30 Z"/></svg>`;
+  const arrow = dial.querySelector<SVGElement>(".gd-dial-arrow")!;
   const marks = new Map<string, HTMLElement>();
-  for (const [label, offset] of [
-    ["N", Math.PI],
-    ["E", Math.PI / 2],
-    ["S", 0],
-    ["W", -Math.PI / 2],
-  ] as const) {
-    const t = div("gd-compass-tick");
-    t.textContent = label;
-    t.dataset.yaw = String(offset);
-    strip.appendChild(t);
-  }
+  const mapBtn = document.createElement("button");
+  mapBtn.type = "button";
+  mapBtn.className = "gd-map-btn";
+  mapBtn.textContent = "Map";
+  mapBtn.hidden = true;
+  let mapHandler: (() => void) | null = null;
+  mapBtn.addEventListener("click", () => mapHandler?.());
+  side.append(dial, mapBtn);
+
+  const mapLayer = div("gd-map");
+  mapLayer.hidden = true;
+  const mapCanvas = document.createElement("canvas");
+  const mapHint = div("gd-map-hint");
+  mapHint.textContent = "Tap anywhere to fold the map away";
+  mapLayer.append(mapCanvas, mapHint);
+  mapLayer.addEventListener("click", () => (mapLayer.hidden = true));
 
   const fills: HTMLElement[] = [];
   for (let i = 0; i < MAX_HP / HEART_HP; i++) {
@@ -129,7 +137,7 @@ export function createHud(): Hud {
   shop.hidden = true;
 
   pantryBar.hidden = true;
-  document.body.append(corner, compass, boss, bannerEl, pantryBar, shop);
+  document.body.append(corner, side, boss, bannerEl, pantryBar, shop, mapLayer);
 
   let lastHp = -1;
   return {
@@ -205,7 +213,7 @@ export function createHud(): Hud {
       shop.hidden = false;
       return render;
     },
-    shopOpen: () => !shop.hidden,
+    shopOpen: () => !shop.hidden || !mapLayer.hidden,
     onWardrobe(handler) {
       wardrobeHandler = handler;
     },
@@ -341,29 +349,41 @@ export function createHud(): Hud {
       for (const [slot, pip] of pips) pip.dataset.kit = armor[slot];
     },
     setCompass(heading, list) {
-      compass.hidden = list === null;
-      if (list === null) return;
-      for (const t of strip.querySelectorAll<HTMLElement>(".gd-compass-tick")) {
-        const x = compassAt(heading, Number(t.dataset.yaw));
-        t.hidden = x === null;
-        if (x !== null) t.style.left = `${x * 100}%`;
-      }
-      for (const el of marks.values()) el.hidden = true;
+      dial.hidden = heading === null;
+      if (heading === null) return;
+      arrow.style.transform = `rotate(${heading}rad)`;
       for (const m of list) {
         let el = marks.get(m.id);
         if (!el) {
-          el = div("gd-compass-mark");
-          el.dataset.id = m.id;
-          el.innerHTML = `<span></span><b></b>`;
-          el.querySelector("b")!.textContent = m.label;
-          strip.appendChild(el);
+          el = div("gd-dial-mark");
+          el.title = m.name;
+          el.style.background = m.color;
+          dial.insertBefore(el, arrow);
           marks.set(m.id, el);
         }
-        const x = compassAt(heading, m.yaw);
-        el.hidden = x === null;
-        if (x !== null) el.style.left = `${x * 100}%`;
+        el.classList.toggle("is-beaten", m.beaten);
+        el.style.transform = `rotate(${m.bearing}rad) translateY(calc(var(--gd-dial-r) * -1)) rotate(${-m.bearing}rad)`;
       }
     },
+    offerMap(onOpen) {
+      mapHandler = onOpen;
+      mapBtn.hidden = onOpen === null;
+    },
+    openMap(hero, beaten) {
+      mapLayer.hidden = false;
+      const ratio = Math.min(window.devicePixelRatio, 2);
+      const w = mapCanvas.clientWidth;
+      const h = mapCanvas.clientHeight;
+      mapCanvas.width = Math.round(w * ratio);
+      mapCanvas.height = Math.round(h * ratio);
+      const ctx = mapCanvas.getContext("2d")!;
+      ctx.scale(ratio, ratio);
+      drawWorldMap(ctx, w, h, hero, beaten);
+    },
+    closeMap() {
+      mapLayer.hidden = true;
+    },
+    mapOpen: () => !mapLayer.hidden,
   };
 }
 

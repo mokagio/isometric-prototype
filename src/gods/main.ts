@@ -75,6 +75,7 @@ import {
   type Hero,
 } from "./hero";
 import { createHud } from "./hud";
+import { dialMarks, headingOf } from "./compass";
 import { loadSave, SAVE_KEY, storeSave } from "./save";
 import { addSnack, MAX_EACH, SNACK_INFO, SNACKS, useSnack, type Snack } from "./pantry";
 import { toon } from "./toon";
@@ -364,11 +365,11 @@ smith.root.scale.setScalar(1.1);
 scene.add(smith.root);
 blob(1.3).position.set(smith.root.position.x, 0.07, smith.root.position.z);
 
-// Merchants behind the hamlets' stalls; the village's fishmonger is already one of its fishermen.
+// Merchants behind the stalls; the village's fishmonger is already one of its fishermen.
 const merchantFigs = MERCHANTS.filter((m) => m.trade !== "fish").map((m, i) => {
-  const tunic = { baker: 0xf2e8d0, potions: 0x7a3a8a, weapons: 0x5a5a62, armour: 0x8a5a22, fish: 0 }[m.trade];
+  const tunic = { baker: 0xf2e8d0, potions: 0x7a3a8a, weapons: 0x5a5a62, armour: 0x8a5a22, maps: 0x2f6f5a, fish: 0 }[m.trade];
   const fig = buildFigure({ ...SMITH_BUILD, tunic, bulk: 1.05 + (i % 2) * 0.15, hairStyle: i % 2 ? "short" : "bald", hair: 0x4a3a2e });
-  if (m.trade === "baker" || m.trade === "potions") fig.sword.visible = false;
+  if (m.trade === "baker" || m.trade === "potions" || m.trade === "maps") fig.sword.visible = false;
   fig.root.position.set(m.x, 0, m.z);
   fig.root.rotation.y = Math.PI;
   fig.walk = i * 2.1;
@@ -394,6 +395,31 @@ function wares(m: Merchant): Array<MerchantRow & { buy: () => void }> {
   if (m.trade === "baker") return [snack("bread", "Heals 3 hearts", 4), snack("cake", "Heals you all the way", 10)];
   if (m.trade === "fish") return [snack("fish", "Heals 5 hearts", 6)];
   if (m.trade === "potions") return [snack("potion", "Heals 6 hearts", 12)];
+  if (m.trade === "maps") {
+    return [
+      {
+        name: "Compass",
+        note: "Shows which way you're going, and where every god is",
+        price: COMPASS_PRICE,
+        blocked: save.compass ? "Owned" : undefined,
+        buy: () => {
+          save.compass = true;
+          hud.banner("Compass", "It sits on the side of your screen", 3);
+        },
+      },
+      {
+        name: "Map",
+        note: "The whole land, and you on it",
+        price: MAP_PRICE,
+        blocked: save.map ? "Owned" : undefined,
+        buy: () => {
+          save.map = true;
+          offerMap();
+          hud.banner("Map", "Press the Map button to look at it", 3);
+        },
+      },
+    ];
+  }
   // The weaponsmith.
   return (Object.keys(WEAPON_PRICES) as WeaponId[]).map((id) => ({
     name: WEAPONS[id].name,
@@ -414,7 +440,14 @@ function openMerchant(m: Merchant): void {
     openShop();
     return;
   }
-  const ledes = { baker: "Fresh from the oven.", fish: "Caught this morning.", potions: "Red for health. Drink when you need it.", weapons: "Better steel for the road.", armour: "" };
+  const ledes = {
+    baker: "Fresh from the oven.",
+    fish: "Caught this morning.",
+    potions: "Red for health. Drink when you need it.",
+    weapons: "Better steel for the road.",
+    maps: "Never get lost again.",
+    armour: "",
+  };
   merchantRedraw = hud.openMerchant(m.name, ledes[m.trade], save.coins, wares(m), (i) => {
     const item = wares(m)[i];
     if (!item || item.blocked || save.coins < item.price) return;
@@ -425,6 +458,27 @@ function openMerchant(m: Merchant): void {
     merchantRedraw?.(save.coins, wares(m));
   });
 }
+
+const COMPASS_PRICE = 20;
+const MAP_PRICE = 35;
+
+function showMap(): void {
+  if (hud.mapOpen()) {
+    hud.closeMap();
+    return;
+  }
+  if (!save.map || hud.shopOpen()) return;
+  // Under the world the map has nothing to say about where you are.
+  hud.openMap(inTartarus(hero.x, hero.z) ? null : { x: hero.x, z: hero.z, yaw: hero.yaw }, save.beaten);
+}
+
+function offerMap(): void {
+  hud.offerMap(save.map ? showMap : null);
+}
+
+window.addEventListener("keydown", (e) => {
+  if (!e.repeat && e.key.toLowerCase() === "m") showMap();
+});
 
 /** Eat or drink one thing from the bar. */
 function eat(snack: Snack): void {
@@ -3068,14 +3122,16 @@ function draw(dt: number): void {
   sun.target.position.set(sx, heroY, sz);
   sun.position.set(sx + SUN_OFFSET.x, SUN_OFFSET.y + heroY, sz + SUN_OFFSET.z);
 
+  // The compass has no north to find under the world.
+  hud.setCompass(save.compass && !inTartarus(hero.x, hero.z) ? headingOf(hero.yaw) : null, dialMarks(hero.x, hero.z, save.beaten));
+
   renderer.render(scene, camera);
 }
 
 hud.setCoins(save.coins);
 hud.setArmor(save.armor);
 hud.setPantry(save.pantry);
-// The kids took the compass away: finding your way is part of the adventure.
-hud.setCompass(0, null);
+offerMap();
 hud.setHealth(hero.hp);
 hud.banner("Battle of the Gods", fight === "won" ? "Ares is beaten — more gods are coming" : "Ares waits in his colosseum, north of the city", 3.5);
 
@@ -3120,6 +3176,12 @@ if (import.meta.env.DEV) {
       give(n: number) {
         save.coins += n;
         hud.setCoins(save.coins);
+      },
+      /** Hand over the compass and the map without the walk to the cartographer. */
+      chart() {
+        save.compass = true;
+        save.map = true;
+        offerMap();
       },
     },
   });

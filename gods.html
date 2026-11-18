@@ -216,62 +216,100 @@
       .gd-kit .gd-pip[data-kit="minotaur"] path, .gd-kit .gd-pip[data-kit="minotaur"] rect { fill: #6a3a22; stroke: #e8dcc4; }
       .gd-kit .gd-pip[data-kit="minotaur"] .gd-crest { fill: #e8dcc4; }
 
-      /* Compass along the top: where the god is, and the way home. */
-      .gd-compass {
+      /* The compass, down the right under the menu: north up, the arrow the way you face, a dot per god round the rim. */
+      .gd-side {
         position: fixed;
-        top: calc(var(--ww-inset-top) + 6px);
-        left: 50%;
-        transform: translateX(-50%);
-        width: min(46vw, 360px);
-        height: 34px;
+        top: calc(var(--ww-inset-top) + var(--ww-btn) + 12px);
+        right: var(--ww-inset-right);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        z-index: 1;
         pointer-events: none;
-        border-radius: 999px;
-        background: linear-gradient(90deg, transparent, var(--gd-panel) 18%, var(--gd-panel) 82%, transparent);
       }
-      .gd-compass::after {
-        content: "";
+      .gd-dial {
+        --gd-dial-r: 37px;
+        position: relative;
+        width: 88px;
+        height: 88px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(251, 243, 223, 0.95) 0 55%, var(--gd-panel) 56%);
+        border: 3px solid var(--gd-gold);
+        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+        box-sizing: border-box;
+      }
+      .gd-dial > b {
+        position: absolute;
+        font: 700 10px var(--gd-serif);
+        color: var(--gd-ink);
+        transform: translate(-50%, -50%);
+      }
+      .gd-dial-n { left: 50%; top: 25%; color: var(--gd-red) !important; }
+      .gd-dial-e { left: 75%; top: 50%; }
+      .gd-dial-s { left: 50%; top: 75%; }
+      .gd-dial-w { left: 25%; top: 50%; }
+      .gd-dial-arrow {
         position: absolute;
         left: 50%;
-        top: 2px;
-        border: 5px solid transparent;
-        border-top-color: var(--gd-gold);
-        transform: translateX(-50%);
-      }
-      /* Upright on a phone there is no room beside the hearts: it drops below them. */
-      @media (max-width: 560px) {
-        .gd-compass { top: calc(var(--ww-inset-top) + 132px); width: 70vw; }
-        body .gd-boss { top: calc(var(--ww-inset-top) + 132px); width: 80vw; }
-        body .gd-interact { bottom: calc(var(--ww-inset-bottom) + 175px); }
-      }
-      .gd-compass-strip {
-        position: absolute;
-        inset: 0 12%;
-        overflow: hidden;
-      }
-      .gd-compass-tick, .gd-compass-mark {
-        position: absolute;
         top: 50%;
-        transform: translate(-50%, -50%);
+        width: 30px;
+        height: 30px;
+        margin: -15px 0 0 -15px;
+      }
+      .gd-dial-arrow path { fill: var(--gd-red); stroke: var(--gd-ink); stroke-width: 2; stroke-linejoin: round; }
+      .gd-dial-mark {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 11px;
+        height: 11px;
+        margin: -5.5px 0 0 -5.5px;
+        border-radius: 50%;
+        border: 1.5px solid var(--gd-cream);
+        box-sizing: border-box;
+      }
+      .gd-dial-mark.is-beaten { opacity: 0.35; }
+      .gd-map-btn {
+        pointer-events: auto;
+        min-height: 32px;
+        padding: 4px 14px;
+        border: 2px solid var(--gd-gold);
+        border-radius: 999px;
+        background: var(--gd-panel);
+        color: var(--gd-cream);
+        font: italic 700 14px var(--gd-serif);
+        cursor: pointer;
+      }
+      .gd-map-btn:active { transform: scale(0.96); }
+      @media (pointer: fine) {
+        .gd-map-btn::after { content: " (M)"; opacity: 0.6; }
+      }
+      /* Upright on a phone the god's health bar crosses the top: sit below it. */
+      @media (max-width: 560px) {
+        .gd-side { top: calc(var(--ww-inset-top) + 180px); }
+      }
+
+      /* The cartographer's map, over everything until tapped away. */
+      .gd-map {
+        position: fixed;
+        inset: 0;
+        z-index: 3;
+        background: #e9d6a8;
+        padding: var(--ww-inset-top) var(--ww-inset-right) var(--ww-inset-bottom) var(--ww-inset-left);
+        box-sizing: border-box;
+        cursor: pointer;
+      }
+      .gd-map canvas { display: block; width: 100%; height: 100%; }
+      .gd-map-hint {
+        position: absolute;
+        left: 50%;
+        bottom: calc(var(--ww-inset-bottom) + 4px);
+        transform: translateX(-50%);
+        font: italic 600 13px var(--gd-serif);
+        color: #6b4f34;
         white-space: nowrap;
       }
-      .gd-compass-tick { font: 700 12px var(--gd-serif); color: rgba(251, 243, 223, 0.55); }
-      .gd-compass-mark { display: flex; align-items: center; gap: 4px; font: italic 700 12px var(--gd-serif); color: var(--gd-cream); }
-      .gd-compass-mark span {
-        width: 10px;
-        height: 10px;
-        transform: rotate(45deg);
-        background: var(--gd-gold);
-        border: 1.5px solid var(--gd-ink);
-      }
-      .gd-compass-mark[data-id="colosseum"] span { background: #d8382c; }
-      .gd-compass-mark[data-id="village"] span { background: #2a8fd0; }
-      .gd-compass-mark[data-id="volcano"] span { background: #f06a1e; }
-      .gd-compass-mark[data-id="olympus"] span { background: #ffd23a; }
-      .gd-compass-mark[data-id="artemis"] span { background: #6fbf6a; }
-      .gd-compass-mark[data-id="kratos"] span { background: #8a8a92; }
-      .gd-compass-mark[data-id="hydra"] span { background: #3f8a5a; }
-      .gd-compass-mark[data-id="medusa"] span { background: #9ab84a; }
-      .gd-compass-mark[data-id="minotaur"] span { background: #8a5a3a; }
 
       /* The god's health, top centre. */
       .gd-boss {

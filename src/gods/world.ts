@@ -271,7 +271,7 @@ export function huts(): House[] {
 }
 
 /** What a merchant trades in. */
-export type Trade = "baker" | "potions" | "weapons" | "armour" | "fish";
+export type Trade = "baker" | "potions" | "weapons" | "armour" | "fish" | "maps";
 
 /** A merchant behind a stall: where they stand, and how close counts as at their counter. */
 export interface Merchant {
@@ -282,7 +282,10 @@ export interface Merchant {
 }
 export const MERCHANT_RANGE = 3.6;
 
-/** One behind each hamlet's stall, in the order the hamlets are listed, and the fishmonger at the village market. */
+/** The cartographer's stall on the city's plaza, south of the fountain. */
+export const CARTOGRAPHER = { x: -4, z: 9 };
+
+/** One behind each hamlet's stall, in the order the hamlets are listed, the fishmonger at the village market, and the city's cartographer. */
 export const MERCHANTS: readonly Merchant[] = [
   ...(["baker", "potions", "weapons", "armour"] as const).map((trade, i) => ({
     trade,
@@ -291,6 +294,7 @@ export const MERCHANTS: readonly Merchant[] = [
     z: HAMLETS[i]!.z + 5.3,
   })),
   { trade: "fish", name: "Fishmonger", x: SEA_ARENA.x + SEA_ARENA.r + SEA_ARENA.thick + 2.7, z: VILLAGE.z - 8 },
+  { trade: "maps", name: "Cartographer", x: CARTOGRAPHER.x, z: CARTOGRAPHER.z + 1.3 },
 ];
 
 /** Where a customer stands to trade with a merchant: across the stall from them. */
@@ -372,6 +376,7 @@ export function layoutWorld(): World {
   boxes.push({ x0: MONUMENT.x - MONUMENT.w / 2 - 2, z0: MONUMENT.z - MONUMENT.d / 2 - 2, x1: MONUMENT.x + MONUMENT.w / 2 + 2, z1: MONUMENT.z + MONUMENT.d / 2 + 2 });
   // The forge and counter, with the smith behind them.
   boxes.push({ x0: BLACKSMITH.x - 0.5, z0: BLACKSMITH.z - 3, x1: BLACKSMITH.x + 3.5, z1: BLACKSMITH.z + 3 });
+  boxes.push({ x0: CARTOGRAPHER.x - 1.3, z0: CARTOGRAPHER.z - 0.6, x1: CARTOGRAPHER.x + 1.3, z1: CARTOGRAPHER.z + 0.6 });
   const circles: Circle[] = [
     FOUNTAIN,
     { x: -4.5, z: CITY_GATE_Z, r: 1 },

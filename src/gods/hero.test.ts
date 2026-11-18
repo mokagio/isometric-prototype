@@ -74,7 +74,7 @@ describe("jumping", () => {
 
 describe("the save", () => {
   it("round-trips", () => {
-    const save = { coins: 12, armor: godKit("ares"), beaten: ["ares"], bronze: ["helmet" as const, "legs" as const], weapon: "ares" as const, bought: ["spear" as const], pantry: { bread: 2, potion: 1 } };
+    const save = { coins: 12, armor: godKit("ares"), beaten: ["ares"], bronze: ["helmet" as const, "legs" as const], weapon: "ares" as const, bought: ["spear" as const], pantry: { bread: 2, potion: 1 }, compass: true, map: false };
     expect(decodeSave(encodeSave(save))).toEqual(save);
   });
 

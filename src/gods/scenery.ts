@@ -31,6 +31,7 @@ import {
   ARENA_R,
   BLACKSMITH,
   CAMPS,
+  CARTOGRAPHER,
   CITY,
   CITY_GATE_Z,
   COLOSSEUM,
@@ -645,6 +646,18 @@ function market(b: Batch): void {
     });
     b.add(AMPHORA, C.terracotta, { x: s.x + 0.9, y: 0, z: s.z + 1.6 }, {}, 0.7);
   }
+
+  // The cartographer's: rolled maps on the counter, a globe at one end.
+  const { x, z } = CARTOGRAPHER;
+  b.add(G.box, C.wood, { x, y: 0.5, z }, {}, { x: 2.4, y: 1.0, z: 1.1 });
+  for (const dx of [-1.1, 1.1]) b.add(G.cyl8, C.wood, { x: x + dx, y: 1.3, z }, {}, { x: 0.06, y: 2.6, z: 0.06 });
+  b.add(G.box, 0xc8913a, { x, y: 2.65, z }, { x: 0.15 }, { x: 2.8, y: 0.08, z: 1.6 });
+  for (let k = 0; k < 4; k++) {
+    b.add(G.cyl8, k % 2 ? 0xf2e6c4 : 0xe6d3a2, { x: x - 0.9 + k * 0.38, y: 1.1, z: z - 0.1 + (k % 2) * 0.2 }, { x: Math.PI / 2 }, { x: 0.11, y: 0.8, z: 0.11 });
+  }
+  b.add(G.blob, 0x2f7fc8, { x: x + 0.75, y: 1.42, z }, {}, 0.32);
+  b.add(G.blob, 0x6fbf6a, { x: x + 0.62, y: 1.52, z: z - 0.18 }, {}, 0.15);
+  b.add(G.cyl8, 0x9c6b2f, { x: x + 0.75, y: 1.06, z }, {}, { x: 0.12, y: 0.12, z: 0.12 });
 }
 
 // ---------------------------------------------------------------------------
