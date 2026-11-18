@@ -1,10 +1,10 @@
 # Games Playground
 
 A browser games prototype: TypeScript, Vite, no framework, and one runtime dependency that only Blockpocalypse uses.
-Thirteen pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), Peaceful Plains (`game.html`, entry `main.ts`), Whispering Woods (`woods.html`, entry `woods/main.ts`), Blockpocalypse (`blockpocalypse.html`, entry `blockpocalypse/main.ts`), Amelia's Dungeon (`dungeon.html`, entry `dungeon/main.ts`), Battle of the Gods (`gods.html`, entry `gods/main.ts`), Seaside (`seaside.html`, entry `seaside/main.ts`), a world editor for the Plains (`editor.html`), an island editor for the Woods (`woodsEditor.html`, entry `woods/editor/main.ts`), a coastline editor (`outline.html`), the dungeon builder (`dungeonEditor.html`, entry `dungeon/editor/main.ts`), the asset library (`library.html`, entry `sunnyside/catalogPage.ts`), and credits (`credits.html`).
+Fourteen pages, all listed as Rollup inputs in `vite.config.ts`: the games list (`index.html`, entry `home.ts`), Peaceful Plains (`game.html`, entry `main.ts`), Whispering Woods (`woods.html`, entry `woods/main.ts`), Blockpocalypse (`blockpocalypse.html`, entry `blockpocalypse/main.ts`), Amelia's Dungeon (`dungeon.html`, entry `dungeon/main.ts`), Battle of the Gods (`gods.html`, entry `gods/main.ts`), Seaside (`seaside.html`, entry `seaside/main.ts`), Turbo Karts (`race.html`, entry `race/main.ts`), a world editor for the Plains (`editor.html`), an island editor for the Woods (`woodsEditor.html`, entry `woods/editor/main.ts`), a coastline editor (`outline.html`), the dungeon builder (`dungeonEditor.html`, entry `dungeon/editor/main.ts`), the asset library (`library.html`, entry `sunnyside/catalogPage.ts`), and credits (`credits.html`).
 A new game is an entry in `games.ts` plus its own page and Rollup input.
 Only Peaceful Plains is isometric: Whispering Woods is drawn straight down the screen, and shares the input, sprite, loop, and viewport plumbing but none of `iso.ts`.
-Blockpocalypse, Amelia's Dungeon and Battle of the Gods share none of it — see below.
+Blockpocalypse, Amelia's Dungeon, Battle of the Gods and Turbo Karts share none of it — see below.
 
 ## Art that cannot be redistributed
 
@@ -251,6 +251,24 @@ It is drawn with the same Sunnyside pack and painter as Whispering Woods — the
 The kid's fishing, digging and watering strips, the crop stages, soil and items are cut from the pack by `scripts/vendorSeaside.sh` into `public/seaside/`; re-run it rather than editing those files.
 The rules are pure and tested: `garden.ts` (a crop grows a stage only while watered, and each stage drinks the water up), `fishing.ts` (reel while it bites, not before or after), `coop.ts`, `market.ts`, `save.ts` under the `seaside:save` key.
 Cooking and decorating are the next things the kids asked for.
+
+## Turbo Karts
+
+`src/race/` is a kart racer in three.js with a chase camera: six karts, crystals on the road that hand out a turbo, an oil slick or a homing rocket, and a ladder climbed only by winning.
+It borrows Battle of the Gods' `toon.ts` for the look and nothing else of that game; the rest of the playground lends it `createMenu`.
+
+A track is a seed (`track.ts`): control points round a squashed circle, a closed Catmull-Rom through them, re-sampled every `STEP` metres so `s` is arithmetic on an index.
+`makeTrack` re-rolls until no stretch of road comes within reach of another's barrier and no corner is tighter than `MIN_TURN_RADIUS`, so every seed is raceable, and `race.test.ts` holds it to that over thirty rungs.
+`lateral` is metres right of the centreline facing the way the race runs; past the kerb is grass (`GRASS` of top speed) and at `BARRIER` a tyre wall, which is the only collision a kart has with the course.
+Laps count on crossing `s` = 0 (`lapsCrossed`), backwards takes one away, and the grid starts on lap -1 behind the line.
+
+`ladder.ts` is a formula rather than a table: each rung is a longer, twistier track in the next of four themes, with rivals allowed a larger share of their kart's top speed.
+Winning the highest open rung opens the next and, while the garage lasts, a new kart (`carsUnlocked`); the player starts at the back of the grid, since the race is the overtaking.
+`rival.ts` is the computer driver — aim up its own lane, lift for a bend in proportion to how much the road turns ahead — with a little rubber band (`BAND`) so a race stays close; the test that each of the first dozen tracks is lapped without help is what catches a generator change that makes a corner undriveable.
+Items are drawn by place (`drawItem`): the leader gets oil and never a rocket, the back of the pack turbos and rockets.
+
+On a touch screen the kart drives itself forward once the screen has been touched, so the left thumb steers by sliding and the right is free for the brake and the item.
+Progress is under the `race:save` key; on the dev server `window.race` can start a rung, hand over an item, put the player on the last stretch, or hand the wheel to the computer for a recording.
 
 ## Islands
 

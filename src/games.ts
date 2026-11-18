@@ -12,4 +12,5 @@ export const GAMES: GameEntry[] = [
   { name: "Amelia's Dungeon", href: "dungeon.html" },
   { name: "Battle of the Gods", href: "gods.html" },
   { name: "Seaside", href: "seaside.html" },
+  { name: "Turbo Karts", href: "race.html" },
 ];

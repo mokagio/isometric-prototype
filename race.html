@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Turbo Karts | Games Playground</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%23d8382c'/><path d='M3 11 L4.5 7 L10 6.5 L13.5 9 L13.5 11 Z' fill='%23f4f1e8'/><circle cx='5' cy='12' r='1.6' fill='%2325252b'/><circle cx='12' cy='12' r='1.6' fill='%2325252b'/></svg>"
+    />
+    <style>
+      :root {
+        --rc-red: #d8382c;
+        --rc-ink: #1c1c22;
+        --rc-paper: #f4f1e8;
+        --rc-gold: #f2c230;
+        --rc-panel: rgba(28, 28, 34, 0.78);
+        --rc-font: "Trebuchet MS", system-ui, sans-serif;
+      }
+      [hidden] { display: none !important; }
+      html, body {
+        height: 100%;
+        overflow: hidden;
+        background: #9fd6f5;
+        overscroll-behavior: none;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      #stage { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: auto; }
+
+      /* Place, lap and clock, top left. */
+      .rc-top {
+        position: fixed;
+        top: var(--ww-inset-top);
+        left: var(--ww-inset-left);
+        display: grid;
+        gap: 2px;
+        pointer-events: none;
+        color: var(--rc-paper);
+        font-family: var(--rc-font);
+        text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+      }
+      .rc-place { font: italic 900 52px/1 var(--rc-font); letter-spacing: -0.02em; }
+      .rc-place small { font-size: 22px; opacity: 0.8; margin-left: 2px; }
+      .rc-place[data-place="1"] { color: var(--rc-gold); }
+      .rc-lap, .rc-time {
+        justify-self: start;
+        padding: 2px 10px;
+        border-radius: 999px;
+        background: var(--rc-panel);
+        font: 700 16px var(--rc-font);
+        text-shadow: none;
+      }
+      .rc-time { font-variant-numeric: tabular-nums; }
+
+      /* What you are holding, top centre. */
+      .rc-item {
+        position: fixed;
+        top: var(--ww-inset-top);
+        left: 50%;
+        transform: translateX(-50%);
+        width: 64px;
+        height: 64px;
+        display: grid;
+        place-items: center;
+        border-radius: 16px;
+        background: var(--rc-panel);
+        border: 3px solid rgba(244, 241, 232, 0.5);
+        font-size: 36px;
+        pointer-events: none;
+      }
+      .rc-item:empty { opacity: 0.45; }
+      .rc-item.is-full { border-color: var(--rc-gold); box-shadow: 0 0 14px rgba(242, 194, 48, 0.7); }
+      .rc-item.is-rolling { animation: rc-shake 0.12s linear infinite; }
+      @keyframes rc-shake { 50% { transform: translateX(-50%) rotate(8deg); } }
+
+      /* The course from above, under the menu button. */
+      .rc-map {
+        position: fixed;
+        top: calc(var(--ww-inset-top) + 56px);
+        right: var(--ww-inset-right);
+        width: 132px;
+        height: 132px;
+        border-radius: 16px;
+        background: var(--rc-panel);
+        pointer-events: none;
+      }
+      @media (max-width: 560px) {
+        .rc-map { width: 104px; height: 104px; }
+      }
+
+      .rc-banner {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 28%;
+        text-align: center;
+        pointer-events: none;
+        opacity: 0;
+        transform: scale(0.8);
+        transition: opacity 0.25s, transform 0.25s;
+      }
+      .rc-banner.is-on { opacity: 1; transform: none; }
+      .rc-banner h2 {
+        margin: 0;
+        font: italic 900 clamp(40px, 12vw, 96px) var(--rc-font);
+        color: var(--rc-paper);
+        letter-spacing: -0.01em;
+        text-shadow: 0 4px 0 var(--rc-red), 0 8px 20px rgba(0, 0, 0, 0.4);
+      }
+      .rc-banner p { margin: 4px 16px 0; font: 700 clamp(16px, 4vw, 22px) var(--rc-font); color: var(--rc-paper); text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6); }
+
+      /* Steering: a thumb anywhere on the left half; brake and item under the right. */
+      .rc-steer-zone { position: fixed; left: 0; top: 0; bottom: 0; width: 55%; touch-action: none; }
+      @media (pointer: fine) { .rc-steer-zone, .rc-pads { display: none; } }
+      .rc-steer {
+        position: fixed;
+        width: 64px;
+        height: 64px;
+        margin: -32px 0 0 -32px;
+        border-radius: 50%;
+        background: rgba(244, 241, 232, 0.8);
+        box-shadow: 0 0 0 46px rgba(244, 241, 232, 0.14), 0 2px 6px rgba(0, 0, 0, 0.3);
+        pointer-events: none;
+      }
+      .rc-pads {
+        position: fixed;
+        right: var(--ww-inset-right);
+        bottom: var(--ww-inset-bottom);
+        width: 180px;
+        height: 150px;
+      }
+      .rc-btn {
+        position: absolute;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        border: 4px solid var(--rc-paper);
+        color: var(--rc-paper);
+        padding: 0;
+        cursor: pointer;
+        touch-action: none;
+        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+      }
+      .rc-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
+      .rc-use { right: 0; bottom: 0; width: 96px; height: 96px; font-size: 44px; background: radial-gradient(circle at 50% 35%, #ffd75a, #e0a10a); color: #6a4a00; }
+      .rc-brake { left: 0; top: 0; width: 70px; height: 70px; font-size: 24px; background: radial-gradient(circle at 50% 35%, #e55a4e, var(--rc-red)); }
+
+      /* Garage and results. */
+      .rc-panel {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        /* Clear of the menu button: above the card upright, beside it on its side. */
+        padding: calc(var(--ww-inset-top) + 56px) var(--ww-inset-right) var(--ww-inset-bottom) var(--ww-inset-left);
+        background: linear-gradient(rgba(28, 28, 34, 0.15), rgba(28, 28, 34, 0.55));
+        overflow: auto;
+      }
+      .rc-card {
+        width: min(100%, 460px);
+        max-height: 100%;
+        overflow: auto;
+        box-sizing: border-box;
+        padding: 18px 18px 20px;
+        background: var(--rc-paper);
+        border-radius: 20px;
+        border: 4px solid var(--rc-ink);
+        box-shadow: 0 8px 0 rgba(0, 0, 0, 0.3);
+        color: var(--rc-ink);
+        font-family: var(--rc-font);
+      }
+      .rc-title { margin: 0; font: italic 900 38px/1 var(--rc-font); color: var(--rc-red); letter-spacing: -0.02em; }
+      .rc-lede { margin: 6px 0 4px; font-weight: 600; color: #4a4a52; }
+      .rc-card h3 { margin: 14px 0 6px; font: 800 13px var(--rc-font); letter-spacing: 0.08em; text-transform: uppercase; color: #6a6a72; }
+      .rc-cars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .rc-car {
+        display: grid;
+        justify-items: center;
+        gap: 2px;
+        padding: 8px 4px;
+        border: 3px solid transparent;
+        border-radius: 14px;
+        background: #e8e3d6;
+        font: 800 15px var(--rc-font);
+        color: var(--rc-ink);
+        cursor: pointer;
+      }
+      .rc-car:disabled { cursor: default; color: #8a8478; }
+      .rc-car:disabled .rc-car-name { font-size: 12px; font-weight: 700; }
+      .rc-car.is-picked { border-color: var(--rc-red); background: #fff; }
+      .rc-stats { display: grid; width: 100%; padding: 0 4px; box-sizing: border-box; gap: 2px; }
+      .rc-stat { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 4px; }
+      .rc-stat i { font: 700 10px var(--rc-font); color: #6a6a72; font-style: normal; text-align: left; }
+      .rc-stat > span { height: 5px; border-radius: 3px; background: #d6d0c2; overflow: hidden; }
+      .rc-stat > span > span { display: block; height: 100%; background: var(--rc-red); }
+      .rc-ladder { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+      .rc-rung {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 34px 1fr auto;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px 8px 8px;
+        border: 3px solid var(--rc-ink);
+        border-radius: 14px;
+        background: #fff;
+        font: 800 17px var(--rc-font);
+        color: var(--rc-ink);
+        text-align: left;
+        cursor: pointer;
+      }
+      .rc-rung.is-next { background: var(--rc-gold); box-shadow: 0 4px 0 var(--rc-ink); }
+      .rc-rung:disabled { border-style: dashed; background: transparent; color: #8a8478; cursor: default; }
+      .rc-rung-n { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--rc-ink); color: var(--rc-paper); font-size: 16px; }
+      .rc-rung[data-theme="meadow"] .rc-rung-n { background: #3f9a3a; }
+      .rc-rung[data-theme="desert"] .rc-rung-n { background: #c88a32; }
+      .rc-rung[data-theme="snow"] .rc-rung-n { background: #4f86c8; }
+      .rc-rung[data-theme="autumn"] .rc-rung-n { background: #c8462a; }
+      .rc-rung:disabled .rc-rung-n { background: #b8b2a6; }
+      .rc-rung-name small { display: block; font: 600 12px var(--rc-font); color: #6a6a72; }
+      .rc-rung.is-next .rc-rung-name small { color: #5a4a10; }
+      .rc-rung-mark { font-size: 20px; }
+
+      .rc-standings { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 4px; }
+      .rc-standings li {
+        display: grid;
+        grid-template-columns: 40px 16px 1fr auto;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 10px;
+        background: #e8e3d6;
+        font: 700 16px var(--rc-font);
+      }
+      .rc-standings li.is-you { background: var(--rc-gold); }
+      .rc-standings i { font-style: normal; font-variant-numeric: tabular-nums; }
+      .rc-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--rc-ink); box-sizing: border-box; }
+      .rc-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+      .rc-go {
+        flex: 1 1 auto;
+        padding: 12px 16px;
+        border: 3px solid var(--rc-ink);
+        border-radius: 14px;
+        background: var(--rc-red);
+        color: var(--rc-paper);
+        font: italic 900 19px var(--rc-font);
+        cursor: pointer;
+        box-shadow: 0 4px 0 var(--rc-ink);
+      }
+      .rc-go:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--rc-ink); }
+      .rc-go-quiet { background: #fff; color: var(--rc-ink); }
+
+      /* A phone on its side: karts and ladder side by side, so the next race is in view without scrolling. */
+      @media (max-height: 500px) {
+        .rc-panel { padding: var(--ww-inset-top) calc(var(--ww-inset-right) + 60px) var(--ww-inset-bottom) calc(var(--ww-inset-left) + 60px); }
+        .rc-card { width: min(100%, 780px); padding: 12px 14px; }
+        .rc-garage .rc-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+        .rc-garage .rc-cols h3 { margin-top: 8px; }
+        .rc-title { font-size: 28px; }
+        .rc-place { font-size: 40px; }
+      }
+
+      .rc-keys {
+        position: fixed;
+        left: var(--ww-inset-left);
+        bottom: var(--ww-inset-bottom);
+        margin: 0;
+        padding: 8px 12px;
+        list-style: none;
+        font: 13px var(--rc-font);
+        color: var(--rc-paper);
+        background: var(--rc-panel);
+        border-radius: 10px;
+        pointer-events: none;
+      }
+      .rc-keys kbd { font: 700 12px var(--rc-font); color: var(--rc-gold); }
+      @media (pointer: coarse) { .rc-keys { display: none; } }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <ul class="rc-keys">
+      <li><kbd>↑</kbd> go · <kbd>↓</kbd> brake · <kbd>← →</kbd> steer</li>
+      <li><kbd>Space</kbd> use item</li>
+    </ul>
+    <script type="module" src="/src/race/main.ts"></script>
+  </body>
+</html>

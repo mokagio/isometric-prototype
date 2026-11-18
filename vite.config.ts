@@ -30,6 +30,7 @@ export default defineConfig({
         dungeon: resolve(import.meta.dirname, "dungeon.html"),
         gods: resolve(import.meta.dirname, "gods.html"),
         seaside: resolve(import.meta.dirname, "seaside.html"),
+        race: resolve(import.meta.dirname, "race.html"),
         editor: resolve(import.meta.dirname, "editor.html"),
         dungeonEditor: resolve(import.meta.dirname, "dungeonEditor.html"),
         woodsEditor: resolve(import.meta.dirname, "woodsEditor.html"),
