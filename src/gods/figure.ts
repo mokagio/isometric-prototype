@@ -231,6 +231,19 @@ export function weaponModel(kind: string): THREE.Group {
     g.add(part(BOX, kind === "ares" ? gold : m(0xb88a2e), [0.18 * k, 0.035, 0.05], [0, 0.09, 0]));
     g.add(part(CYL, m(0x6b4429), [0.024, 0.15, 0.024], [0, 0, 0]));
     g.add(part(SPHERE, gold, [0.035, 0.035, 0.035], [0, -0.09, 0]));
+  } else if (kind === "iron") {
+    const iron = m(0x8c949c);
+    g.add(part(xiphos(), iron, [1.15, 1.2, 1.15], [0, 0.1, 0]));
+    g.add(part(BOX, m(0x4a4a52), [0.22, 0.04, 0.06], [0, 0.09, 0]));
+    g.add(part(CYL, m(0x3a2a1e), [0.026, 0.16, 0.026], [0, 0, 0]));
+    g.add(part(SPHERE, m(0x4a4a52), [0.04, 0.04, 0.04], [0, -0.09, 0]));
+  } else if (kind === "spear") {
+    // A long ash shaft with a bronze leaf at the end, held a third of the way up.
+    const bronze = m(0xc8913a, 0x201004);
+    g.add(part(CYL, wood, [0.024, 2.4, 0.024], [0, 0.55, 0]));
+    g.add(part(new THREE.ConeGeometry(0.07, 0.34, 4), bronze, [1, 1, 0.45], [0, 1.92, 0]));
+    g.add(part(CYL, bronze, [0.03, 0.08, 0.03], [0, 1.73, 0]));
+    g.add(part(CONE, bronze, [0.03, 0.12, 0.03], [0, -0.68, 0], [Math.PI, 0, 0]));
   } else if (kind === "trident" || kind === "bident") {
     const metal = kind === "trident" ? gold : m(0x5fe08a, 0x0a3018);
     g.add(part(CYL, kind === "trident" ? wood : m(0x1a1418), [0.022, 1.9, 0.022], [0, 0.35, 0]));
