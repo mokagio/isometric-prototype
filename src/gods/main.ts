@@ -22,7 +22,6 @@ import {
   HERO_BUILD,
   KIT_PAINT,
   poseFigure,
-  BANDIT_BUILD,
   FISHER_BUILD,
   HADES_BUILD,
   ZEUS_BUILD,
@@ -34,6 +33,7 @@ import {
   ANGEL_BUILD,
   boltGeometry,
   weaponModel,
+  consolidate,
   LAVA_SKELETON_BUILD,
   DROWNED_BUILD,
   SKELETON_BUILD,
@@ -53,10 +53,13 @@ import {
   STRIKE_TIME,
   strikeGrunt,
   updateGrunt,
+  BODY_R,
   type Blow,
   type Grunt,
   type GruntKind,
 } from "./grunts";
+import { buildHorse, COATS, fadeHorse, lightHorse, poseHorse, RIDER_DROP, seatRider, type Horse } from "./horse";
+import { rollLoot } from "./loot";
 import {
   CITY_HEAL,
   face,
@@ -165,6 +168,7 @@ import {
   ARENA_R,
   BLACKSMITH,
   CAMPS,
+  chestOf,
   COLOSSEUM,
   FIGHT_TRIGGER,
   counterOf,
@@ -523,6 +527,10 @@ interface Foe {
   flash: number;
   /** Which camp it belongs to, or -1 for Ares's soldiers. */
   camp: number;
+  /** A rider's mount, which carries the figure and is what stands in the scene. */
+  horse?: Horse;
+  /** What hangs in the scene: the horse, or the figure on foot. */
+  top: THREE.Object3D;
   /** Knocked off an island in Tartarus: how high it is on the way down to the fire. */
   drop?: number;
 }
@@ -530,7 +538,9 @@ let foes: Foe[] = [];
 let nextId = 1;
 
 const BUILDS: Record<GruntKind, Build> = {
-  bandit: BANDIT_BUILD,
+  // The camps are soldiers of the same army Ares calls in.
+  bandit: SPARTAN_BUILD,
+  rider: SPARTAN_BUILD,
   skeleton: SKELETON_BUILD,
   lava: LAVA_SKELETON_BUILD,
   drowned: DROWNED_BUILD,
@@ -540,19 +550,30 @@ const BUILDS: Record<GruntKind, Build> = {
 function addFoe(kind: GruntKind, x: number, z: number, yaw: number, camp: number): Foe {
   const build = BUILDS[kind];
   const fig = buildFigure(build);
-  if (kind === "spartan") {
+  if (build === SPARTAN_BUILD) {
     wearKit(fig, { helmet: "bronze", chest: "bronze", arms: "none", legs: "bronze" });
     fig.crest.color.setHex(0xa3241e);
   }
-  scene.add(fig.root);
-  const g = makeGrunt(nextId++, kind, x, z, yaw);
-  const foe: Foe = { g, fig, build, shadow: blob(1.1), flash: 0, camp };
+  const id = nextId++;
+  let horse: Horse | undefined;
+  if (kind === "rider") {
+    horse = buildHorse(COATS[id % COATS.length]!, 0xa3241e, 0xc8913a);
+    horse.seat.add(fig.root);
+    fig.root.position.y = RIDER_DROP;
+    // A rider fights with a spear in place of the sword.
+    for (const c of fig.sword.children) c.visible = false;
+    fig.sword.add(weaponModel("spear"));
+  }
+  const top = horse?.root ?? fig.root;
+  scene.add(top);
+  const g = makeGrunt(id, kind, x, z, yaw);
+  const foe: Foe = { g, fig, build, shadow: blob(horse ? 2.2 : 1.1), flash: 0, camp, horse, top };
   foes.push(foe);
   return foe;
 }
 
 function removeFoe(f: Foe): void {
-  scene.remove(f.fig.root);
+  scene.remove(f.top);
   scene.remove(f.shadow);
   foes = foes.filter((o) => o !== f);
 }
@@ -560,12 +581,97 @@ function removeFoe(f: Foe): void {
 /** Fill a camp back up to strength, so the road is never safe. */
 function stockCamp(i: number): void {
   const camp = CAMPS[i]!;
-  const have = foes.filter((f) => f.camp === i).length;
-  for (let n = have; n < camp.count; n++) {
+  const have = foes.filter((f) => f.camp === i);
+  for (let n = have.filter((f) => f.g.kind === "bandit").length; n < camp.count; n++) {
     const a = (n / camp.count) * Math.PI * 2 + i;
     addFoe("bandit", camp.x + Math.sin(a) * 2.2, camp.z + Math.cos(a) * 2.2, a, i);
   }
+  // Riders wait out past the fire, between the tents.
+  for (let n = have.filter((f) => f.g.kind === "rider").length; n < camp.riders; n++) {
+    const a = Math.atan2(camp.rack.x - camp.x, camp.rack.z - camp.z) + Math.PI + n;
+    addFoe("rider", camp.x + Math.sin(a) * 6, camp.z + Math.cos(a) * 6, a + Math.PI, i);
+  }
+  for (const c of chests) if (c.camp === i) c.opened = -1;
 }
+/** A chest at every tent's mouth: shut until the hero opens it, and shut again when the camp restocks. */
+interface Chest {
+  camp: number;
+  x: number;
+  z: number;
+  root: THREE.Group;
+  lid: THREE.Group;
+  /** Seconds since it was opened, or -1 while it is shut. */
+  opened: number;
+}
+const CHEST_RANGE = 1.9;
+const chestPaint = toon(0xffffff);
+chestPaint.vertexColors = true;
+chestPaint.side = THREE.DoubleSide;
+const chests: Chest[] = CAMPS.flatMap((camp, i) =>
+  camp.tents.map((t) => {
+    const at = chestOf(t);
+    const wood = toon(0x7a4a26);
+    const iron = toon(0x3a3a40);
+    const gold = toon(0xe8b83e, { emissive: 0x302008 });
+    const box = (m: THREE.Material, s: [number, number, number], p: [number, number, number]): THREE.Mesh => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(...s), m);
+      mesh.position.set(...p);
+      mesh.castShadow = true;
+      return mesh;
+    };
+    const root = new THREE.Group();
+    root.position.set(at.x, groundY(at.x, at.z), at.z);
+    // Its front, with the lock, toward the fire.
+    root.rotation.y = at.yaw;
+    root.add(box(wood, [0.9, 0.45, 0.55], [0, 0.225, 0]));
+    for (const x of [-0.32, 0.32]) root.add(box(iron, [0.07, 0.47, 0.57], [x, 0.225, 0]));
+    // The lid hinges along the back edge.
+    const lid = new THREE.Group();
+    lid.position.set(0, 0.45, -0.275);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.275, 0.275, 0.9, 12, 1, false, 0, Math.PI).rotateZ(Math.PI / 2), wood);
+    top.position.set(0, 0, 0.275);
+    top.castShadow = true;
+    lid.add(top);
+    for (const x of [-0.32, 0.32]) {
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.285, 0.07, 12, 1, false, 0, Math.PI).rotateZ(Math.PI / 2), iron);
+      band.position.set(x, 0, 0.275);
+      lid.add(band);
+    }
+    lid.add(box(gold, [0.12, 0.14, 0.04], [0, -0.02, 0.56]));
+    root.add(lid);
+    // Gold heaped inside, seen once the lid is up.
+    root.add(box(gold, [0.78, 0.06, 0.44], [0, 0.42, 0]));
+    consolidate(root, chestPaint);
+    root.traverse((o) => {
+      if (o instanceof THREE.Mesh) o.castShadow = true;
+    });
+    scene.add(root);
+    return { camp: i, x: at.x, z: at.z, root, lid, opened: -1 };
+  }),
+);
+
+function openChest(c: Chest): void {
+  c.opened = 0;
+  const loot = rollLoot(Math.random, save.bought, save.pantry);
+  dropCoins(c.x, c.z, loot.coins);
+  burst(c.x, 0.8, c.z, 0xffd860, 18, 5);
+  const found: string[] = [`${loot.coins} coins`];
+  if (loot.snack) {
+    addSnack(save.pantry, loot.snack);
+    hud.setPantry(save.pantry);
+    found.push(SNACK_INFO[loot.snack].name);
+  }
+  if (loot.weapon) {
+    save.bought.push(loot.weapon);
+    save.weapon = loot.weapon;
+    armHero();
+    hud.banner(`You found the ${WEAPONS[loot.weapon].name}!`, `And ${found.join(" and ")}`, 3);
+  } else {
+    hud.banner("Treasure!", found.join(" and "), 2.2);
+  }
+  storeSave(save);
+}
+
 CAMPS.forEach((_, i) => stockCamp(i));
 
 /** The skeletons that walk the volcano's stairs, as a camp of their own. */
@@ -1605,7 +1711,7 @@ function swingLands(
   const power = blowPower(save.weapon, swordPower(save.armor));
   let hitAny = false;
   for (const f of foes) {
-    if (!test(f.g.x, f.g.z, 0.5)) continue;
+    if (!test(f.g.x, f.g.z, BODY_R[f.g.kind])) continue;
     const result = strikeGrunt(f.g, power, fromX, fromZ);
     if (result === "none") continue;
     hitAny = true;
@@ -2227,14 +2333,15 @@ function update(dt: number): void {
     }
     if (f.camp === STAIR_CAMP) onStairs(f.g);
     else if (f.g.state !== "dead") {
-      const q = pushOut(world, f.g.x, f.g.z, 0.45, gateClosed || f.camp === -1, seaGateClosed || f.camp === -1, hadesGateClosed || f.camp === -1);
+      const q = pushOut(world, f.g.x, f.g.z, f.horse ? 0.9 : 0.45, gateClosed || f.camp === -1, seaGateClosed || f.camp === -1, hadesGateClosed || f.camp === -1);
       f.g.x = q.x;
       f.g.z = q.z;
       // Never stand inside the hero.
       const d = dist(f.g.x, f.g.z, hero.x, hero.z);
-      if (d < 0.9 && d > 1e-4) {
-        f.g.x = hero.x + ((f.g.x - hero.x) / d) * 0.9;
-        f.g.z = hero.z + ((f.g.z - hero.z) / d) * 0.9;
+      const room = BODY_R[f.g.kind] + 0.4;
+      if (d < room && d > 1e-4) {
+        f.g.x = hero.x + ((f.g.x - hero.x) / d) * room;
+        f.g.z = hero.z + ((f.g.z - hero.z) / d) * room;
       }
     }
   }
@@ -2245,8 +2352,9 @@ function update(dt: number): void {
       const b = foes[j]!.g;
       if (a.state === "dead" || b.state === "dead") continue;
       const d = dist(a.x, a.z, b.x, b.z);
-      if (d < 0.95 && d > 1e-4) {
-        const push = (0.95 - d) / 2;
+      const room = BODY_R[a.kind] + BODY_R[b.kind] - 0.05;
+      if (d < room && d > 1e-4) {
+        const push = (room - d) / 2;
         const nx = (b.x - a.x) / d;
         const nz = (b.z - a.z) / d;
         a.x -= nx * push;
@@ -2652,10 +2760,12 @@ function update(dt: number): void {
   // The blacksmith's counter.
   const atCounter = standing(hero) && dist(hero.x, hero.z, BLACKSMITH.x - 1.4, BLACKSMITH.z) < SHOP_RANGE;
   const merchant = standing(hero) ? MERCHANTS.find((m) => dist(hero.x, hero.z, counterOf(m).x, counterOf(m).z) < MERCHANT_RANGE) : undefined;
-  controls.offer(atCounter ? "Blacksmith" : (merchant?.name ?? null));
+  const chest = standing(hero) && !atCounter && !merchant ? chests.find((c) => c.opened < 0 && dist(hero.x, hero.z, c.x, c.z) < CHEST_RANGE) : undefined;
+  controls.offer(atCounter ? "Blacksmith" : (merchant?.name ?? (chest ? "Open chest" : null)));
   if (controls.takeInteract()) {
     if (atCounter) openShop();
     else if (merchant) openMerchant(merchant);
+    else if (chest) openChest(chest);
   }
 
   blockAnim += ((hero.blocking ? 1 : 0) - blockAnim) * Math.min(1, dt * 18);
@@ -2693,22 +2803,41 @@ function draw(dt: number): void {
   const hammer = (clock * 1.3) % 1;
   poseFigure(smith, dt, { swing: hammer });
   for (const f of fishers) poseFigure(f, dt, {});
+  // A chest's lid swings up and back, with a little bounce at the top.
+  for (const c of chests) {
+    if (c.opened >= 0) c.opened += dt;
+    const t = c.opened < 0 ? 0 : Math.min(1, c.opened / 0.35);
+    c.lid.rotation.x = -1.95 * t + (t >= 1 ? Math.sin(Math.min(c.opened - 0.35, 0.4) * 24) * 0.1 * Math.max(0, 1 - (c.opened - 0.35) * 2.5) : 0);
+  }
   for (const f of merchantFigs) poseFigure(f, dt, {});
 
   for (const f of foes) {
     const g = f.g;
-    f.fig.root.position.set(g.x, foeY(f), g.z);
-    f.fig.root.rotation.y = g.yaw;
+    f.top.position.set(g.x, foeY(f), g.z);
+    f.top.rotation.y = g.yaw;
     let fallen = -1;
     if (g.state === "down") fallen = g.t + 0.5;
     else if (g.state === "rise") fallen = Math.max(0, 0.5 - g.t * 0.6);
     else if (g.state === "dead") fallen = g.t + 0.5;
-    poseFigure(f.fig, dt, { speed: g.moving ? GRUNTS[g.kind].speed : 0, swing: gruntSwing(g), fallen, block: g.kind === "spartan" ? 0.3 : 0 });
+    const speed = g.moving ? GRUNTS[g.kind].speed : 0;
+    if (f.horse) {
+      // The horse goes down and takes its rider with it.
+      poseHorse(f.horse, dt, speed, g.state === "dead" ? g.t : -1);
+      poseFigure(f.fig, dt, { swing: gruntSwing(g), block: 0.3 });
+      seatRider(f.fig);
+    } else {
+      poseFigure(f.fig, dt, { speed, swing: gruntSwing(g), fallen, block: f.build === SPARTAN_BUILD ? 0.3 : 0 });
+    }
     // The wind-up glows, so a swing can be seen coming.
-    if (g.state === "windup") flash(f.fig, 0.25 + 0.25 * Math.sin(clock * 30), 0xffaa40);
-    else flash(f.fig, f.flash, 0xffffff);
+    const glow = g.state === "windup" ? 0.25 + 0.25 * Math.sin(clock * 30) : f.flash;
+    const tint = g.state === "windup" ? 0xffaa40 : 0xffffff;
+    flash(f.fig, glow, tint);
+    if (f.horse) lightHorse(f.horse, glow, tint);
     f.flash = Math.max(0, f.flash - dt * 6);
-    if (g.state === "dead") fade(f.fig, Math.max(0, 1 - g.t / DEAD_FADE));
+    if (g.state === "dead") {
+      fade(f.fig, Math.max(0, 1 - g.t / DEAD_FADE));
+      if (f.horse) fadeHorse(f.horse, Math.max(0, 1 - g.t / DEAD_FADE));
+    }
     f.shadow.position.set(g.x, foeY(f) + 0.07, g.z);
     f.shadow.visible = g.state !== "dead";
   }
@@ -3108,9 +3237,10 @@ function draw(dt: number): void {
   // People go sooner: past this a figure is a few pixels tall, and each one is a dozen draws.
   const seen = (x: number, z: number): boolean => Math.hypot(x - camera.position.x, z - camera.position.z) < Math.min(far, PEOPLE_FAR);
   for (const f of foes) {
-    f.fig.root.visible = seen(f.g.x, f.g.z);
-    f.shadow.visible = f.fig.root.visible && f.g.state !== "dead";
+    f.top.visible = seen(f.g.x, f.g.z);
+    f.shadow.visible = f.top.visible && f.g.state !== "dead";
   }
+  for (const c of chests) c.root.visible = seen(c.x, c.z);
   for (const f of fishers) f.root.visible = seen(f.root.position.x, f.root.position.z);
   smith.root.visible = seen(smith.root.position.x, smith.root.position.z);
   for (const f of merchantFigs) f.root.visible = seen(f.root.position.x, f.root.position.z);

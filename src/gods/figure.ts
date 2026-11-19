@@ -607,7 +607,7 @@ function part(g: THREE.BufferGeometry, mat: THREE.Material, s: [number, number, 
  * one per armour slot so each piece still shows or hides alone. A figure is
  * a hundred shapes; a phone wants a handful of draws.
  */
-function consolidate(group: THREE.Object3D, base: THREE.MeshToonMaterial, special: Set<THREE.Material>): void {
+export function consolidate(group: THREE.Object3D, base: THREE.MeshToonMaterial, special: Set<THREE.Material> = new Set()): void {
   const buckets = new Map<string, THREE.Mesh[]>();
   for (const c of group.children) {
     if (!(c instanceof THREE.Mesh) || c.userData.keep) continue;

@@ -1,5 +1,5 @@
 import { dist } from "./bearing";
-import { HAMLET_R, HAMLETS, CAMPS, CITY, COLOSSEUM, ARENA_R, WALL_THICK, VILLAGE, hash } from "./world";
+import { HAMLET_R, HAMLETS, CAMPS, CAMP_R, CITY, COLOSSEUM, ARENA_R, WALL_THICK, VILLAGE, hash } from "./world";
 import { VOLCANO } from "./volcano";
 import { OLYMPUS, ZEUS_RING } from "./zeus";
 import { ARTEMIS } from "./artemis";
@@ -45,7 +45,7 @@ function places(): Array<{ x: number; z: number; r: number }> {
     { x: PEAK.x, z: PEAK.z, r: PEAK.r + 12 },
     { x: LAIR.x, z: LAIR.z, r: LAIR.r + 10 },
     { x: MAZE_CENTRE.x, z: MAZE_CENTRE.z, r: (MAZE.size * MAZE.cell) * 0.72 + 6 },
-    ...CAMPS.map((c) => ({ x: c.x, z: c.z, r: 9 })),
+    ...CAMPS.map((c) => ({ x: c.x, z: c.z, r: CAMP_R })),
   ];
 }
 const PLACES = places();

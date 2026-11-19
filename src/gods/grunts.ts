@@ -1,7 +1,11 @@
 import { dist, inArc, turnToward, yawTo } from "./bearing";
 
-/** The rank and file: bandits on the road, skeletons on the volcano's stairs, and the soldiers Ares calls in. */
-export type GruntKind = "bandit" | "skeleton" | "lava" | "drowned" | "spartan";
+/**
+ * The rank and file: soldiers in the camps out in the country, some of them on
+ * horseback, skeletons on the volcano's stairs, and the soldiers Ares calls in.
+ * A camp soldier is still a `bandit` underneath, since it fights like one.
+ */
+export type GruntKind = "bandit" | "rider" | "skeleton" | "lava" | "drowned" | "spartan";
 
 /** The ones that, felled, lie still a while and get back up unless struck again. */
 export const RISES: ReadonlySet<GruntKind> = new Set(["bandit", "skeleton", "lava", "drowned"]);
@@ -25,7 +29,12 @@ export const GRUNTS: Record<GruntKind, GruntStats> = {
   drowned: { hp: 3, speed: 2.3, reach: 1.7, damage: 12, windup: 0.6, recover: 0.7, aggro: 40 },
   bandit: { hp: 3, speed: 2.4, reach: 1.7, damage: 12, windup: 0.6, recover: 0.7, aggro: 13 },
   spartan: { hp: 2, speed: 3.6, reach: 1.8, damage: 10, windup: 0.45, recover: 0.55, aggro: 60 },
+  // Just slower than the hero's run, so a rider can be got away from.
+  rider: { hp: 4, speed: 5.8, reach: 2.6, damage: 16, windup: 0.55, recover: 0.8, aggro: 18 },
 };
+
+/** How much ground a grunt takes up: a horse is a lot more than a man. */
+export const BODY_R: Record<GruntKind, number> = { bandit: 0.5, rider: 1.1, skeleton: 0.5, lava: 0.5, drowned: 0.5, spartan: 0.5 };
 
 /** A felled bandit lies flat this long, and a blow in that time finishes it. */
 export const DOWN_TIME = 4;
@@ -184,4 +193,4 @@ export function strikeGrunt(g: Grunt, power: number, fromX: number, fromZ: numbe
 }
 
 /** How many coins a grunt leaves behind when it is finished for good. */
-export const BOUNTY: Record<GruntKind, number> = { bandit: 3, skeleton: 4, lava: 5, drowned: 4, spartan: 2 };
+export const BOUNTY: Record<GruntKind, number> = { bandit: 3, rider: 6, skeleton: 4, lava: 5, drowned: 4, spartan: 2 };

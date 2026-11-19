@@ -31,6 +31,7 @@ import {
   ARENA_R,
   BLACKSMITH,
   CAMPS,
+  type Pitch,
   CARTOGRAPHER,
   CITY,
   CITY_GATE_Z,
@@ -211,6 +212,8 @@ const G = {
   cobble: new THREE.CylinderGeometry(1, 1, 1, 7),
   halfDisc: new THREE.CylinderGeometry(1, 1, 1, 16, 1, false, -Math.PI / 2, Math.PI),
   fluted: fluted(),
+  // A ridge tent: a triangular prism, apex up, standing on y = 0 and running along z.
+  tent: tentGeometry(),
 };
 
 /** Faceted rather than smooth: each face its own flat colour band. */
@@ -661,7 +664,14 @@ function market(b: Batch): void {
 }
 
 // ---------------------------------------------------------------------------
-// Bandit camps out in the open country
+// Soldiers' camps out in the open country
+
+/** A ridge tent: a triangular prism, apex up, standing on y = 0 and running along z, flat-shaded. */
+function tentGeometry(): THREE.BufferGeometry {
+  const g = new THREE.CylinderGeometry(1, 1, 1, 3).rotateX(-Math.PI / 2).translate(0, 0.5, 0).toNonIndexed();
+  g.computeVertexNormals();
+  return g;
+}
 
 function camps(b: Batch): void {
   // Each camp: a ring of stones, a cold fire, and a broken shield.
@@ -685,6 +695,52 @@ function camps(b: Batch): void {
     b.add(G.blob, 0x9a7a4a, { x: camp.x + 2, y: 0.3, z: camp.z - 2.2 }, {}, { x: 0.36, y: 0.42, z: 0.34 });
     b.add(G.blob, 0x8a6a3e, { x: camp.x + 2.6, y: 0.24, z: camp.z - 1.7 }, {}, { x: 0.3, y: 0.34, z: 0.3 });
     b.add(G.cyl, 0x8a6a3a, { x: camp.x - 2.4, y: 0.05, z: camp.z + 1.4 }, { x: 0.1 }, { x: 0.5, y: 0.04, z: 0.5 });
+    camp.tents.forEach((t, i) => tent(b, t, i));
+    rack(b, camp.rack);
+    b.setFrame();
+  }
+}
+
+/** A soldier's tent, its mouth toward the fire and a red pennant on the front pole. */
+function tent(b: Batch, t: Pitch, i: number): void {
+  b.setFrame(t.x, t.z, t.yaw);
+  const canvas = i % 2 ? 0xe2d4b0 : 0xd2bf94;
+  b.add(G.tent, canvas, { x: 0, y: 0, z: 0 }, {}, { x: 1.6, y: 1.35, z: 2.6 });
+  b.add(G.tent, 0x2e2218, { x: 0, y: 0, z: 1.31 }, {}, { x: 0.75, y: 0.8, z: 0.02 });
+  b.add(G.box, 0xa3241e, { x: 0, y: 0.3, z: 0 }, {}, { x: 2.5, y: 0.12, z: 2.62 });
+  b.add(G.cyl8, 0x6b4a2a, { x: 0, y: 2.04, z: 0 }, { x: Math.PI / 2 }, { x: 0.05, y: 2.9, z: 0.05 });
+  for (const z of [-1.35, 1.35]) b.add(G.cyl8, 0x6b4a2a, { x: 0, y: 1.2, z }, {}, { x: 0.05, y: 2.4, z: 0.05 });
+  b.add(G.box, 0xa3241e, { x: 0, y: 2.25, z: 1.35 - 0.2 }, {}, { x: 0.02, y: 0.22, z: 0.4 });
+  // Guy ropes out to pegs at the four corners.
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      b.add(G.cyl8, 0x5a4630, { x: sx * 1.75, y: 0.1, z: sz * 1.5 }, {}, { x: 0.04, y: 0.2, z: 0.04 });
+    }
+  }
+}
+
+/** A rack of spears with shields and a helmet hung on it: the camp's armoury. */
+function rack(b: Batch, r: Pitch): void {
+  b.setFrame(r.x, r.z, r.yaw);
+  const wood = 0x6b4a2a;
+  const bronze = 0xc8913a;
+  for (const x of [-1, 1]) b.add(G.cyl8, wood, { x, y: 0.8, z: 0 }, {}, { x: 0.07, y: 1.6, z: 0.07 });
+  b.add(G.cyl8, wood, { x: 0, y: 1.45, z: 0 }, { z: Math.PI / 2 }, { x: 0.05, y: 2.2, z: 0.05 });
+  b.add(G.cyl8, wood, { x: 0, y: 0.35, z: 0 }, { z: Math.PI / 2 }, { x: 0.04, y: 2.1, z: 0.04 });
+  // Spears lean on the bar from the front, their butts on the ground.
+  const lean = 0.18;
+  const len = 2.5;
+  for (const x of [-0.6, -0.2, 0.2, 0.6]) {
+    const z0 = 0.25;
+    b.add(G.cyl8, 0x8a6a44, { x, y: (Math.cos(lean) * len) / 2, z: z0 - (Math.sin(lean) * len) / 2 }, { x: -lean }, { x: 0.025, y: len, z: 0.025 });
+    b.add(G.pyramid, bronze, { x, y: Math.cos(lean) * len + 0.13, z: z0 - Math.sin(lean) * len - 0.025 }, { x: -lean }, { x: 0.06, y: 0.28, z: 0.03 });
+  }
+  // A helmet on each post, and a shield leaning against each.
+  for (const x of [-1, 1]) {
+    b.add(G.dome, bronze, { x, y: 1.6, z: 0 }, {}, { x: 0.2, y: 0.24, z: 0.22 });
+    b.add(G.box, 0xa3241e, { x, y: 1.88, z: 0 }, {}, { x: 0.05, y: 0.12, z: 0.36 });
+    b.add(G.cyl, bronze, { x: x * 1.35, y: 0.48, z: 0.25 }, { x: Math.PI / 2 - 0.25 }, { x: 0.48, y: 0.06, z: 0.48 });
+    b.add(G.cyl, 0xa3241e, { x: x * 1.35, y: 0.48, z: 0.29 }, { x: Math.PI / 2 - 0.25 }, { x: 0.3, y: 0.02, z: 0.3 });
   }
 }
 

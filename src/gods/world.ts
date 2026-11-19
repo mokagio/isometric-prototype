@@ -146,12 +146,6 @@ function clampToRegions(x: number, z: number, r: number): { x: number; z: number
   return best;
 }
 
-export interface Camp {
-  x: number;
-  z: number;
-  count: number;
-}
-
 /** The houses round every hamlet's square, doors facing in, leaving the road open. */
 export function hamletHouses(): House[] {
   const out: House[] = [];
@@ -170,30 +164,65 @@ export function hamletHouses(): House[] {
   return out;
 }
 
+/** Something standing in a camp, at `(x, z)` with its front turned along `yaw` toward the fire. */
+export interface Pitch {
+  x: number;
+  z: number;
+  yaw: number;
+}
+
 export interface Camp {
   x: number;
   z: number;
+  /** Soldiers on foot. */
   count: number;
+  /** Soldiers on horseback. */
+  riders: number;
+  tents: Pitch[];
+  rack: Pitch;
 }
 
-/** Bandit camps every 70 m or so along all four roads, off to alternate sides, and none in a hamlet. */
-function campsAlong(from: number, to: number, at: (t: number, side: number) => { x: number; z: number }): Camp[] {
+/** How far out from the fire the tents are pitched, and the rack stands. */
+export const TENT_OUT = 8.2;
+export const RACK_OUT = 6.8;
+/** How much ground a camp levels and keeps clear of trees. */
+export const CAMP_R = 12;
+
+function pitch(cx: number, cz: number, a: number, r: number): Pitch {
+  const x = cx + Math.sin(a) * r;
+  const z = cz + Math.cos(a) * r;
+  return { x, z, yaw: Math.atan2(cx - x, cz - z) };
+}
+
+/** Where a tent's chest sits: just outside its mouth, on the side of the fire. */
+export function chestOf(t: Pitch): { x: number; z: number; yaw: number } {
+  return { x: t.x + Math.sin(t.yaw) * 1.9, z: t.z + Math.cos(t.yaw) * 1.9, yaw: t.yaw };
+}
+
+/** Two tents and a weapon rack round the fire, all on the side `away` from the way through, so it stays open. */
+function makeCamp(x: number, z: number, count: number, riders: number, away: number): Camp {
+  return { x, z, count, riders, tents: [pitch(x, z, away - 1.25, TENT_OUT), pitch(x, z, away + 1.25, TENT_OUT)], rack: pitch(x, z, away, RACK_OUT) };
+}
+
+/** Soldiers' camps every 70 m or so along all four roads, off to alternate sides, and none in a hamlet. */
+function campsAlong(from: number, to: number, at: (t: number, side: number) => { x: number; z: number; away: number }): Camp[] {
   const out: Camp[] = [];
   const len = Math.abs(to - from);
   const n = Math.floor(len / 70);
   for (let k = 1; k <= n; k++) {
     const t = from + ((to - from) * k) / (n + 1);
     const p = at(t, k % 2 ? 1 : -1);
-    if (!inHamlet(p.x, p.z, HAMLET_R + 12)) out.push({ ...p, count: k === 1 ? 2 : 3 });
+    // The camp nearest home keeps no horses.
+    if (!inHamlet(p.x, p.z, HAMLET_R + 12)) out.push(makeCamp(p.x, p.z, k === 1 ? 2 : 3, k === 1 ? 0 : 1, p.away));
   }
   return out;
 }
 
 export const CAMPS: readonly Camp[] = [
-  ...campsAlong(CITY_GATE_Z - 26, COLOSSEUM.z + ARENA_R + WALL_THICK + 20, (z, side) => ({ x: side * 5, z })),
-  ...campsAlong(BOUNDS.x1, VILLAGE.x - VILLAGE.r - 6, (x, side) => ({ x, z: EAST_ROAD_Z + side * 6 })),
-  ...campsAlong(BOUNDS.x0, VOLCANO.x + VOLCANO.r + 8, (x) => ({ x, z: VOLCANO.z })),
-  ...campsAlong(BOUNDS.z1, OLYMPUS.z - OLYMPUS.r - 50, (z) => ({ x: OLYMPUS.x, z })),
+  ...campsAlong(CITY_GATE_Z - 26, COLOSSEUM.z + ARENA_R + WALL_THICK + 20, (z, side) => ({ x: side * 5, z, away: (side * Math.PI) / 2 })),
+  ...campsAlong(BOUNDS.x1, VILLAGE.x - VILLAGE.r - 6, (x, side) => ({ x, z: EAST_ROAD_Z + side * 6, away: side > 0 ? 0 : Math.PI })),
+  ...campsAlong(BOUNDS.x0, VOLCANO.x + VOLCANO.r + 8, (x, side) => ({ x, z: VOLCANO.z, away: side > 0 ? 0 : Math.PI })),
+  ...campsAlong(BOUNDS.z1, OLYMPUS.z - OLYMPUS.r - 50, (z, side) => ({ x: OLYMPUS.x, z, away: (side * Math.PI) / 2 })),
 ];
 
 export interface World {
@@ -359,7 +388,7 @@ export function trees(): Tree[] {
       if (dist(x, z, ZEUS_RING.x, ZEUS_RING.z) < ZEUS_RING.r + ZEUS_RING.thick + 8) continue;
       if (z > BOUNDS.z1 - 6 && Math.abs(x - OLYMPUS.x) < 8) continue;
       if (x < BOUNDS.x0 + 6 && Math.abs(z - VOLCANO.z) < 8) continue;
-      if (CAMPS.some((c) => dist(x, z, c.x, c.z) < 9)) continue;
+      if (CAMPS.some((c) => dist(x, z, c.x, c.z) < CAMP_R)) continue;
       out.push({ x, z, size: 0.8 + hash(gx, gz, 4) * 0.7 });
     }
   }
@@ -383,6 +412,12 @@ export function layoutWorld(): World {
     { x: 4.5, z: CITY_GATE_Z, r: 1 },
     { x: LIGHTHOUSE.x, z: LIGHTHOUSE.z, r: LIGHTHOUSE.r },
     { x: SEA_STATUE.x, z: SEA_STATUE.z, r: 1.4 },
+    // The back of each tent, leaving its mouth and chest free to walk up to, and each rack.
+    ...CAMPS.flatMap((c) => [
+      ...c.tents.map((t) => ({ x: t.x - Math.sin(t.yaw) * 0.4, z: t.z - Math.cos(t.yaw) * 0.4, r: 1.5 })),
+      ...c.tents.map((t) => ({ ...chestOf(t), r: 0.5 })),
+      { x: c.rack.x, z: c.rack.z, r: 1 },
+    ]),
     ...trees()
       .filter((t) => outside(t.x, t.z) < 2)
       .map((t) => ({ x: t.x, z: t.z, r: TRUNK_R * t.size })),

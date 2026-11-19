@@ -20,6 +20,7 @@ import {
   SHORE_X,
   VILLAGE,
   CAMPS,
+  chestOf,
   CITY,
   COLOSSEUM,
   FOUNTAIN,
@@ -74,6 +75,28 @@ describe("the world", () => {
   it("walks the whole road without being pushed off it", () => {
     for (let z = -26; z > COLOSSEUM.z + ARENA_R + WALL_THICK; z -= 1) {
       expect(pushOut(world, 0, z, 0.45, false)).toEqual({ x: 0, z });
+    }
+  });
+
+  it("lets the hero walk up to every chest from the camp's fire", () => {
+    for (const camp of CAMPS) {
+      for (const t of camp.tents) {
+        const c = chestOf(t);
+        const len = dist(camp.x, camp.z, c.x, c.z);
+        // From the fire to just short of the chest, nothing stands in the way.
+        for (let d = 0; d < len - 1.2; d += 0.5) {
+          const p = { x: camp.x + ((c.x - camp.x) / len) * d, z: camp.z + ((c.z - camp.z) / len) * d };
+          expect(pushOut(world, p.x, p.z, 0.45, false)).toEqual(p);
+        }
+      }
+    }
+  });
+
+  it("keeps every camp's tents and rack apart", () => {
+    for (const camp of CAMPS) {
+      const [a, b] = camp.tents;
+      expect(dist(a!.x, a!.z, b!.x, b!.z)).toBeGreaterThan(5);
+      for (const t of camp.tents) expect(dist(t.x, t.z, camp.rack.x, camp.rack.z)).toBeGreaterThan(3.5);
     }
   });
 

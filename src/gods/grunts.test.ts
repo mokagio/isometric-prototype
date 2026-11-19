@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DOWN_TIME, GRUNTS, makeGrunt, RISE_TIME, strikeGrunt, updateGrunt, type Blow, type Grunt } from "./grunts";
+import { RUN } from "./hero";
+import { BODY_R, DOWN_TIME, GRUNTS, makeGrunt, RISE_TIME, strikeGrunt, updateGrunt, type Blow, type Grunt } from "./grunts";
 
 const run = (g: Grunt, seconds: number, hero: { x: number; z: number; alive: boolean }): Blow[] => {
   const blows: Blow[] = [];
@@ -59,5 +60,17 @@ describe("a spartan", () => {
     const g = makeGrunt(1, "spartan", 0, 0);
     g.hp = 1;
     expect(strikeGrunt(g, 1, 0, -1)).toBe("dead");
+  });
+
+  it("lets the hero outrun a rider, just", () => {
+    expect(GRUNTS.rider.speed).toBeLessThan(RUN);
+    expect(GRUNTS.rider.speed).toBeGreaterThan(RUN * 0.85);
+  });
+
+  it("knocks a rider off for good rather than letting it get back up", () => {
+    const g = makeGrunt(1, "rider", 0, 0);
+    g.hp = 1;
+    expect(strikeGrunt(g, 1, 0, -1)).toBe("dead");
+    expect(BODY_R.rider).toBeGreaterThan(BODY_R.bandit);
   });
 });

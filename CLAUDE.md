@@ -188,7 +188,7 @@ Its `ad-` class names, its `ad:` storage keys and its `<style>` blocks stayed as
 
 ## Battle of the Gods
 
-`src/gods/` is a third-person 3D game in three.js: walk out of a city, past bandit camps on the road, into a colosseum where a Greek god waits.
+`src/gods/` is a third-person 3D game in three.js: walk out of a city, past soldiers' camps on the road, into a colosseum where a Greek god waits.
 Beating the god wins that god's armour; the blacksmith in town sells bronze pieces for the coins the road pays.
 It was designed by two children, and the answers they gave are the spec: Ares first, sword and shield, armour bought in town plus a god's own kit for winning, a Breath of the Wild look, phone first, tablet second, computer last.
 It shares nothing with Blockpocalypse's code, only the library, and nothing with the rest of the playground but `createMenu` and the page furniture.
@@ -200,7 +200,7 @@ Static scenery goes through `batch.ts`, merged into one mesh per colour for the 
 The rules live in modules with no three.js in them, and are what the tests cover: `hero.ts`, `grunts.ts`, `ares.ts`, `armor.ts` (guard, prices, the shield's arc), `world.ts` (layout and collision), `follow.ts` (camera-relative stick, auto-turn, lock-on), `save.ts`.
 Headings follow three.js: yaw 0 faces +z, forward is `(sin yaw, cos yaw)`, and `bearing.ts` is the arithmetic; the road runs north toward -z.
 
-The map is big on purpose: the kids asked for a long walk between colosseums, so each god sits 600-700 m from the city, with a `HAMLETS` village (houses, a well, a stall; it heals and restocks like the city) halfway along each old route and bandit `CAMPS` every 70 m.
+The map is big on purpose: the kids asked for a long walk between colosseums, so each god sits 600-700 m from the city, with a `HAMLETS` village (houses, a well, a stall; it heals and restocks like the city) halfway along each old route and soldiers' `CAMPS` every 70 m.
 Each hamlet has a merchant behind its stall (`MERCHANTS`): the baker, the potion seller and the village's fishmonger sell food and potions that go into the `pantry.ts` bar along the bottom of the screen (up to `MAX_EACH` of each, tapped or keys 1–4 to use), a weaponsmith sells the Bronze Spear and Iron Sword (`WEAPON_PRICES`), and an armourer runs the blacksmith's own counter.
 The open land rolls into hills you can walk over (`terrain.ts`): `heightAt` is level wherever something stands, and `groundY` reads it off the ground mesh's own 8 m grid, so feet, trees, grass and coins all sit on what is drawn.
 There are no roads: the kids took them away, so the walkable world is one `OPEN` box of countryside. Nothing points the way until it is bought: the cartographer on the city's plaza sells a compass and a map, kept in the save.
@@ -210,7 +210,9 @@ Scenery tiles wholly inside the fog, and people past `PEOPLE_FAR`, are not drawn
 
 Ares is beaten by not standing in front of him: his shield rings off frontal blows while he is on guard, and the opening is the charge — sidestep it and he runs into the wall and is dazed.
 He calls in Spartans at each line in `SUMMON_AT`.
-A bandit knocked flat gets back up unless struck again while down; the camps restock whenever the hero is in the city, which also heals.
+The camps are manned by Ares's own Spartans, dressed as the ones he calls in but fighting as the old bandits did (the `bandit` kind): a soldier knocked flat gets back up unless struck again while down. Every camp past the first on a route keeps a `rider`, built on `horse.ts`'s horse; a rider is a little slower than the hero's run, and goes down for good with its horse.
+Each camp pitches two tents and a weapon rack on the side away from the old route, so the straight walks `world.test.ts` pins stay open, and a chest at each tent's mouth (`chestOf`) is opened with the interact button for whatever `loot.ts` rolls: coins always, sometimes food, now and then a merchant's weapon the hero lacks.
+The camps restock, and their chests shut and refill, whenever the hero is in the city, which also heals.
 
 The road forks just past the city: north to Ares, east to a fishing village on the coast with Poseidon's colosseum at its heart.
 The walkable world is `REGIONS` in `world.ts` — the meadow, the road east, the village and the piers — and everything past them is hills or sea, so a new place to go is a new box there.
